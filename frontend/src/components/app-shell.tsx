@@ -41,6 +41,7 @@ import { hasFeature, useLicense } from '@/features/license/api'
 import { LICENSE_TAB, LicenseBanner, ProBadge } from '@/features/license/pro-gate'
 import { describePlan } from '@/features/license/describe-plan'
 import { useTour } from '@/features/tutorial/use-tour'
+import { UpdateBadge } from '@/features/updates/update-badge'
 import { useIdleLock } from '@/hooks/use-idle-lock'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
@@ -244,6 +245,7 @@ export function AppShell() {
             <kbd className="hidden rounded border bg-background px-1.5 text-[10px] font-medium sm:inline">Ctrl K</kbd>
           </button>
           <div className="ml-auto flex items-center gap-1">
+            <UpdateBadge />
             <Button variant="ghost" size="icon" onClick={tour.start} aria-label="Ver tutorial" title="Ver tutorial">
               <CircleHelp />
             </Button>

@@ -23,7 +23,7 @@ import {
 } from './api'
 import { describePlan } from './describe-plan'
 import { ProBadge } from './pro-gate'
-import { CheckoutDialog, type CheckoutRef, SubscribeCard } from './subscribe-card'
+import { CheckoutDialog, type CheckoutRef, SubscribeCard, SubscriptionCard } from './subscribe-card'
 
 function PlanSummary({ info }: { info: LicenseInfo }) {
   const { title, detail } = describePlan(info)
@@ -107,6 +107,7 @@ export function LicenseSection() {
       </SettingsCard>
 
       {info.server_configured && (!info.valid || info.plan === 'trial') && <SubscribeCard proLabel={info.pro_label} onStarted={setCheckout} />}
+      {info.server_configured && info.valid && info.plan === 'pro' && !info.perpetual && <SubscriptionCard />}
 
       {!(info.valid && info.perpetual) && (
         <SettingsCard

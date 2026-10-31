@@ -92,10 +92,30 @@ def wait_ready(port: int, timeout: float = 30) -> bool:
     return False
 
 
+_running_mutex = None  # kept open for the whole process lifetime
+
+
+def hold_running_mutex() -> None:
+    """Named mutex that exists while any copy of the app runs. The installer's update mode waits
+    for it to disappear before replacing files (Windows' Restart Manager can't always close us
+    without admin rights). Released by Windows when the process ends."""
+    global _running_mutex
+    if sys.platform != "win32":
+        return
+    try:
+        import ctypes
+
+        _running_mutex = ctypes.windll.kernel32.CreateMutexW(None, False, f"{APP_ID}-app-running")
+    except Exception:
+        log.exception("Could not create the app mutex")
+
+
 def main() -> None:
     import webview
 
     from app import config
+
+    hold_running_mutex()
 
     port, running = pick_port()
     config.PORT = port  # so LAN URL / QR show the real port
@@ -128,8 +148,25 @@ def main() -> None:
         js_api=api,
     )
     api._attach(window)
+    if not running:
+        # In-app update: once the installer is running, close cleanly so it can replace our files
+        # (the installer reopens the app when it's done).
+        from app.services import updates
+
+        updates.set_exit_handler(lambda: quit_app(window))
     webview.start(private_mode=False, storage_path=str(DATA_DIR / "webview"))
     os._exit(0)
+
+
+def quit_app(window) -> None:
+    """Closes the window (ends webview.start → os._exit) and makes sure the process goes away."""
+    log.info("Closing for an update")
+    threading.Timer(5.0, lambda: os._exit(0)).start()  # fallback if the window doesn't close
+    try:
+        window.destroy()
+    except Exception:
+        log.exception("Could not close the window")
+        os._exit(0)
 
 
 if __name__ == "__main__":

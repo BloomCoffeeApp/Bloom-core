@@ -96,11 +96,46 @@ npm run e2e:ui       # modo interactivo de Playwright
 ./build/build.ps1
 ```
 
-Genera `build/output/Bloom/Bloom.exe` y, si tenés [Inno Setup 6](https://jrsoftware.org/isinfo.php),
-un instalador en `build/output/installer/`.
+Genera `build/output/Bloom/Bloom.exe` y, si tenés [Inno Setup 6](https://jrsoftware.org/isinfo.php)
+(`winget install --id JRSoftware.InnoSetup -e --scope user`), el instalador
+`build/output/installer/Bloom-Setup-<versión>.exe` y su manifiesto de actualización `latest.json`.
+
+El instalador es **por usuario** (sin permisos de administrador): instala en
+`%LOCALAPPDATA%\Programs\Bloom`, crea accesos en el menú Inicio (y opcionalmente en el escritorio)
+y se desinstala desde *Configuración de Windows → Aplicaciones*. Como no pide permisos, no agrega reglas
+de firewall: la primera vez que actives el modo red, Windows pregunta si permitís el acceso (elegí *Permitir*).
 
 Los datos se guardan en `%APPDATA%\Bloom` (base `data.db`, respaldos diarios y log).
 Desinstalar la app **no** borra los datos. Al actualizar, la base se migra sola (con un respaldo previo).
+
+### Actualizaciones automáticas
+
+La app busca versiones nuevas un rato después de abrirse y cada 6 horas, en la dirección de
+`updateManifest` de `brand.json` (vacío = desactivado). Si hay una, el administrador la ve en
+*Configuración → Acerca de* (y un aviso en la barra superior); con *Actualizar ahora* la app descarga el
+instalador, lo verifica, hace un respaldo y se cierra; el instalador corre en silencio y la vuelve a abrir.
+
+El manifiesto (`latest.json`) tiene `version`, `url`, `sha256`, `size`, `notes`, `published_at` y
+`signature`: una firma Ed25519 de los demás campos hecha con la clave privada del distribuidor (la misma que
+firma las licencias; la app trae solo la clave pública). La app **ignora** manifiestos sin firma o con firma
+inválida, versiones iguales o anteriores a la instalada, direcciones que no sean `https` y descargas cuyo
+tamaño o `sha256` no coincidan. Sin internet no pasa nada: solo se muestra un aviso.
+
+### Publicar una versión
+
+1. Subí `version` en `brand.json` (es la única fuente: la usan la app, el instalador y el manifiesto).
+2. `./build/build.ps1` → `build/output/installer/Bloom-Setup-<versión>.exe` y `latest.json` **sin firmar**.
+   Con `updateManifest = https://github.com/<usuario>/<repo>/releases/latest/download/latest.json`,
+   la `url` del instalador apunta a `.../releases/download/v<versión>/Bloom-Setup-<versión>.exe`.
+3. Firmá `latest.json` con la clave del distribuidor (completa `sha256`, `size` y `signature`). Si armás
+   tu propia distribución, generá tu par de claves y reemplazá `backend/app/licensing/public_key.txt`.
+4. Publicá el release con los dos archivos:
+   ```powershell
+   gh release create v<versión> build/output/installer/Bloom-Setup-<versión>.exe build/output/installer/latest.json --title "Bloom <versión>" --notes "Novedades..."
+   ```
+   `releases/latest/download/latest.json` siempre apunta al último release, así que las instalaciones
+   existentes lo ven en su próxima búsqueda. Para probar sin publicar: `BLOOM_UPDATE_MANIFEST=<url>`
+   (solo funciona corriendo desde el código, nunca en el `.exe`).
 
 ## Cambiar el nombre, colores o puerto
 
@@ -113,6 +148,8 @@ Todo sale de [`brand.json`](brand.json) en la raíz:
 | `appId` | Identificador interno (el launcher lo usa para reconocer su propio servidor) |
 | `port` | Puerto local del servidor (si está ocupado por otra app, el `.exe` usa el siguiente libre) |
 | `colors` | Colores del logo e ícono |
+| `version` | Versión de la app (instalador, *Acerca de*, actualizaciones) |
+| `updateManifest` | Dirección `https` del `latest.json` de actualizaciones (vacío = sin actualizaciones automáticas) |
 
 El ícono del `.exe` se regenera solo en `build/build.ps1` (`build/make_icon.py`); el logo de la app es `frontend/public/logo.svg` y `src/components/logo.tsx`.
 

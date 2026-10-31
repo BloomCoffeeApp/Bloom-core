@@ -90,6 +90,7 @@ class CashSessionOut(BaseModel):
     voided_total_cents: int
     courtesy_count: int = 0
     courtesy_cents: int = 0
+    courtesy_cost_cents: int = 0
     discounts_cents: int
     movements_in_cents: int
     movements_out_cents: int

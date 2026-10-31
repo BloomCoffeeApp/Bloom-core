@@ -42,7 +42,9 @@ function CurrentSession({ s }: { s: CashSession }) {
           hint={
             [
               s.voided_count ? `${s.voided_count} anuladas` : '',
-              s.courtesy_count ? `Cortesías: ${s.courtesy_count} (${fmtMoney(s.courtesy_cents)} a precio de carta)` : '',
+              s.courtesy_count
+                ? `Cortesías: ${s.courtesy_count} (${fmtMoney(s.courtesy_cents)} a precio de carta, costo ${fmtMoney(s.courtesy_cost_cents)})`
+                : '',
             ]
               .filter(Boolean)
               .join(' · ') || undefined

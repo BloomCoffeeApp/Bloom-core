@@ -10,6 +10,7 @@ from app.licensing import client as license_client
 from app.licensing.features import PRO_LABEL
 from app.licensing.status import store_token
 from app.models import User
+from app.services import audit
 from app.services import settings as settings_svc
 
 router = APIRouter(prefix="/api/license", tags=["license"])
@@ -108,4 +109,23 @@ def checkout_status(checkout_id: str, _: User = AdminOnly) -> dict:
         raise HTTPException(400, str(e)) from e
     if result.get("license"):
         result["license"] = _out()  # same shape as GET /api/license (the UI caches it as such)
+    return result
+
+
+@router.get("/subscription")
+def subscription(_: User = AdminOnly) -> dict:
+    try:
+        return license_client.subscription()
+    except license_client.LicenseServerError as e:
+        raise HTTPException(400, str(e)) from e
+
+
+@router.post("/subscription/cancel")
+def cancel_subscription(me: User = AdminOnly, db: Session = Depends(get_db)) -> dict:
+    try:
+        result = license_client.cancel_subscription()
+    except license_client.LicenseServerError as e:
+        raise HTTPException(400, str(e)) from e
+    audit.log(db, me.id, "cancel", "subscription", None, {"code": result.get("cancellation_code")})
+    db.commit()
     return result

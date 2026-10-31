@@ -3,17 +3,18 @@ import os
 import sys
 from pathlib import Path
 
-APP_VERSION = "1.0.0"
-
 FROZEN = getattr(sys, "frozen", False)
 BASE_DIR = Path(sys._MEIPASS) if FROZEN else Path(__file__).resolve().parents[2]  # type: ignore[attr-defined]
 
-# Branding lives in /brand.json (single source of truth for name, port, colors).
-_BRAND_DEFAULTS = {"name": "Bloom", "appId": "bloom-cafe", "dataDirName": "Bloom", "port": 47821}
+# Branding lives in /brand.json (single source of truth for name, port, colors and the app
+# version, which build/build.ps1 also reads for the installer and the update manifest).
+_BRAND_DEFAULTS = {"name": "Bloom", "appId": "bloom-cafe", "dataDirName": "Bloom", "port": 47821, "version": "0.0.0"}
 try:
     BRAND: dict = {**_BRAND_DEFAULTS, **json.loads((BASE_DIR / "brand.json").read_text(encoding="utf-8"))}
 except (OSError, ValueError):
     BRAND = dict(_BRAND_DEFAULTS)
+
+APP_VERSION: str = str(BRAND["version"])
 
 APP_NAME = BRAND["dataDirName"]
 APP_DISPLAY_NAME = BRAND["name"]

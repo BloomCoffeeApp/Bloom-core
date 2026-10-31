@@ -165,6 +165,29 @@ def checkout_status(checkout_id: str) -> dict:
     return out
 
 
+def _token_body() -> dict:
+    try:
+        token = token_path().read_text(encoding="utf-8").strip()
+    except OSError as e:
+        raise LicenseServerError("Esta computadora no tiene una licencia activa.") from e
+    return {"token": token, "machine_id": machine_id()}
+
+
+def subscription() -> dict:
+    """The automatic-charge subscription behind this license (plan, status, paid date)."""
+    return _post("/v1/subscription", _token_body())
+
+
+def cancel_subscription() -> dict:
+    """'Botón de baja': stops future charges; the time already paid keeps working."""
+    resp = _post("/v1/subscription/cancel", _token_body())
+    try:  # the paid date doesn't change, but keep the local token fresh
+        refresh()
+    except LicenseServerError as e:
+        log.info("Refresh after cancelling skipped: %s", e)
+    return resp
+
+
 PENDING_CHECKOUT_DAYS = 7
 
 

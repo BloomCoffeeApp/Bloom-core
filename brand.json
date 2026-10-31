@@ -2,6 +2,8 @@
   "name": "Bloom",
   "tagline": "Gestión para cafeterías",
   "description": "Punto de venta, stock, compras, clientes y asistente de barista para cafeterías.",
+  "version": "1.0.0",
+  "updateManifest": "",
   "appId": "bloom-cafe",
   "exeName": "Bloom",
   "dataDirName": "Bloom",

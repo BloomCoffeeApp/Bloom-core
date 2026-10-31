@@ -87,9 +87,10 @@ def _live_totals(db: Session, session_id: int) -> dict[str, Any]:
         select(func.count(Sale.id), func.coalesce(func.sum(Sale.total_cents), 0), func.coalesce(func.sum(Sale.discount_cents), 0))
         .where(Sale.cash_session_id == session_id, Sale.status == "completed", Sale.is_courtesy.is_(False))
     ).one()
-    # Courtesies add $0 to the drawer (no payments); shown apart with the menu value given away.
+    # Courtesies add $0 to the drawer (no payments); shown apart with the menu value given away
+    # and what they cost us (ingredients at the time of the sale): that's the real loss.
     courtesy_row = db.execute(
-        select(func.count(Sale.id), func.coalesce(func.sum(Sale.courtesy_cents), 0))
+        select(func.count(Sale.id), func.coalesce(func.sum(Sale.courtesy_cents), 0), func.coalesce(func.sum(Sale.cost_cents), 0))
         .where(Sale.cash_session_id == session_id, Sale.status == "completed", Sale.is_courtesy.is_(True))
     ).one()
     void_row = db.execute(
@@ -110,6 +111,7 @@ def _live_totals(db: Session, session_id: int) -> dict[str, Any]:
         "voided_total": int(void_row[1]),
         "courtesy_count": int(courtesy_row[0]),
         "courtesy_cents": int(courtesy_row[1]),
+        "courtesy_cost": int(courtesy_row[2]),
         "movements": movements,
         "mv_in": mv_in,
         "mv_out": mv_out,
@@ -180,6 +182,7 @@ def session_summary(db: Session, s: CashSession, *, detail: bool = False) -> dic
         "voided_total_cents": totals["voided_total"],
         "courtesy_count": totals["courtesy_count"],
         "courtesy_cents": totals["courtesy_cents"],
+        "courtesy_cost_cents": totals["courtesy_cost"],
         "discounts_cents": totals["discounts"],
         "movements_in_cents": totals["mv_in"],
         "movements_out_cents": totals["mv_out"],

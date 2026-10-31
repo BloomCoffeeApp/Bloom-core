@@ -9,6 +9,7 @@ from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 from app.licensing import status as lic_status
 from app.licensing import token as lic_token
 from app.licensing.machine import machine_id
+from tests.conftest import login
 
 DAY = 86_400
 
@@ -213,3 +214,31 @@ def test_bad_token_from_server_never_replaces_a_working_license(seeded, signer, 
     with pytest.raises(lc.LicenseServerError):
         lc.activate("BLOOM-XXXXX")
     assert st.current_status(force=True).valid
+
+
+def test_cancel_subscription_from_the_app(seeded, monkeypatch):
+    """'Botón de baja': admin-only, sends this PC's license, keeps the license, audits the code."""
+    from app.licensing import client as lc
+
+    client, h = seeded
+    calls = []
+
+    def fake_post(path, body):
+        calls.append((path, body))
+        if path == "/v1/refresh":
+            raise lc.LicenseServerError("offline")
+        cancelled = path.endswith("/cancel")
+        return {"has_subscription": True, "status": "cancelled" if cancelled else "authorized", "plan_label": "Pro mensual",
+                "amount_cents": 1000000, "days": 30, "paid_through": "2026-12-01T00:00:00",
+                "cancellation_code": "BAJA-1234ABCD" if cancelled else None}
+
+    monkeypatch.setattr(lc, "_post", fake_post)
+    assert client.get("/api/license/subscription", headers=h).json()["status"] == "authorized"
+    r = client.post("/api/license/subscription/cancel", headers=h)
+    assert r.status_code == 200 and r.json()["cancellation_code"] == "BAJA-1234ABCD"
+    assert calls[1][0] == "/v1/subscription/cancel" and calls[1][1]["token"] and calls[1][1]["machine_id"]
+    assert client.get("/api/license", headers=h).json()["valid"]  # paid time keeps working
+    audit = client.get("/api/system/audit", headers=h).json()
+    assert any(a["action"] == "cancel" and a["entity"] == "subscription" for a in audit)
+    cashier = login(client, "Caja Demo", "1111")
+    assert client.post("/api/license/subscription/cancel", headers=cashier).status_code == 403

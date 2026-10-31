@@ -40,6 +40,7 @@ import { LanHelp } from './lan-help'
 import type { BackupRow, BackupSettings, PaymentMethod, RestoreResult } from './types'
 import { Logo } from '@/components/logo'
 import { useHasFeature } from '@/features/license/api'
+import { UpdatesPanel } from '@/features/updates/updates-panel'
 import { BRAND } from '@/lib/brand'
 
 function fmtBytes(n: number | null | undefined) {
@@ -55,6 +56,7 @@ const LABEL: Record<string, { text: string; variant: 'default' | 'secondary' | '
   auto: { text: 'Automático', variant: 'secondary' },
   'pre-restore': { text: 'Antes de restaurar', variant: 'outline' },
   'pre-migracion': { text: 'Antes de actualizar', variant: 'outline' },
+  'pre-update': { text: 'Antes de actualizar', variant: 'outline' },
 }
 
 export function BackupSection({ settings }: { settings: BackupSettings }) {
@@ -346,6 +348,7 @@ export function AboutSection({ isAdmin }: { isAdmin: boolean }) {
         </div>
         {info.data && <Badge variant="secondary">Versión {info.data.version}</Badge>}
       </div>
+      {isAdmin && <UpdatesPanel />}
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="flex items-start gap-3 rounded-xl border p-4">
           <Scale className="mt-0.5 size-5 text-muted-foreground" />
@@ -358,7 +361,7 @@ export function AboutSection({ isAdmin }: { isAdmin: boolean }) {
           <ExternalLink className="mt-0.5 size-5 text-muted-foreground" />
           <div className="text-sm">
             <p className="font-medium">Tus datos son tuyos</p>
-            <p className="text-muted-foreground">Todo se guarda en esta computadora. No se envía nada a internet.</p>
+            <p className="text-muted-foreground">Todo se guarda en esta computadora. Tus datos nunca se envían a internet.</p>
           </div>
         </div>
       </div>

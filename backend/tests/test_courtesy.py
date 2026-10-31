@@ -162,3 +162,19 @@ def test_pro_revenue_reports_exclude_courtesy(seeded, db):
     before = snap()
     assert client.post("/api/sales", json=_courtesy(db, qty=5), headers=admin).status_code == 200
     assert snap() == before
+
+
+def test_courtesy_cost_is_reported_as_a_loss(seeded, db):
+    """Giving something away costs its ingredients: shown in the Z and (Pro) in the losses report."""
+    client, admin = seeded
+    sale = client.post("/api/sales", json=_courtesy(db, qty=2), headers=admin).json()
+    db.expire_all()
+    cost = db.get(Sale, sale["id"]).cost_cents
+    assert cost > 0
+    cur = client.get("/api/cash/current", headers=admin).json()
+    assert cur["courtesy_cost_cents"] >= cost and cur["courtesy_cents"] >= 2 * LATTE
+    if bloom_pro:
+        today = local_today().isoformat()
+        w = client.get("/api/reports/waste", params={"from": today, "to": today}, headers=admin).json()["totals"]
+        assert w["courtesy"]["count"] >= 1 and w["courtesy"]["cost_cents"] >= cost
+        assert w["loss_cents"] == w["value_cents"] + w["courtesy"]["cost_cents"]

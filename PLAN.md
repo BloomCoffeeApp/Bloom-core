@@ -393,6 +393,8 @@ Cada fase termina con: tests pasando, app levantando sin errores de consola, com
 
 - **Ventana sin marco** (`desktop_window.py`): la barra de título la dibuja la app (header + `components/window-controls.tsx`). Arrastrar usa el loop nativo de Windows (`WM_NCLBUTTONDOWN`/HTCAPTION); redimensionar desde los bordes lo hace Python siguiendo el cursor (Windows no redimensiona ventanas sin `WS_THICKFRAME`). Posición/tamaño/maximizado se guardan en `window.json` (píxeles físicos). En navegador/tablet no aparece nada de esto.
 
+- **Instalador por usuario + actualizaciones** (`build/installer.iss`, `app/services/updates.py`): Inno Setup sin UAC en `%LOCALAPPDATA%\Programs\<name>` (sin regla de firewall: Windows pregunta al activar el modo red). La versión vive solo en `brand.json`. La app lee `brand.json → updateManifest` (`latest.json`, p. ej. el último release de GitHub), firmado con Ed25519 con la clave de licencias sobre `BLOOM-UPDATE1\n` + JSON canónico (el prefijo evita confundirlo con un token de licencia); se rechazan firmas inválidas, versiones no más nuevas, URLs no https y descargas con otro `sha256`/tamaño. Instalar = respaldo `pre-update` → instalador `/SILENT /UPDATE=1` → la app se cierra (handler del launcher); el instalador espera el mutex `<appId>-app-running` (el Restart Manager sin admin no siempre puede cerrar la app) y la vuelve a abrir. Desde el código fuente no se ejecuta el instalador.
+
 ## 10. Preguntas abiertas para el dueño
 - ¿Cuántas PCs/cajas? ¿Se usará tablet en la barra? (define si “modo red local” es prioridad).
 - ¿Hace falta facturación electrónica desde el día 1 o alcanza con ticket no fiscal?

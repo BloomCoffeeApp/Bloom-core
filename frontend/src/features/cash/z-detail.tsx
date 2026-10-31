@@ -60,6 +60,7 @@ export function ZDetailSheet({ id, onOpenChange }: { id: number | null; onOpenCh
               <Row label="Descuentos" value={fmtMoney(s.discounts_cents)} />
               <Row label={`Anulaciones (${s.voided_count})`} value={fmtMoney(s.voided_total_cents)} />
               <Row label={`Cortesías (${s.courtesy_count})`} value={`${fmtMoney(s.courtesy_cents)} a precio de carta`} />
+              {s.courtesy_count > 0 && <Row label="Pérdida por cortesías (costo)" value={`−${fmtMoney(s.courtesy_cost_cents)}`} />}
               <Row label="Ingresos / egresos" value={`${fmtMoney(s.movements_in_cents)} / −${fmtMoney(s.movements_out_cents)}`} />
               <Separator className="my-2" />
               <Row label="Ventas" value={fmtMoney(s.sales_total_cents)} strong />

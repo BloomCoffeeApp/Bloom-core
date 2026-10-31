@@ -145,3 +145,39 @@ export function useCheckoutStatus(checkoutId: string | null) {
     retry: true,
   })
 }
+
+// ---- the automatic-charge subscription behind this license (cancel = "botón de baja")
+
+export interface SubscriptionInfo {
+  has_subscription: boolean
+  status?: 'pending' | 'authorized' | 'paused' | 'cancelled'
+  plan_label?: string
+  amount_cents?: number | null
+  days?: number | null
+  paid_through: string | null
+  cancellation_code?: string | null
+}
+
+const subscriptionKey = ['license', 'subscription'] as const
+
+export function useSubscription(enabled: boolean) {
+  return useQuery({
+    queryKey: subscriptionKey,
+    queryFn: () => api.get<SubscriptionInfo>('/license/subscription'),
+    enabled,
+    retry: false,
+    staleTime: 5 * 60_000,
+  })
+}
+
+export function useCancelSubscription() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => api.post<SubscriptionInfo>('/license/subscription/cancel'),
+    onSuccess: (s) => {
+      qc.setQueryData(subscriptionKey, s)
+      void qc.invalidateQueries({ queryKey: licenseKey })
+    },
+    onError: (e: Error) => toast.error(e.message),
+  })
+}

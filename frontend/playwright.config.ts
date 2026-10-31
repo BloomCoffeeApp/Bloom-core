@@ -5,7 +5,7 @@ import path from 'node:path'
 
 import { defineConfig, devices } from '@playwright/test'
 
-import { ADMIN_STATE, API_PORT, E2E_MACHINE, WEB_PORT } from './e2e/constants'
+import { ADMIN_STATE, API_PORT, E2E_MACHINE, MANIFEST_PORT, WEB_PORT } from './e2e/constants'
 
 /**
  * End-to-end suite: starts an ISOLATED stack (own backend port, own fresh SQLite DB in a temp
@@ -107,6 +107,8 @@ export default defineConfig({
         BLOOM_LICENSE_PUBLIC_KEY: process.env.BLOOM_E2E_LICENSE_PUB!,
         BLOOM_MACHINE_ID: E2E_MACHINE,
         BLOOM_LICENSE_SERVER: '',
+        // Update checks go to updates.spec.ts' local manifest server (nothing listens otherwise = offline).
+        BLOOM_UPDATE_MANIFEST: `http://127.0.0.1:${MANIFEST_PORT}/latest.json`,
       },
       reuseExistingServer: false,
       timeout: 120_000,

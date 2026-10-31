@@ -237,7 +237,8 @@ test.describe('POS', () => {
     expect(cur.sales_total_cents).toBe(before.sales_total_cents)
     expect(cur.tickets).toBe(before.tickets)
     expect(cur.courtesy_count).toBe(before.courtesy_count + 1)
-    const line = `Cortesías: ${cur.courtesy_count} (${money(cur.courtesy_cents)} a precio de carta)`
+    expect(cur.courtesy_cost_cents).toBeGreaterThan(0)
+    const line = `Cortesías: ${cur.courtesy_count} (${money(cur.courtesy_cents)} a precio de carta, costo ${money(cur.courtesy_cost_cents)})`
     await page.goto('/caja')
     await expect(statCard(page, 'Ventas del turno')).toContainText(line)
 
@@ -250,6 +251,8 @@ test.describe('POS', () => {
     const z = page.getByRole('dialog', { name: /Cierre de caja #\d+/ })
     const zLine = z.getByText(`Cortesías (${cur.courtesy_count})`).locator('..')
     await expect(zLine).toContainText(`${money(cur.courtesy_cents)} a precio de carta`)
+    // What they cost is shown as a loss.
+    await expect(z.getByText('Pérdida por cortesías (costo)').locator('..')).toContainText(`−${money(cur.courtesy_cost_cents)}`)
     await expect(z.getByText('Ventas', { exact: true }).locator('..')).toContainText(money(cur.sales_total_cents))
     expect(errors.consoleErrors).toEqual([])
   })

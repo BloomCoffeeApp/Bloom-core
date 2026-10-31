@@ -268,7 +268,8 @@ export function CloseCashDialog({
         {session.courtesy_count > 0 && (
           <p className="rounded-xl bg-primary/10 px-4 py-2.5 text-sm" data-testid="close-courtesy">
             <span className="font-medium">
-              Cortesías: {session.courtesy_count} ({fmtMoney(session.courtesy_cents)} a precio de carta)
+              Cortesías: {session.courtesy_count} ({fmtMoney(session.courtesy_cents)} a precio de carta, costo{' '}
+              {fmtMoney(session.courtesy_cost_cents)})
             </span>
             <span className="text-muted-foreground"> · no se cobraron, no suman al esperado.</span>
           </p>

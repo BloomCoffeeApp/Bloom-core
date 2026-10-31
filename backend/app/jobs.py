@@ -1,11 +1,19 @@
-"""Background periodic jobs (alerts evaluation, daily backup) in a daemon thread."""
+"""Background periodic jobs (alerts evaluation, daily backup, update check) in daemon threads."""
 
 import logging
 import threading
+from collections.abc import Callable
 
 log = logging.getLogger("cafeteria.jobs")
 _stop = threading.Event()
 INTERVAL_S = 300
+_extra: list[Callable[[], None]] = []
+
+
+def register(fn: Callable[[], None]) -> None:
+    """Extra periodic job (e.g. from the Pro modules). Idempotent; failures are logged, never raised."""
+    if fn not in _extra:
+        _extra.append(fn)
 
 
 def run_once() -> None:
@@ -33,6 +41,11 @@ def run_once() -> None:
             backup.daily_backup_if_needed(keep=int(cfg.get("keep", 30)))
         except Exception:
             log.exception("daily backup failed")
+    for fn in list(_extra):
+        try:
+            fn()
+        except Exception:
+            log.exception("job %s failed", getattr(fn, "__qualname__", fn))
 
 
 def _loop() -> None:
@@ -41,9 +54,25 @@ def _loop() -> None:
         _stop.wait(INTERVAL_S)
 
 
+def _updates_loop() -> None:
+    """Looks for a new version a little after startup and then every few hours. Offline is fine."""
+    from app.services import updates
+
+    if _stop.wait(updates.STARTUP_DELAY_S):
+        return
+    while not _stop.is_set():
+        try:
+            if updates.manifest_url():
+                updates.check_if_due()
+        except Exception:
+            log.exception("update check failed")
+        _stop.wait(INTERVAL_S)
+
+
 def start_jobs() -> None:
     _stop.clear()
     threading.Thread(target=_loop, name="cafe-jobs", daemon=True).start()
+    threading.Thread(target=_updates_loop, name="cafe-updates", daemon=True).start()
 
 
 def stop_jobs() -> None:

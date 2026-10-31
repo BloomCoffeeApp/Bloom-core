@@ -1,7 +1,8 @@
-import { CircleCheckBig, Copy, ExternalLink, Loader2, Monitor, Repeat, ShieldCheck } from 'lucide-react'
+import { CircleCheckBig, CircleSlash, Copy, ExternalLink, Loader2, Monitor, Repeat, ShieldCheck } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 
+import { ConfirmDialog } from '@/components/confirm-dialog'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -14,11 +15,11 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
-import { fmtMoney } from '@/lib/format'
+import { fmtDate, fmtMoney } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 import { SettingsCard } from '../settings/form'
-import { type Plan, useCheckoutStatus, usePlans, useStartCheckout } from './api'
+import { type Plan, useCancelSubscription, useCheckoutStatus, usePlans, useStartCheckout, useSubscription } from './api'
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
 
@@ -193,5 +194,78 @@ export function CheckoutDialog({ checkout, onClose }: { checkout: CheckoutRef; o
         )}
       </DialogContent>
     </Dialog>
+  )
+}
+
+/** The subscription behind a paid license, with a visible way to cancel it ("botón de baja"). */
+export function SubscriptionCard() {
+  const sub = useSubscription(true)
+  const cancel = useCancelSubscription()
+  const [confirm, setConfirm] = useState(false)
+  if (sub.isLoading) return <Skeleton className="h-32 rounded-2xl" />
+  if (sub.isError)
+    return (
+      <SettingsCard title="Tu suscripción" description="No pudimos consultar tu suscripción ahora.">
+        <p className="text-sm text-muted-foreground">
+          {sub.error.message} También podés cancelarla desde tu cuenta de Mercado Pago (Suscripciones).
+        </p>
+      </SettingsCard>
+    )
+  const s = sub.data
+  if (!s?.has_subscription) return null
+  const until = fmtDate(s.paid_through)
+  const cancelled = s.status === 'cancelled'
+  const every = s.days && s.days >= 365 ? 'por año' : 'por mes'
+  return (
+    <SettingsCard
+      title="Tu suscripción"
+      description={cancelled ? 'Cancelada: no se te va a volver a cobrar.' : 'Se cobra sola con tu tarjeta en Mercado Pago.'}
+    >
+      <div className="grid gap-1 text-sm">
+        <p>
+          <b>{s.plan_label}</b>
+          {s.amount_cents != null && (
+            <>
+              {' '}
+              · <span className="tabular">{fmtMoney(s.amount_cents)}</span> {every}
+            </>
+          )}
+        </p>
+        <p className="text-muted-foreground">
+          {cancelled ? `Pro sigue activo hasta el ${until}, que ya está pago.` : `Pagado hasta el ${until}; después se renueva sola.`}
+        </p>
+      </div>
+      {cancelled ? (
+        <p className="flex items-start gap-2 rounded-xl border bg-muted/40 p-3 text-sm" data-testid="cancellation-code">
+          <CircleSlash className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+          <span>
+            Código de baja: <b className="font-mono">{s.cancellation_code}</b>. Te lo mandamos también por mail. Si
+            querés volver, suscribite de nuevo cuando quieras.
+          </span>
+        </p>
+      ) : (
+        <div>
+          <Button variant="outline" className="h-11 text-destructive hover:text-destructive" onClick={() => setConfirm(true)}>
+            <CircleSlash /> Cancelar suscripción
+          </Button>
+        </div>
+      )}
+      <ConfirmDialog
+        open={confirm}
+        onOpenChange={setConfirm}
+        title="¿Cancelar la suscripción?"
+        description={`No se van a hacer más débitos. Lo que ya pagaste sigue funcionando hasta el ${until}; después la app vuelve al plan gratuito sin perder tus datos.`}
+        confirmLabel="Sí, cancelar"
+        destructive
+        onConfirm={() =>
+          cancel.mutate(undefined, {
+            onSuccess: (r) => {
+              setConfirm(false)
+              toast.success(`Suscripción cancelada. Código de baja: ${r.cancellation_code}`)
+            },
+          })
+        }
+      />
+    </SettingsCard>
   )
 }
