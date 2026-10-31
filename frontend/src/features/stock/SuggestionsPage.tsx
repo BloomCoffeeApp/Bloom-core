@@ -11,6 +11,7 @@ import { useAuth } from '@/lib/auth'
 import { fmtMoney, fmtNumber, fmtQty } from '@/lib/format'
 
 import { useHasFeature } from '@/features/license/api'
+import { proModules } from '@pro'
 
 import { useCreateOrderFromSuggestions } from './purchasing'
 import { useSuggestions } from './api'
@@ -20,7 +21,8 @@ export function SuggestionsPage() {
   const { data, isLoading } = useSuggestions()
   const { can } = useAuth()
   const createOrder = useCreateOrderFromSuggestions()
-  const purchasesPro = useHasFeature('purchases')
+  // The Compras module must be in this build (Pro edition) and licensed.
+  const purchasesPro = useHasFeature('purchases') && !!proModules.Purchases
   const navigate = useNavigate()
   const total = data?.reduce((a, g) => a + g.total_est_cents, 0) ?? 0
 

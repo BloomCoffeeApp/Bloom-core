@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 
 import { useHasFeature } from '@/features/license/api'
 import { api } from '@/lib/api'
+import { proModules } from '@pro'
 
 /** What Stock needs from the Compras (Pro) module; inert when it isn't licensed. */
 export interface SupplierLite {
@@ -12,7 +13,9 @@ export interface SupplierLite {
 }
 
 export function useSuppliersLite(enabled = true) {
-  const pro = useHasFeature('purchases')
+  // Only when the Compras module is in this build (Pro edition) and licensed.
+  const licensed = useHasFeature('purchases')
+  const pro = !!proModules.Purchases && licensed
   return useQuery({
     // Same key as the Compras module, so both stay in sync.
     queryKey: ['purchases', 'suppliers', false],

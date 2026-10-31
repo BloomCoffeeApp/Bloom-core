@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react'
 
 import { StatCard } from '@/components/stat-card'
 import { useHasFeature } from '@/features/license/api'
+import { proModules } from '@pro'
 import { presetRange, PresetToggle, type PresetKey } from '@/components/report-kit'
 import { useAuth } from '@/lib/auth'
 import { fmtDate, fmtMoney, fmtNumber, fmtPct } from '@/lib/format'
@@ -38,7 +39,8 @@ export function DashboardPage() {
   const range = useMemo(() => presetRange(preset), [preset])
   const dash = useDashboard(range.from, range.to)
   const alerts = useOpenAlerts()
-  const baristaPro = useHasFeature('barista')
+  // The Barista module must be in this build (Pro edition) and licensed.
+  const baristaPro = useHasFeature('barista') && !!proModules.Barista
   const barista = useBaristaToday(can('barista', 'encargado') && !!baristaPro)
   const cash = useCashCurrent(can('cajero', 'encargado'))
 

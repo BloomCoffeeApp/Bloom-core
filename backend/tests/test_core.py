@@ -48,3 +48,9 @@ def test_health_identifies_app_and_security_headers(client):
     assert r.json()["app"] == "bloom-cafe"
     assert r.headers["x-content-type-options"] == "nosniff"
     assert r.headers["cache-control"] == "no-store"
+
+
+def test_unknown_api_path_is_404_not_the_spa(client):
+    """A Pro endpoint missing in the Free edition must not fall through to index.html."""
+    r = client.get("/api/no-existe")
+    assert r.status_code == 404 and "text/html" not in r.headers.get("content-type", "")

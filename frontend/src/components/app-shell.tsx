@@ -33,6 +33,7 @@ import {
   SidebarRail,
   SidebarSeparator,
   SidebarTrigger,
+  useSidebar,
 } from '@/components/ui/sidebar'
 import { hasFeature, useLicense } from '@/features/license/api'
 import { LicenseBanner, ProBadge } from '@/features/license/pro-gate'
@@ -66,6 +67,16 @@ export const initials = (name: string) =>
 interface AlertSummary {
   open: number
   critical: number
+}
+
+/** On phones the sidebar is a sheet: close it once a link (or the palette) navigates. */
+function CloseMobileSidebarOnNavigate() {
+  const { pathname } = useLocation()
+  const { isMobile, setOpenMobile } = useSidebar()
+  useEffect(() => {
+    if (isMobile) setOpenMobile(false)
+  }, [pathname, isMobile, setOpenMobile])
+  return null
 }
 
 export function AppShell() {
@@ -112,6 +123,7 @@ export function AppShell() {
 
   return (
     <SidebarProvider {...marginDrag}>
+      <CloseMobileSidebarOnNavigate />
       <Sidebar collapsible="icon" variant="inset">
         <SidebarHeader {...drag}>
           <Link to="/" className="flex items-center gap-2 px-2 py-1.5">

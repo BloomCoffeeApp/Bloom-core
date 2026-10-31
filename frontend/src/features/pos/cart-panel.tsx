@@ -223,7 +223,7 @@ export function CartPanel({
   const maxRedeem = cart.customer && ppr > 0 ? Math.floor(cart.customer.points / ppr) * ppr : 0
 
   return (
-    <div className="flex min-h-0 flex-col border-l bg-card">
+    <div className="flex min-h-0 flex-col border-t bg-card md:border-t-0 md:border-l">
       {/* Channel + table */}
       <div className="space-y-3 border-b p-3">
         <div className="grid grid-cols-3 gap-1 rounded-xl bg-muted p-1">

@@ -253,6 +253,7 @@ export function CloseCashDialog({
                 value={r.counted}
                 onChange={(v) => setCounted((c) => ({ ...c, [r.method]: v }))}
                 placeholder={r.method === 'efectivo' ? 'Contá…' : undefined}
+                aria-label={`Contado ${r.name}`}
                 autoFocus={r.method === 'efectivo'}
                 className="[&_input]:h-10"
               />

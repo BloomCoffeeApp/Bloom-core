@@ -141,7 +141,7 @@ function PosPage() {
   }
 
   return (
-    <div className="grid h-[calc(100svh-3.5rem)] grid-cols-[1fr_340px] overflow-hidden lg:grid-cols-[1fr_400px] xl:grid-cols-[1fr_440px]">
+    <div className="grid h-[calc(100svh-3.5rem)] grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)_minmax(0,50%)] overflow-hidden md:grid-cols-[1fr_340px] md:grid-rows-1 lg:grid-cols-[1fr_400px] xl:grid-cols-[1fr_440px]">
       <ProductGrid
         catalog={catalog.data}
         loading={catalog.isLoading}

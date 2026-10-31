@@ -167,9 +167,9 @@ export function ProductEditor({
                   <Input id="pe-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej.: Latte" />
                 </div>
                 <div className="grid gap-1.5">
-                  <Label>Categoría</Label>
+                  <Label htmlFor="pe-cat">Categoría</Label>
                   <Select value={categoryId ? String(categoryId) : 'none'} onValueChange={(v) => setCategoryId(v === 'none' ? null : Number(v))}>
-                    <SelectTrigger className="w-full">
+                    <SelectTrigger id="pe-cat" className="w-full">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -183,8 +183,8 @@ export function ProductEditor({
                   </Select>
                 </div>
                 <div className="grid gap-1.5">
-                  <Label>Precio de venta</Label>
-                  <MoneyInput value={price} onChange={setPrice} className="[&_input]:text-base [&_input]:font-semibold" />
+                  <Label htmlFor="pe-price">Precio de venta</Label>
+                  <MoneyInput id="pe-price" value={price} onChange={setPrice} className="[&_input]:text-base [&_input]:font-semibold" />
                 </div>
                 <div className="grid gap-1.5 sm:col-span-2">
                   <Label>Color en el POS</Label>

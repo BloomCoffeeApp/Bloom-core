@@ -21,6 +21,7 @@ export function MoneyInput({
   autoFocus?: boolean
   disabled?: boolean
   id?: string
+  'aria-label'?: string
   onKeyDown?: React.KeyboardEventHandler<HTMLInputElement>
 }) {
   const [text, setText] = useState(toText(value))

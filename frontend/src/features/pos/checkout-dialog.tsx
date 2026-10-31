@@ -179,6 +179,7 @@ function CheckoutBody({
                   value={r.amount}
                   onChange={(v) => update(i, { amount: v ?? 0 })}
                   disabled={!split}
+                  aria-label={`Monto ${m?.name ?? r.method}`}
                   className="w-36 [&_input]:h-11 [&_input]:text-right [&_input]:text-base"
                 />
                 {split && (
@@ -207,6 +208,7 @@ function CheckoutBody({
                 value={cashRow.tendered}
                 onChange={(v) => update(cashIdx, { tendered: v })}
                 placeholder="¿Con cuánto paga?"
+                aria-label="Efectivo recibido"
                 className="w-44 [&_input]:h-11 [&_input]:text-right [&_input]:text-base"
               />
             </div>

@@ -53,6 +53,10 @@ export function useCloseCash() {
   return useMutation({
     mutationFn: (body: { counts: { payment_method: string; counted_cents: number }[]; notes?: string }) =>
       api.post<CashSessionDetail>('/cash/close', body),
-    onSuccess: () => qc.invalidateQueries({ queryKey: cashKeys.all }),
+    // Not awaited on purpose: once `current` refetches as null the close dialog unmounts, and the
+    // caller's mutate() onSuccess (which opens the Z report) would never run.
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: cashKeys.all })
+    },
   })
 }
