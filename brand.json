@@ -1,0 +1,15 @@
+{
+  "name": "Bloom",
+  "tagline": "Gestión para cafeterías",
+  "description": "Punto de venta, stock, compras, clientes y asistente de barista para cafeterías.",
+  "appId": "bloom-cafe",
+  "exeName": "Bloom",
+  "dataDirName": "Bloom",
+  "publisher": "Bloom contributors",
+  "port": 47821,
+  "colors": {
+    "primary": "#8B5A2B",
+    "accent": "#C8874A",
+    "background": "#FAF7F2"
+  }
+}

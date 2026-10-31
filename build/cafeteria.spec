@@ -1,0 +1,74 @@
+# PyInstaller spec — build with: ./build/build.ps1
+# -*- mode: python ; coding: utf-8 -*-
+import json
+import os
+import sys
+from pathlib import Path
+
+from PyInstaller.utils.hooks import collect_data_files, collect_submodules
+
+ROOT = Path(SPECPATH).parent  # noqa: F821 (SPECPATH is injected by PyInstaller)
+BRAND = json.loads((ROOT / "brand.json").read_text(encoding="utf-8"))
+EXE_NAME = BRAND.get("exeName", "Bloom")
+
+# Pro edition: the private `bloom_pro` package, if linked. The Pro build passes BLOOM_PRO_PATH
+# (a folder with bloom_pro compiled to .pyd) so the .exe ships native code, not Python sources.
+# The import path must be set BEFORE collect_submodules below, or it silently collects nothing.
+pathex = [str(ROOT / "backend")]
+PRO_PATH = os.environ.get("BLOOM_PRO_PATH")
+if PRO_PATH:
+    pathex.insert(0, PRO_PATH)
+sys.path[:0] = pathex
+
+datas = [
+    (str(ROOT / "brand.json"), "."),
+    (str(ROOT / "frontend" / "dist"), "frontend/dist"),
+    (str(ROOT / "backend" / "migrations"), "backend/migrations"),
+]
+# Public key that verifies licenses (read next to app/licensing/token.py when frozen).
+datas.append((str(ROOT / "backend" / "app" / "licensing" / "public_key.txt"), "app/licensing"))
+datas += collect_data_files("tzdata")
+
+APP_MODULES = collect_submodules("app")
+# Compiled Pro modules hide their imports from PyInstaller: bundle every core module explicitly.
+assert len(APP_MODULES) > 20, f"collect_submodules('app') found only {APP_MODULES}"
+
+hiddenimports = (
+    APP_MODULES
+    + collect_submodules("uvicorn")
+    + collect_submodules("alembic")
+    + ["desktop_window", "sqlalchemy.dialects.sqlite", "argon2", "openpyxl", "qrcode", "PIL"]
+)
+
+try:
+    import bloom_pro  # noqa: F401
+
+    EDITION = "pro"
+except ImportError:
+    EDITION = "free"
+if EDITION == "pro":
+    hiddenimports += collect_submodules("bloom_pro")
+    # Imports used only by the (compiled, hence opaque) Pro modules.
+    hiddenimports += ["csv", "unicodedata", "openpyxl"] + collect_submodules("fastapi") + collect_submodules("starlette")
+    datas += collect_data_files("bloom_pro")  # JSON data, public key
+print(f"Bloom build: edition={EDITION} pro_path={PRO_PATH or '-'}")
+
+a = Analysis(  # noqa: F821
+    [str(ROOT / "launcher.py")],
+    pathex=pathex,
+    datas=datas,
+    hiddenimports=hiddenimports,
+    excludes=["tkinter", "pytest", "PyInstaller"],
+    noarchive=False,
+)
+pyz = PYZ(a.pure)  # noqa: F821
+exe = EXE(  # noqa: F821
+    pyz,
+    a.scripts,
+    [],
+    exclude_binaries=True,
+    name=EXE_NAME,
+    console=False,
+    icon=str(ROOT / "build" / "icon.ico"),
+)
+coll = COLLECT(exe, a.binaries, a.datas, name=EXE_NAME)  # noqa: F821

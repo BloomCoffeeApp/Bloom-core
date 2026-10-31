@@ -1,0 +1,197 @@
+import { Check, Copy, FileUp, KeyRound, Loader2, RefreshCw, Sparkles, X } from 'lucide-react'
+import { type ChangeEvent, useRef, useState } from 'react'
+import { toast } from 'sonner'
+
+import { ConfirmDialog } from '@/components/confirm-dialog'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Skeleton } from '@/components/ui/skeleton'
+import { fmtDate } from '@/lib/format'
+import { cn } from '@/lib/utils'
+
+import { SettingsCard } from '../settings/form'
+import {
+  hasFeature,
+  type LicenseInfo,
+  type ProFeature,
+  useActivateLicense,
+  useDeactivateLicense,
+  useImportLicense,
+  useLicense,
+  useRefreshLicense,
+  useStartTrial,
+} from './api'
+import { ProBadge } from './pro-gate'
+
+const fromUnix = (s: number | null) => (s ? new Date(s * 1000) : null)
+
+function PlanSummary({ info }: { info: LicenseInfo }) {
+  const until = fromUnix(info.expires_at)
+  let title = 'Plan gratuito'
+  let detail = 'Punto de venta, caja, productos, stock, clientes y avisos. Sin vencimiento.'
+  if (info.valid && info.perpetual) {
+    title = `${info.pro_label} · licencia perpetua`
+    detail = `A nombre de ${info.customer}. No vence.`
+  } else if (info.valid && info.plan === 'trial') {
+    title = `Prueba de ${info.pro_label}`
+    detail = `Termina el ${fmtDate(until)} (${info.days_left} día/s).`
+  } else if (info.valid) {
+    title = info.pro_label
+    detail = info.in_grace
+      ? `Vencida el ${fmtDate(until)}: sigue activa ${info.days_left} día(s) más mientras se renueva.`
+      : `A nombre de ${info.customer}. Paga hasta el ${fmtDate(until)}.`
+  }
+  return (
+    <div
+      className={cn(
+        'flex items-start gap-4 rounded-2xl border p-5',
+        info.valid ? 'border-primary/30 bg-primary/5' : 'bg-muted/30',
+      )}
+    >
+      <div
+        className={cn(
+          'flex size-12 shrink-0 items-center justify-center rounded-2xl',
+          info.valid ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground',
+        )}
+      >
+        <Sparkles className="size-6" />
+      </div>
+      <div className="min-w-0">
+        <p className="font-heading text-xl font-semibold">{title}</p>
+        <p className="text-sm text-muted-foreground">{detail}</p>
+        {info.problem && <p className="mt-2 text-sm text-destructive">{info.problem}</p>}
+      </div>
+    </div>
+  )
+}
+
+export function LicenseSection() {
+  const { data: info, isLoading } = useLicense()
+  const activate = useActivateLicense()
+  const trial = useStartTrial()
+  const importLic = useImportLicense()
+  const refresh = useRefreshLicense()
+  const deactivate = useDeactivateLicense()
+  const [key, setKey] = useState('')
+  const [confirmOff, setConfirmOff] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  if (isLoading || !info) return <Skeleton className="h-64 rounded-2xl" />
+
+  const onFile = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (file) importLic.mutate((await file.text()).trim())
+  }
+  const copyId = () => {
+    void navigator.clipboard?.writeText(info.machine_id)
+    toast.success('ID copiado')
+  }
+  const hasStored = info.valid || !!info.problem
+  const busy = activate.isPending || trial.isPending || importLic.isPending
+
+  return (
+    <div className="space-y-6">
+      <SettingsCard title="Licencia" description={`Tu plan de ${info.app_name} en esta computadora.`}>
+        <PlanSummary info={info} />
+
+        <div className="grid gap-2 sm:grid-cols-2">
+          {(Object.entries(info.catalog) as [ProFeature, string][]).map(([feature, text]) => {
+            const on = hasFeature(info, feature)
+            return (
+              <div key={feature} className="flex items-center gap-2 text-sm">
+                {on ? <Check className="size-4 text-success" /> : <X className="size-4 text-muted-foreground" />}
+                <span className={cn(!on && 'text-muted-foreground')}>{text}</span>
+                {!on && <ProBadge className="ml-auto" />}
+              </div>
+            )
+          })}
+        </div>
+        {!info.valid && (
+          <p className="text-xs text-muted-foreground">
+            En el plan gratuito podés tener hasta {info.free_max_users} usuarios activos.
+          </p>
+        )}
+      </SettingsCard>
+
+      {!(info.valid && info.perpetual) && (
+        <SettingsCard
+          title={info.valid ? 'Cambiar de licencia' : `Activar ${info.pro_label}`}
+          description="Ingresá la clave que recibiste al suscribirte."
+        >
+          <form
+            className="flex flex-col gap-2 sm:flex-row"
+            onSubmit={(e) => {
+              e.preventDefault()
+              activate.mutate(key, { onSuccess: () => setKey('') })
+            }}
+          >
+            <div className="relative flex-1">
+              <KeyRound className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={key}
+                onChange={(e) => setKey(e.target.value.toUpperCase())}
+                placeholder="BLOOM-XXXXX-XXXXX-XXXXX-XXXXX"
+                className="h-11 pl-9 font-mono"
+                aria-label="Clave de licencia"
+              />
+            </div>
+            <Button type="submit" className="h-11" disabled={key.trim().length < 8 || busy || !info.server_configured}>
+              {activate.isPending && <Loader2 className="animate-spin" />} Activar
+            </Button>
+          </form>
+          {!info.server_configured && (
+            <p className="text-xs text-muted-foreground">
+              Esta instalación no tiene servidor de licencias configurado: usá “Importar archivo de licencia”.
+            </p>
+          )}
+          <div className="flex flex-wrap gap-2">
+            {!hasStored && info.server_configured && (
+              <Button variant="outline" onClick={() => trial.mutate(undefined)} disabled={busy}>
+                <Sparkles /> Probar Pro 14 días gratis
+              </Button>
+            )}
+            <Button variant="outline" onClick={() => fileRef.current?.click()} disabled={busy}>
+              <FileUp /> Importar archivo de licencia
+            </Button>
+            <input ref={fileRef} type="file" accept=".lic,.txt" className="hidden" onChange={onFile} />
+          </div>
+        </SettingsCard>
+      )}
+
+      <SettingsCard title="Esta computadora" description="Para soporte o para pedir una licencia sin conexión a internet.">
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant="outline" className="h-9 px-3 font-mono text-xs">
+            {info.machine_id}
+          </Badge>
+          <Button variant="ghost" size="sm" onClick={copyId}>
+            <Copy /> Copiar ID
+          </Button>
+        </div>
+        {hasStored && (
+          <div className="flex flex-wrap gap-2">
+            {info.server_configured && !info.perpetual && (
+              <Button variant="outline" onClick={() => refresh.mutate(undefined)} disabled={refresh.isPending}>
+                <RefreshCw className={cn(refresh.isPending && 'animate-spin')} /> Actualizar ahora
+              </Button>
+            )}
+            <Button variant="ghost" className="text-destructive" onClick={() => setConfirmOff(true)}>
+              Desactivar en esta PC
+            </Button>
+          </div>
+        )}
+      </SettingsCard>
+
+      <ConfirmDialog
+        open={confirmOff}
+        onOpenChange={setConfirmOff}
+        title="¿Desactivar la licencia en esta computadora?"
+        description="Libera el lugar para usarla en otra PC. Acá vuelve al plan gratuito; tus datos no se tocan."
+        confirmLabel="Desactivar"
+        destructive
+        onConfirm={() => deactivate.mutate(undefined, { onSuccess: () => setConfirmOff(false) })}
+      />
+    </div>
+  )
+}

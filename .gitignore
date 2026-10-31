@@ -1,0 +1,62 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Node / front
+node_modules/
+frontend/dist/
+*.tsbuildinfo
+frontend/test-results/
+frontend/playwright-report/
+frontend/e2e/.tmp/
+frontend/blob-report/
+
+# Datos locales: NUNCA subir bases de datos, backups ni uploads
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+backend/backups/
+backend/uploads/
+# Desktop window profile (WebView2 storage incl. session tokens) and window position
+backend/webview/
+backend/window.json
+# Installed license (bound to this PC)
+backend/license.lic
+backend/license_state.json
+backups/
+uploads/
+
+# Build / empaquetado
+build/output/
+build/dist/
+build/work/
+dist/
+*.spec.bak
+installer/
+
+# Secretos y entorno
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Editor / SO
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.log
+.claude/settings.local.json
+
+# Pro edition (private repo, plugged in with ../pro/scripts/link.ps1 as junctions): never commit
+backend/bloom_pro
+backend/tests/pro
+frontend/src/pro
+frontend/e2e/pro

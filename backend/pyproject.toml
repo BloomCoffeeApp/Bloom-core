@@ -1,0 +1,17 @@
+[project]
+name = "cafeteria-controlapp"
+version = "1.0.0"
+description = "Gestión integral para cafeterías: POS, stock, compras, clientes y asistente de barista."
+requires-python = ">=3.12"
+license = "MIT"
+dependencies = [
+  "fastapi", "uvicorn[standard]", "sqlalchemy>=2.0", "alembic", "pydantic>=2", "argon2-cffi",
+  "openpyxl", "pywebview", "qrcode[pil]", "tzdata",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "httpx", "pyinstaller"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

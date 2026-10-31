@@ -1,0 +1,130 @@
+<p align="center"><img src="frontend/public/logo.svg" width="96" alt="Bloom"></p>
+
+# Bloom — gestión para cafeterías
+
+Sistema de gestión integral para cafeterías, pensado para usarse en el mostrador y en la barra:
+**punto de venta, caja, stock con recetas, compras, clientes, alertas, reportes** y un
+**asistente para el barista** que registra extracciones y sugiere cómo calibrar el espresso.
+
+Funciona como **aplicación de escritorio para Windows** (un `.exe` con base de datos local SQLite)
+y también se puede abrir desde una **tablet o celular en la red local**.
+
+## Funcionalidades
+
+| Módulo | Qué hace |
+|---|---|
+| **Inicio** | KPIs del día con comparación, ventas por hora, top productos, medios de pago, alertas, receta del día y estado de caja. |
+| **Punto de venta** | Pantalla táctil, modificadores (tipo de leche, shot extra…), pagos divididos, vuelto, clientes y puntos, ticket imprimible, atajos de teclado. |
+| **Caja** | Apertura, ingresos/egresos, cierre con arqueo por medio de pago e historial de cierres. |
+| **Productos** | Menú con categorías, recetas (escandallo) con costo y margen en vivo, aumentos masivos por % e historial de precios. |
+| **Stock** | Insumos con semáforo, movimientos, mermas, conteo físico y sugerencia de compra. |
+| **Compras** | Proveedores, órdenes de compra, recepción con costo promedio ponderado, facturas, pagos y vencimientos. |
+| **Clientes** | Fichas con preferencias, historial, fidelización por puntos y cuenta corriente. |
+| **Barista** | Cafés y días desde tueste, equipos y mantenimiento, registro de shots con cronómetro, asistente de calibración, recetas de filtrado paso a paso, calculadoras y estadísticas. |
+| **Avisos** | Alertas automáticas (stock, vencimientos, caja, cumpleaños, mantenimiento), tablón del equipo y checklists de apertura/cierre. |
+| **Reportes** | Ventas, rentabilidad, stock, mermas, compras y cajas, exportables a Excel y CSV. |
+| **Configuración** | Usuarios con roles y PIN, datos del negocio, fidelización, umbrales, respaldos automáticos y modo red local con QR. |
+
+## Ediciones
+
+| | Gratis (este repo) | Pro |
+|---|---|---|
+| Punto de venta, caja, ventas, productos y recetas, stock, clientes y fidelización, avisos | ✓ | ✓ |
+| Usuarios | hasta 2 | ilimitados |
+| Asistente de barista y guía de bebidas | | ✓ |
+| Compras, proveedores y cuenta corriente | | ✓ |
+| Reportes avanzados y exportación a Excel/CSV | | ✓ |
+| Menú para clientes (QR y pantalla) | | ✓ |
+| Modo red local, descarga de respaldos | | ✓ |
+
+Este repositorio es la edición gratuita, completa y funcional por sí sola. Los módulos Pro se
+distribuyen aparte y se activan con una licencia (`Configuración → Licencia`): una licencia
+firmada, atada a la computadora, que se valida **sin internet** y se renueva sola cuando hay
+conexión. Si una suscripción vence, solo se apagan las funciones Pro: las ventas y los datos
+nunca se bloquean.
+
+## Tecnología
+
+- **Backend:** Python 3.12+ · FastAPI · SQLAlchemy 2 · Alembic · SQLite
+- **Frontend:** React · TypeScript · Vite · Tailwind CSS · shadcn/ui · TanStack Query · Recharts
+- **Escritorio:** pywebview (WebView2) · PyInstaller · Inno Setup
+
+La app es un servidor local que sirve la API y la interfaz; la ventana de escritorio solo la muestra.
+La ventana no tiene el marco de Windows: la barra de título (arrastrar, doble clic para maximizar,
+minimizar, maximizar, cerrar y bordes para redimensionar) es parte de la app y recuerda su posición y tamaño.
+Por eso la misma instalación se puede usar desde otros dispositivos de la red local.
+
+## Desarrollo
+
+Requisitos: Python 3.12+, Node.js 20+, Windows 10/11 (WebView2).
+
+```powershell
+./scripts/setup.ps1   # instala dependencias (venv + npm)
+./scripts/dev.ps1     # backend (puerto de brand.json) + frontend en :5173
+```
+
+Abrí <http://localhost:5173>. La primera vez aparece el asistente de configuración; podés cargar
+**datos de ejemplo** (todos ficticios) para explorar la app. Usuarios demo: Caja `1111`, Barista `2222`, Encargado `3333`.
+
+Tests:
+
+```powershell
+cd backend; .venv\Scripts\python -m pytest
+cd frontend; npx tsc -b
+```
+
+### Tests end-to-end
+
+Pruebas de la interfaz con [Playwright](https://playwright.dev) en `frontend/e2e/`:
+
+```powershell
+cd frontend
+npm run e2e          # headless
+npm run e2e:headed   # viendo el navegador
+npm run e2e:ui       # modo interactivo de Playwright
+```
+
+- Usan el **Microsoft Edge** que viene con Windows (no hace falta descargar navegadores).
+  Para usar el Chromium de Playwright: `$env:PW_CHANNEL="chromium"` (antes `npx playwright install chromium`).
+- Levantan su propio backend (puerto 47899) y Vite (puerto 5199) con una **base de datos nueva y aislada**
+  en una carpeta temporal: no tocan tu `dev.db` ni los servidores de desarrollo que tengas abiertos.
+- La configuración inicial se hace con datos de ejemplo (admin "Admin", PIN `0000`).
+
+## Generar el ejecutable
+
+```powershell
+./build/build.ps1
+```
+
+Genera `build/output/Bloom/Bloom.exe` y, si tenés [Inno Setup 6](https://jrsoftware.org/isinfo.php),
+un instalador en `build/output/installer/`.
+
+Los datos se guardan en `%APPDATA%\Bloom` (base `data.db`, respaldos diarios y log).
+Desinstalar la app **no** borra los datos. Al actualizar, la base se migra sola (con un respaldo previo).
+
+## Cambiar el nombre, colores o puerto
+
+Todo sale de [`brand.json`](brand.json) en la raíz:
+
+| Campo | Para qué |
+|---|---|
+| `name`, `tagline`, `description` | Nombre visible (ventana, login, menú, título, instalador) |
+| `exeName`, `dataDirName` | Nombre del `.exe` y carpeta de datos en `%APPDATA%` |
+| `appId` | Identificador interno (el launcher lo usa para reconocer su propio servidor) |
+| `port` | Puerto local del servidor (si está ocupado por otra app, el `.exe` usa el siguiente libre) |
+| `colors` | Colores del logo e ícono |
+
+El ícono del `.exe` se regenera solo en `build/build.ps1` (`build/make_icon.py`); el logo de la app es `frontend/public/logo.svg` y `src/components/logo.tsx`.
+
+## Seguridad
+
+- Acceso por usuario + PIN con roles; todas las rutas de la API exigen sesión salvo login/configuración inicial.
+- Bloqueo progresivo tras 5 PIN incorrectos (por usuario y por dispositivo), PINs con hash Argon2.
+- Cambiar PIN, rol o desactivar un usuario cierra sus sesiones.
+- El servidor escucha solo en `127.0.0.1`, salvo que actives "Modo red local" en Configuración.
+- Encabezados de seguridad, documentación de la API desactivada en el `.exe`, exportaciones protegidas contra inyección de fórmulas.
+- Respaldos automáticos diarios y antes de cada migración/restauración.
+
+## Licencia
+
+[MIT](LICENSE)
