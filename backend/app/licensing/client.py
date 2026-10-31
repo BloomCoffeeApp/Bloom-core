@@ -21,7 +21,8 @@ from app.licensing.status import (
 )
 
 log = logging.getLogger("cafeteria.license")
-TIMEOUT_S = 12
+# Free hosting (e.g. Render) sleeps when idle and takes up to ~1 min to wake up.
+TIMEOUT_S = 75
 # Renew in the background at most this often (tokens are re-signed with the latest paid date).
 REFRESH_EVERY_S = 12 * 3600
 
