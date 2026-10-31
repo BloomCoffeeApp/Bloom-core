@@ -1,8 +1,12 @@
 """System info, backups/restore, LAN helpers and audit log listing."""
 
 import io
+import ipaddress
 import socket
 import sqlite3
+import subprocess
+import sys
+import time
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -11,7 +15,7 @@ import qrcode
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app import config
+from app import config, lan
 from app.db import engine
 from app.models import AuditLog, User
 from app.services import backup as backup_svc
@@ -111,6 +115,34 @@ def lan_ips() -> list[str]:
     return [ip for ip in ips if not ip.startswith(("127.", "169.254.", "0."))]
 
 
+_profile_cache: dict[str, tuple[float, str | None]] = {}
+
+
+def network_category(ip: str) -> str | None:
+    """Windows' category of the network `ip` is on ("Public", "Private", "DomainAuthenticated").
+
+    Windows blocks incoming connections on Public networks: phones can't open the app or the menu.
+    """
+    if sys.platform != "win32":
+        return None
+    ip = str(ipaddress.IPv4Address(ip))  # it goes into a command line
+    now = time.monotonic()
+    hit = _profile_cache.get(ip)
+    if hit and now - hit[0] < 30:
+        return hit[1]
+    cmd = f"(Get-NetConnectionProfile -InterfaceIndex (Get-NetIPAddress -IPAddress '{ip}' -ErrorAction Stop).InterfaceIndex).NetworkCategory"
+    try:
+        out = subprocess.run(
+            ["powershell", "-NoProfile", "-NonInteractive", "-Command", cmd],
+            capture_output=True, text=True, timeout=5, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        ).stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        out = ""
+    category = out.splitlines()[0].strip() if out else None
+    _profile_cache[ip] = (now, category)
+    return category
+
+
 def lan_url() -> str | None:
     ips = lan_ips()
     return f"http://{ips[0]}:{config.PORT}" if ips else None
@@ -126,6 +158,7 @@ def info(db: Session) -> dict[str, Any]:
     size = sum(p.stat().st_size for p in (db_path, Path(f"{db_path}-wal")) if p.exists())
     backups = list_backups()
     ips = lan_ips()
+    lan_enabled = bool((settings_svc.get(db, "network") or {}).get("lan_enabled"))
     return {
         "app_name": config.APP_NAME,
         "version": config.APP_VERSION,
@@ -137,7 +170,9 @@ def info(db: Session) -> dict[str, Any]:
         "lan_ips": ips,
         "lan_url": f"http://{ips[0]}:{config.PORT}" if ips else None,
         "port": config.PORT,
-        "lan_enabled": bool((settings_svc.get(db, "network") or {}).get("lan_enabled")),
+        "lan_enabled": lan_enabled,
+        "lan_active": lan.active(lan_enabled),
+        "network_public": bool(ips) and network_category(ips[0]) == "Public",
     }
 
 

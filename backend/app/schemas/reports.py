@@ -55,6 +55,8 @@ class RecentSale(BaseModel):
     ts: datetime
     total_cents: int
     status: str
+    is_courtesy: bool = False
+    courtesy_cents: int = 0
     channel: str
     user_name: str | None
     items_count: float
@@ -220,6 +222,8 @@ class SystemInfo(BaseModel):
     lan_url: str | None
     port: int
     lan_enabled: bool
+    lan_active: bool
+    network_public: bool
 
 
 class RestoreIn(BaseModel):

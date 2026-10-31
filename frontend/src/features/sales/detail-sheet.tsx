@@ -14,6 +14,7 @@ import { useAuth } from '@/lib/auth'
 import { fmtDateTime, fmtMoney, fmtNumber, PAYMENT_LABEL } from '@/lib/format'
 
 import { usePaymentMethods, useSale, useVoidSale } from './api'
+import { CourtesyBadge } from './courtesy-badge'
 import { printTicket } from './print'
 import { CHANNEL_LABEL } from './types'
 
@@ -52,6 +53,7 @@ export function SaleDetailSheet({ id, onOpenChange }: { id: number | null; onOpe
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2 font-heading text-xl">
             Ticket #{s?.number ?? '…'}
+            {s?.is_courtesy && <CourtesyBadge />}
             {s?.status === 'voided' && <Badge variant="destructive">Anulado</Badge>}
           </SheetTitle>
           <SheetDescription>
@@ -70,6 +72,15 @@ export function SaleDetailSheet({ id, onOpenChange }: { id: number | null; onOpe
               {s.status === 'voided' && (
                 <div className="rounded-xl bg-destructive/10 p-3 text-sm text-destructive">
                   Anulado por {s.voided_by_name ?? '—'} {s.voided_at ? `el ${fmtDateTime(s.voided_at)}` : ''}. Motivo: {s.void_reason}
+                </div>
+              )}
+              {s.is_courtesy && (
+                <div className="rounded-xl bg-primary/10 p-3 text-sm" data-testid="courtesy-note">
+                  <p className="font-medium">Cortesía · invita la casa</p>
+                  <p className="text-muted-foreground">
+                    {fmtMoney(s.courtesy_cents)} a precio de carta, sin cobrar.
+                    {s.courtesy_reason ? ` Para / motivo: ${s.courtesy_reason}` : ''}
+                  </p>
                 </div>
               )}
               {s.customer && (
@@ -96,7 +107,12 @@ export function SaleDetailSheet({ id, onOpenChange }: { id: number | null; onOpe
                         <p className="text-xs text-muted-foreground">{it.modifiers.map((m) => m.name).join(' · ')}</p>
                       ) : null}
                       {it.notes && <p className="text-xs text-muted-foreground italic">“{it.notes}”</p>}
-                      {it.discount_cents > 0 && <p className="text-xs text-success">Desc. −{fmtMoney(it.discount_cents)}</p>}
+                      {it.discount_cents > 0 && !s.is_courtesy && (
+                        <p className="text-xs text-success">Desc. −{fmtMoney(it.discount_cents)}</p>
+                      )}
+                      {s.is_courtesy && (
+                        <p className="tabular text-xs text-muted-foreground line-through">{fmtMoney(it.unit_price_cents * it.qty)}</p>
+                      )}
                     </div>
                     <span className="tabular">{fmtMoney(it.total_cents)}</span>
                   </div>
@@ -150,7 +166,11 @@ export function SaleDetailSheet({ id, onOpenChange }: { id: number | null; onOpe
                     )}
                   </div>
                 ))}
-                {s.payments.length === 0 && <p className="text-sm text-muted-foreground">Sin pagos (total cubierto con puntos).</p>}
+                {s.payments.length === 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    {s.is_courtesy ? 'Sin pagos (cortesía, no se cobra).' : 'Sin pagos (total cubierto con puntos).'}
+                  </p>
+                )}
               </div>
               {s.notes && <p className="rounded-xl bg-muted/50 p-3 text-sm">{s.notes}</p>}
             </div>

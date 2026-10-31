@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useDepsChanged } from '@/hooks/use-deps-changed'
 import { fmtMoney, fmtNumber, fmtRelative } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
@@ -57,14 +58,15 @@ export function CustomersPage() {
   const { data: stats, isLoading: statsLoading } = useCustomerStats()
   const [formOpen, setFormOpen] = useState(false)
 
+  // `?nuevo=1` (e.g. from the command palette) opens the form once and is then dropped from the URL.
+  const wantsNew = params.get('nuevo') === '1'
+  if (useDepsChanged([wantsNew]) && wantsNew) setFormOpen(true)
   useEffect(() => {
-    if (params.get('nuevo') === '1') {
-      setFormOpen(true)
-      const next = new URLSearchParams(params)
-      next.delete('nuevo')
-      setParams(next, { replace: true })
-    }
-  }, [params, setParams])
+    if (!wantsNew) return
+    const next = new URLSearchParams(params)
+    next.delete('nuevo')
+    setParams(next, { replace: true })
+  }, [wantsNew, params, setParams])
 
   const setSegment = (s: string) => {
     const next = new URLSearchParams(params)

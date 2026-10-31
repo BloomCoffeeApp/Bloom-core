@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 
 import { Input } from '@/components/ui/input'
 import { parseMoneyToCents } from '@/lib/format'
@@ -24,12 +24,9 @@ export function MoneyInput({
   'aria-label'?: string
   onKeyDown?: React.KeyboardEventHandler<HTMLInputElement>
 }) {
-  const [text, setText] = useState(toText(value))
+  // While focused the user edits free text; otherwise the field always shows the formatted value.
+  const [text, setText] = useState(() => toText(value))
   const [focused, setFocused] = useState(false)
-
-  useEffect(() => {
-    if (!focused) setText(toText(value))
-  }, [value, focused])
 
   return (
     <div className={cn('relative', className)}>
@@ -39,14 +36,15 @@ export function MoneyInput({
       <Input
         inputMode="decimal"
         className="tabular pl-7"
-        value={text}
-        onFocus={() => setFocused(true)}
-        onBlur={() => {
-          setFocused(false)
+        value={focused ? text : toText(value)}
+        onFocus={() => {
           setText(toText(value))
+          setFocused(true)
         }}
+        onBlur={() => setFocused(false)}
         onChange={(e) => {
           setText(e.target.value)
+          setFocused(true)
           onChange(parseMoneyToCents(e.target.value))
         }}
         {...props}

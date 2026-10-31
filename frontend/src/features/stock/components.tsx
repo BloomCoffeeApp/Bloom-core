@@ -1,5 +1,5 @@
 import { ArrowDownRight, ArrowUpRight, Check, ChevronsUpDown, History, PackageOpen } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 
 import { EmptyState } from '@/components/empty-state'
 import { MoneyInput } from '@/components/money-input'
@@ -16,6 +16,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { useDepsChanged } from '@/hooks/use-deps-changed'
 import { fmtDateTime, fmtMoney, fmtNumber, fmtQty } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
@@ -27,27 +28,8 @@ import {
   useSaveStockItem,
   useStockCategories,
 } from './api'
-import type { MovementType, StockItem, StockItemInput, StockStatus, Unit } from './types'
-
-// ------------------------------------------------------------------ unit helpers
-export const UNIT_NAME: Record<Unit, string> = { g: 'gramos', ml: 'mililitros', u: 'unidades' }
-/** Unit used for prices/purchases: kg, L or u. */
-export const bulkUnit = (u: Unit) => (u === 'g' ? 'kg' : u === 'ml' ? 'L' : 'u')
-export const bulkFactor = (u: Unit) => (u === 'u' ? 1 : 1000)
-/** Cost per kg / L / u in cents from cost per base unit. */
-export const bulkCost = (costPerBase: number, u: Unit) => Math.round(costPerBase * bulkFactor(u))
-
-export const MOVEMENT_LABEL: Record<MovementType, string> = {
-  purchase: 'Compra',
-  sale: 'Venta',
-  adjustment: 'Ajuste',
-  waste: 'Merma',
-  internal: 'Consumo interno',
-  void: 'Anulación',
-  count: 'Conteo físico',
-}
-
-export const STATUS_LABEL: Record<StockStatus, string> = { ok: 'OK', low: 'Bajo mínimo', out: 'Sin stock' }
+import { bulkCost, bulkFactor, bulkUnit, MOVEMENT_LABEL, STATUS_LABEL } from './stock-utils'
+import type { StockItem, StockItemInput, StockStatus, Unit } from './types'
 
 // ------------------------------------------------------------------ status visuals
 export function StatusBadge({ status }: { status: StockStatus }) {
@@ -165,13 +147,11 @@ export function AdjustDialog({ item, onOpenChange }: { item: StockItem | null; o
   const [reason, setReason] = useState('')
   const adjust = useAdjustStock()
 
-  useEffect(() => {
-    if (item) {
-      setMode('set')
-      setQty(String(item.current_qty))
-      setReason('')
-    }
-  }, [item])
+  if (useDepsChanged([item]) && item) {
+    setMode('set')
+    setQty(String(item.current_qty))
+    setReason('')
+  }
 
   if (!item) return null
   const n = Number(qty.replace(',', '.'))
@@ -260,12 +240,10 @@ export function WasteDialog({ item, onOpenChange }: { item: StockItem | null; on
   const [reason, setReason] = useState('')
   const waste = useRegisterWaste()
 
-  useEffect(() => {
-    if (item) {
-      setQty('')
-      setReason('')
-    }
-  }, [item])
+  if (useDepsChanged([item]) && item) {
+    setQty('')
+    setReason('')
+  }
 
   if (!item) return null
   const n = Number(qty.replace(',', '.'))
@@ -418,8 +396,7 @@ export function StockItemDialog({
   const suppliers = useSuppliersLite(open)
   const save = useSaveStockItem()
 
-  useEffect(() => {
-    if (!open) return
+  if (useDepsChanged([open, item]) && open) {
     if (item) {
       setForm({
         name: item.name,
@@ -436,7 +413,7 @@ export function StockItemDialog({
       setMinText('0')
       setInitText('0')
     }
-  }, [open, item])
+  }
 
   const set = <K extends keyof StockItemInput>(k: K, v: StockItemInput[K]) => setForm((f) => ({ ...f, [k]: v }))
   const bu = bulkUnit(form.unit)

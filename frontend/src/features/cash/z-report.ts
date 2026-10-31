@@ -30,6 +30,8 @@ export function printZReport(s: CashSessionDetail) {
     <div class="row"><span>Ticket promedio</span><span>${esc(fmtMoney(s.avg_ticket_cents))}</span></div>
     <div class="row"><span>Descuentos</span><span>${esc(fmtMoney(s.discounts_cents))}</span></div>
     <div class="row"><span>Anulaciones (${esc(s.voided_count)})</span><span>${esc(fmtMoney(s.voided_total_cents))}</span></div>
+    <div class="row"><span>Cortesías (${esc(s.courtesy_count)})</span><span>${esc(fmtMoney(s.courtesy_cents))}</span></div>
+    ${s.courtesy_count ? '<div class="row s"><span>(a precio de carta, no suman a ventas)</span><span></span></div>' : ''}
     <div class="row big"><span>VENTAS</span><span>${esc(fmtMoney(s.sales_total_cents))}</span></div>
     <hr/>
     <div class="b">Arqueo por medio de pago</div>

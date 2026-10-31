@@ -50,6 +50,9 @@ export function DataTable<T>({
 }) {
   const [sorting, setSorting] = useState<SortingState>([])
   const [filter, setFilter] = useState('')
+  // TanStack Table is flagged only because the React Compiler can't memoize it; this project
+  // doesn't use the compiler, so there is nothing stale to guard against.
+  // oxlint-disable-next-line react/incompatible-library -- not using React Compiler
   const table = useReactTable({
     data: data ?? NO_ROWS,
     columns,

@@ -61,6 +61,16 @@ test.describe('phone', () => {
     const dialog = page.getByRole('dialog', { name: 'Cobrar' })
     await expect(dialog.getByRole('button', { name: /Confirmar cobro/ })).toBeVisible()
     expect(await noHorizontalOverflow(page)).toBe(true)
+
+    // Courtesy toggle by touch: payment inputs go away, the confirm button fits the screen.
+    await page.getByRole('switch', { name: 'Cortesía (no se cobra)' }).tap()
+    const courtesy = page.getByRole('dialog', { name: 'Cortesía' })
+    const register = courtesy.getByRole('button', { name: 'Registrar cortesía' })
+    await register.scrollIntoViewIfNeeded()
+    await expect(register).toBeInViewport({ ratio: 1 })
+    expect((await register.boundingBox())!.height).toBeGreaterThanOrEqual(44)
+    await expect(courtesy.getByRole('button', { name: /Confirmar cobro/ })).toHaveCount(0)
+    expect(await noHorizontalOverflow(page)).toBe(true)
   })
 
   test('settings tabs are reachable', async ({ page }) => {

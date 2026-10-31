@@ -34,7 +34,20 @@ function CurrentSession({ s }: { s: CashSession }) {
     <div className="space-y-6">
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Fondo inicial" value={fmtMoney(s.opening_cents)} icon={Wallet} hint={`Abierta ${fmtRelative(s.opened_at)}`} />
-        <StatCard label="Ventas del turno" value={fmtMoney(s.sales_total_cents)} icon={ShoppingCart} tone="success" hint={s.voided_count ? `${s.voided_count} anuladas` : undefined} />
+        <StatCard
+          label="Ventas del turno"
+          value={fmtMoney(s.sales_total_cents)}
+          icon={ShoppingCart}
+          tone="success"
+          hint={
+            [
+              s.voided_count ? `${s.voided_count} anuladas` : '',
+              s.courtesy_count ? `Cortesías: ${s.courtesy_count} (${fmtMoney(s.courtesy_cents)} a precio de carta)` : '',
+            ]
+              .filter(Boolean)
+              .join(' · ') || undefined
+          }
+        />
         <StatCard
           label="Efectivo esperado"
           value={fmtMoney(s.expected_cash_cents)}

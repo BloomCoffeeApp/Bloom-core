@@ -5,7 +5,7 @@ from datetime import timedelta
 from typing import Any
 
 from fastapi import HTTPException
-from sqlalchemy import Select, func, or_, select
+from sqlalchemy import Select, and_, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.models import (
@@ -37,7 +37,8 @@ def get_or_404(db: Session, customer_id: int) -> Customer:
 
 
 def _completed():
-    return Sale.status == "completed"
+    # Purchases only: courtesies (on the house) aren't spending nor loyalty activity.
+    return and_(Sale.status == "completed", Sale.is_courtesy.is_(False))
 
 
 # ---------------------------------------------------------------- listing

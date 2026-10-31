@@ -46,4 +46,9 @@ Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExeName}.exe"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}.exe"; Tasks: desktopicon
 
 [Run]
+; LAN mode (tablets, menu QR): let the app accept connections on private networks only.
+Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""{#AppName}"" dir=in action=allow program=""{app}\{#AppExeName}.exe"" enable=yes profile=private"; Flags: runhidden
 Filename: "{app}\{#AppExeName}.exe"; Description: "Abrir {#AppName}"; Flags: nowait postinstall skipifsilent
+
+[UninstallRun]
+Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""{#AppName}"" program=""{app}\{#AppExeName}.exe"""; Flags: runhidden; RunOnceId: "DelFirewallRule"

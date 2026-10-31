@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 
 import { MoneyInput } from '@/components/money-input'
 import { Button } from '@/components/ui/button'
@@ -17,6 +17,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { useAuth } from '@/lib/auth'
 import { fmtMoney, PAYMENT_LABEL } from '@/lib/format'
 import { cn } from '@/lib/utils'
+import { useDepsChanged } from '@/hooks/use-deps-changed'
 
 import { useAdjustPoints, useRegisterPayment, useSaveCustomer } from './api'
 import type { Customer } from './types'
@@ -29,7 +30,7 @@ const AVATAR_TONES = [
   'bg-destructive/10 text-destructive',
 ]
 
-export function initials(name: string) {
+function initials(name: string) {
   const parts = name.replace(/\(.*?\)/g, '').trim().split(/\s+/).filter(Boolean)
   return ((parts[0]?.[0] ?? '?') + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase()
 }
@@ -70,15 +71,14 @@ export function CustomerFormDialog({
   const [notes, setNotes] = useState('')
   const [limit, setLimit] = useState<number | null>(0)
 
-  useEffect(() => {
-    if (!open) return
+  if (useDepsChanged([open, customer]) && open) {
     setName(customer?.name ?? '')
     setPhone(customer?.phone ?? '')
     setEmail(customer?.email ?? '')
     setBirthday(customer?.birthday ?? '')
     setNotes(customer?.notes ?? '')
     setLimit(customer?.credit_limit_cents ?? 0)
-  }, [open, customer])
+  }
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -175,12 +175,10 @@ export function PaymentDialog({
   const [amount, setAmount] = useState<number | null>(null)
   const [method, setMethod] = useState('efectivo')
 
-  useEffect(() => {
-    if (open) {
-      setAmount(customer.balance_cents)
-      setMethod('efectivo')
-    }
-  }, [open, customer.balance_cents])
+  if (useDepsChanged([open, customer.balance_cents]) && open) {
+    setAmount(customer.balance_cents)
+    setMethod('efectivo')
+  }
 
   const tooMuch = amount != null && amount > customer.balance_cents
   const valid = amount != null && amount > 0 && !tooMuch
@@ -264,12 +262,10 @@ export function PointsDialog({
   const [points, setPoints] = useState('')
   const [reason, setReason] = useState('')
 
-  useEffect(() => {
-    if (open) {
-      setPoints('')
-      setReason('')
-    }
-  }, [open])
+  if (useDepsChanged([open]) && open) {
+    setPoints('')
+    setReason('')
+  }
 
   const n = Number.parseInt(points, 10)
   const valid = Number.isFinite(n) && n !== 0 && reason.trim() && customer.points + n >= 0

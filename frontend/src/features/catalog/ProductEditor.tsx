@@ -1,5 +1,5 @@
 import { Plus, Trash2, TrendingDown, TrendingUp } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 
 import { MoneyInput } from '@/components/money-input'
 import { Button } from '@/components/ui/button'
@@ -14,11 +14,13 @@ import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { fmtDateTime, fmtMoney, fmtPct } from '@/lib/format'
 import { cn } from '@/lib/utils'
+import { useDepsChanged } from '@/hooks/use-deps-changed'
 
 import { useStockItems } from '../stock/api'
 import { StockItemPicker } from '../stock/components'
 import { useDeactivateProduct, useModifierGroups, usePriceHistory, useProductCategories, useSaveProduct } from './api'
-import { ColorSwatches, marginOf, marginTextClass } from './shared'
+import { marginOf, marginTextClass } from './catalog-utils'
+import { ColorSwatches } from './shared'
 import type { Product, ProductInput } from './types'
 
 interface DraftRecipe {
@@ -105,8 +107,7 @@ export function ProductEditor({
   const [recipe, setRecipe] = useState<DraftRecipe[]>([])
   const [groupIds, setGroupIds] = useState<number[]>([])
 
-  useEffect(() => {
-    if (!open) return
+  if (useDepsChanged([open, product, defaultCategoryId]) && open) {
     setName(product?.name ?? '')
     setCategoryId(product?.category_id ?? defaultCategoryId ?? null)
     setPrice(product?.price_cents ?? null)
@@ -118,7 +119,7 @@ export function ProductEditor({
     setStockItemId(product?.stock_item_id ?? null)
     setRecipe(product?.recipe_items.map((r) => newRecipe({ stock_item_id: r.stock_item_id, qty: String(r.qty) })) ?? [])
     setGroupIds(product?.modifier_group_ids ?? [])
-  }, [open, product, defaultCategoryId])
+  }
 
   const byId = useMemo(() => new Map(stock.data?.map((s) => [s.id, s])), [stock.data])
   const directCost = resale && stockItemId ? (byId.get(stockItemId)?.avg_cost_cents ?? 0) : 0

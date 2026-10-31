@@ -1,5 +1,5 @@
 import { FolderPlus, Pencil, Tags } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 
 import { EmptyState } from '@/components/empty-state'
 import { Badge } from '@/components/ui/badge'
@@ -10,10 +10,12 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
+import { useDepsChanged } from '@/hooks/use-deps-changed'
 import { cn } from '@/lib/utils'
 
 import { useProductCategories, useSaveCategory } from './api'
-import { CATEGORY_ICONS, ColorSwatches, palette } from './shared'
+import { CATEGORY_ICONS, palette } from './catalog-utils'
+import { ColorSwatches } from './shared'
 import type { CategoryInput, ProductCategory } from './types'
 
 const EMPTY: CategoryInput = { name: '', color: 'amber', icon: 'coffee', sort_order: 0, active: true }
@@ -31,9 +33,8 @@ function CategoryDialog({
 }) {
   const save = useSaveCategory()
   const [form, setForm] = useState<CategoryInput>(EMPTY)
-  useEffect(() => {
-    if (open) setForm(category ? { ...category } : { ...EMPTY, sort_order: nextOrder })
-  }, [open, category, nextOrder])
+  if (useDepsChanged([open, category, nextOrder]) && open)
+    setForm(category ? { ...category } : { ...EMPTY, sort_order: nextOrder })
   const Preview = CATEGORY_ICONS[form.icon] ?? CATEGORY_ICONS.package
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

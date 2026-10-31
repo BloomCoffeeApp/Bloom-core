@@ -1,4 +1,4 @@
-import { CircleCheckBig, Copy, ExternalLink, Loader2, Monitor, ShieldCheck } from 'lucide-react'
+import { CircleCheckBig, Copy, ExternalLink, Loader2, Monitor, Repeat, ShieldCheck } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 
@@ -41,6 +41,7 @@ export function SubscribeCard({ proLabel, onStarted }: { proLabel: string; onSta
   if (!plans.data?.enabled) return null
   const entries = Object.entries(plans.data.plans)
   const selected = plan ?? entries[0]?.[0] ?? null
+  const chosen = selected ? plans.data.plans[selected] : null
 
   const pay = () => {
     if (!selected) return
@@ -94,9 +95,20 @@ export function SubscribeCard({ proLabel, onStarted }: { proLabel: string; onSta
           className="h-11"
         />
       </div>
+      {chosen && (
+        <p className="flex items-start gap-2 rounded-xl border border-primary/30 bg-primary/5 p-3 text-sm" data-testid="auto-charge-notice">
+          <Repeat className="mt-0.5 size-4 shrink-0 text-primary" />
+          <span>
+            <b>Es una suscripción con cobro automático:</b> se debitan{' '}
+            <b className="tabular">{fmtMoney(chosen.amount_cents)}</b> {period(chosen)} de tu tarjeta hasta que la
+            canceles desde tu cuenta de Mercado Pago (Suscripciones). Lo que ya pagaste sigue funcionando hasta que
+            termine el período.
+          </span>
+        </p>
+      )}
       <div className="flex flex-wrap items-center gap-3">
         <Button className="h-11" onClick={pay} disabled={!selected || !EMAIL_RE.test(email.trim()) || start.isPending}>
-          {start.isPending && <Loader2 className="animate-spin" />} Pagar con Mercado Pago
+          {start.isPending && <Loader2 className="animate-spin" />} Suscribirme con Mercado Pago
         </Button>
         <span className="flex items-center gap-1 text-xs text-muted-foreground">
           <ShieldCheck className="size-3.5" /> Los datos de tu tarjeta los maneja Mercado Pago, nunca pasan por esta app.

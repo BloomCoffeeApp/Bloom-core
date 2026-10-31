@@ -85,7 +85,12 @@ def _live_totals(db: Session, session_id: int) -> dict[str, Any]:
 
     sale_row = db.execute(
         select(func.count(Sale.id), func.coalesce(func.sum(Sale.total_cents), 0), func.coalesce(func.sum(Sale.discount_cents), 0))
-        .where(Sale.cash_session_id == session_id, Sale.status == "completed")
+        .where(Sale.cash_session_id == session_id, Sale.status == "completed", Sale.is_courtesy.is_(False))
+    ).one()
+    # Courtesies add $0 to the drawer (no payments); shown apart with the menu value given away.
+    courtesy_row = db.execute(
+        select(func.count(Sale.id), func.coalesce(func.sum(Sale.courtesy_cents), 0))
+        .where(Sale.cash_session_id == session_id, Sale.status == "completed", Sale.is_courtesy.is_(True))
     ).one()
     void_row = db.execute(
         select(func.count(Sale.id), func.coalesce(func.sum(Sale.total_cents), 0))
@@ -103,6 +108,8 @@ def _live_totals(db: Session, session_id: int) -> dict[str, Any]:
         "discounts": int(sale_row[2]),
         "voided_count": int(void_row[0]),
         "voided_total": int(void_row[1]),
+        "courtesy_count": int(courtesy_row[0]),
+        "courtesy_cents": int(courtesy_row[1]),
         "movements": movements,
         "mv_in": mv_in,
         "mv_out": mv_out,
@@ -171,6 +178,8 @@ def session_summary(db: Session, s: CashSession, *, detail: bool = False) -> dic
         "avg_ticket_cents": totals["sales_total"] // totals["tickets"] if totals["tickets"] else 0,
         "voided_count": totals["voided_count"],
         "voided_total_cents": totals["voided_total"],
+        "courtesy_count": totals["courtesy_count"],
+        "courtesy_cents": totals["courtesy_cents"],
         "discounts_cents": totals["discounts"],
         "movements_in_cents": totals["mv_in"],
         "movements_out_cents": totals["mv_out"],
@@ -197,7 +206,7 @@ def session_summary(db: Session, s: CashSession, *, detail: bool = False) -> dic
             .join(Sale, Sale.id == SaleItem.sale_id)
             .outerjoin(Product, Product.id == SaleItem.product_id)
             .outerjoin(ProductCategory, ProductCategory.id == Product.category_id)
-            .where(Sale.cash_session_id == s.id, Sale.status == "completed")
+            .where(Sale.cash_session_id == s.id, Sale.status == "completed", Sale.is_courtesy.is_(False))
             .group_by(ProductCategory.id, ProductCategory.name)
             .order_by(func.sum(SaleItem.total_cents).desc())
         ).all()
@@ -241,7 +250,7 @@ def list_sessions(db: Session, limit: int = 60, offset: int = 0) -> list[dict[st
         sid: (int(cnt or 0), int(tot or 0))
         for sid, cnt, tot in db.execute(
             select(Sale.cash_session_id, func.count(Sale.id), func.sum(Sale.total_cents))
-            .where(Sale.cash_session_id.in_(ids), Sale.status == "completed")
+            .where(Sale.cash_session_id.in_(ids), Sale.status == "completed", Sale.is_courtesy.is_(False))
             .group_by(Sale.cash_session_id)
         )
     }

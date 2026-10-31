@@ -265,6 +265,14 @@ export function CloseCashDialog({
             <DiffText cents={missingCash ? null : totalDiff} className="text-lg" />
           </div>
         </div>
+        {session.courtesy_count > 0 && (
+          <p className="rounded-xl bg-primary/10 px-4 py-2.5 text-sm" data-testid="close-courtesy">
+            <span className="font-medium">
+              Cortesías: {session.courtesy_count} ({fmtMoney(session.courtesy_cents)} a precio de carta)
+            </span>
+            <span className="text-muted-foreground"> · no se cobraron, no suman al esperado.</span>
+          </p>
+        )}
         <div className="space-y-2">
           <Label htmlFor="close-notes">Observaciones</Label>
           <Textarea id="close-notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Opcional" rows={2} />

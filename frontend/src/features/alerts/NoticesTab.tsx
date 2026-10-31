@@ -1,6 +1,6 @@
 import { format } from 'date-fns'
 import { Clock, MoreHorizontal, Pencil, Pin, PinOff, Plus, StickyNote, Trash2 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { EmptyState } from '@/components/empty-state'
@@ -29,11 +29,12 @@ import { Textarea } from '@/components/ui/textarea'
 import { useAuth } from '@/lib/auth'
 import { fmtDateTime, fmtRelative, toDate } from '@/lib/format'
 import { cn } from '@/lib/utils'
+import { useDepsChanged } from '@/hooks/use-deps-changed'
 
 import { useDeleteNotice, useNotices, useSaveNotice } from './api'
 import type { Notice, NoticeColor } from './types'
 
-export const NOTICE_COLORS: Record<NoticeColor, { label: string; card: string; swatch: string }> = {
+const NOTICE_COLORS: Record<NoticeColor, { label: string; card: string; swatch: string }> = {
   amber: { label: 'Amarillo', card: 'bg-warning/15 border-warning/40', swatch: 'bg-warning' },
   rose: { label: 'Rojo', card: 'bg-destructive/10 border-destructive/30', swatch: 'bg-destructive' },
   sky: { label: 'Celeste', card: 'bg-info/10 border-info/30', swatch: 'bg-info' },
@@ -204,14 +205,13 @@ function NoticeFormDialog({
   const [color, setColor] = useState<NoticeColor>('amber')
   const [expires, setExpires] = useState('')
 
-  useEffect(() => {
-    if (!open) return
+  if (useDepsChanged([open, notice]) && open) {
     setTitle(notice?.title ?? '')
     setBody(notice?.body ?? '')
     setPinned(notice?.pinned ?? false)
     setColor(notice?.color ?? 'amber')
     setExpires(toLocalInput(notice?.expires_at ?? null))
-  }, [open, notice])
+  }
 
   const quickExpire = (hours: number) => {
     const d = new Date()

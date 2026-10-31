@@ -3,6 +3,7 @@ import {
   Banknote,
   BookUser,
   CreditCard,
+  Gift,
   Landmark,
   QrCode,
   Split,
@@ -15,6 +16,8 @@ import { useEffect, useState } from 'react'
 import { MoneyInput } from '@/components/money-input'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Switch } from '@/components/ui/switch'
 import { fmtMoney } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
@@ -31,6 +34,92 @@ const ICONS: Record<string, LucideIcon> = {
 }
 
 const BILLS = [100000, 200000, 1000000, 2000000]
+
+/** Courtesy ("invita la casa"): registered with its stock movements but $0 charged. */
+export interface CourtesyIn {
+  reason: string
+}
+
+export type CheckoutConfirm = (payments: PaymentIn[], courtesy: CourtesyIn | null) => void
+
+function CourtesyToggle({ on, onChange }: { on: boolean; onChange: (on: boolean) => void }) {
+  return (
+    <label
+      className={cn(
+        'flex min-h-14 cursor-pointer items-center gap-3 rounded-2xl border px-4 py-2 transition-colors',
+        on ? 'border-primary bg-primary/10' : 'bg-card hover:bg-muted',
+      )}
+    >
+      <Gift className={cn('size-6 shrink-0', on ? 'text-primary' : 'text-muted-foreground')} />
+      <span className="min-w-0 flex-1 leading-tight">
+        <span className="block font-medium">Cortesía (no se cobra)</span>
+        <span className="block text-xs text-muted-foreground">Invita la casa: descuenta stock pero no suma plata a la caja.</span>
+      </span>
+      <Switch checked={on} onCheckedChange={onChange} aria-label="Cortesía (no se cobra)" />
+    </label>
+  )
+}
+
+function CourtesyBody({
+  listTotal,
+  total,
+  submitting,
+  onConfirm,
+}: {
+  listTotal: number
+  total: number
+  submitting: boolean
+  onConfirm: CheckoutConfirm
+}) {
+  const [reason, setReason] = useState('')
+  const confirm = () => {
+    if (!submitting) onConfirm([], { reason: reason.trim() })
+  }
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' && !(e.target instanceof HTMLTextAreaElement)) {
+        e.preventDefault()
+        confirm()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  })
+
+  return (
+    <div className="grid gap-5 md:grid-cols-[1fr_1.1fr]">
+      <div className="rounded-2xl bg-primary/10 p-4 text-center" data-testid="courtesy-total">
+        <p className="text-sm text-muted-foreground">Total a cobrar</p>
+        <p className="tabular font-heading text-5xl font-semibold tracking-tight">{fmtMoney(0)}</p>
+        <p className="tabular mt-1 text-lg text-muted-foreground line-through">{fmtMoney(listTotal)}</p>
+        <p className="mt-1 text-xs text-muted-foreground">Valor a precio de carta</p>
+      </div>
+      <div className="flex flex-col gap-4">
+        <div className="space-y-2">
+          <label htmlFor="courtesy-reason" className="text-sm font-medium">
+            Para quién / motivo <span className="font-normal text-muted-foreground">(opcional)</span>
+          </label>
+          <Input
+            id="courtesy-reason"
+            value={reason}
+            maxLength={200}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="Ej.: cliente habitual, proveedor, compensación…"
+            className="h-12 text-base"
+          />
+          {listTotal !== total && (
+            <p className="text-xs text-muted-foreground">En una cortesía no se aplican descuentos ni canjes de puntos.</p>
+          )}
+          <p className="text-xs text-muted-foreground">Queda registrada a tu nombre y no suma puntos ni cuenta corriente.</p>
+        </div>
+        <Button className="mt-auto h-16 text-xl font-semibold" disabled={submitting} onClick={confirm}>
+          <Gift className="size-6" /> {submitting ? 'Registrando…' : 'Registrar cortesía'}
+        </Button>
+      </div>
+    </div>
+  )
+}
 
 interface PayRow {
   method: string
@@ -49,7 +138,7 @@ function CheckoutBody({
   methods: PaymentMethod[]
   customer: PosCustomer | null
   submitting: boolean
-  onConfirm: (payments: PaymentIn[]) => void
+  onConfirm: CheckoutConfirm
 }) {
   const [split, setSplit] = useState(false)
   const [rows, setRows] = useState<PayRow[]>(() => (total > 0 ? [{ method: 'efectivo', amount: total, tendered: null }] : []))
@@ -99,6 +188,7 @@ function CheckoutBody({
           amount_cents: r.amount,
           tendered_cents: r.method === 'efectivo' && r.tendered != null ? r.tendered : null,
         })),
+      null,
     )
   }
 
@@ -249,10 +339,52 @@ function CheckoutBody({
   )
 }
 
+function CheckoutContent({
+  total,
+  listTotal,
+  methods,
+  customer,
+  submitting,
+  onConfirm,
+}: {
+  total: number
+  listTotal: number
+  methods: PaymentMethod[]
+  customer: PosCustomer | null
+  submitting: boolean
+  onConfirm: CheckoutConfirm
+}) {
+  const [courtesy, setCourtesy] = useState(false)
+  return (
+    <>
+      <DialogHeader>
+        <DialogTitle className="font-heading text-2xl">{courtesy ? 'Cortesía' : 'Cobrar'}</DialogTitle>
+        <DialogDescription>
+          {courtesy ? 'Invita la casa. Enter registra, Esc cancela.' : 'Elegí el medio de pago. Enter confirma, Esc cancela.'}
+        </DialogDescription>
+      </DialogHeader>
+      <CourtesyToggle on={courtesy} onChange={setCourtesy} />
+      {courtesy ? (
+        <CourtesyBody listTotal={listTotal} total={total} submitting={submitting} onConfirm={onConfirm} />
+      ) : (
+        <CheckoutBody
+          key={total}
+          total={total}
+          methods={methods}
+          customer={customer}
+          submitting={submitting}
+          onConfirm={onConfirm}
+        />
+      )}
+    </>
+  )
+}
+
 export function CheckoutDialog({
   open,
   onOpenChange,
   total,
+  listTotal,
   methods,
   customer,
   submitting,
@@ -261,22 +393,21 @@ export function CheckoutDialog({
   open: boolean
   onOpenChange: (o: boolean) => void
   total: number
+  /** Menu value of the cart (no discounts/points): what a courtesy gives away. */
+  listTotal: number
   methods: PaymentMethod[]
   customer: PosCustomer | null
   submitting: boolean
-  onConfirm: (payments: PaymentIn[]) => void
+  onConfirm: CheckoutConfirm
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[95svh] overflow-y-auto sm:max-w-4xl">
-        <DialogHeader>
-          <DialogTitle className="font-heading text-2xl">Cobrar</DialogTitle>
-          <DialogDescription>Elegí el medio de pago. Enter confirma, Esc cancela.</DialogDescription>
-        </DialogHeader>
+        {/* Mounted only while open, so the courtesy toggle starts off on every checkout. */}
         {open && (
-          <CheckoutBody
-            key={total}
+          <CheckoutContent
             total={total}
+            listTotal={listTotal}
             methods={methods}
             customer={customer}
             submitting={submitting}

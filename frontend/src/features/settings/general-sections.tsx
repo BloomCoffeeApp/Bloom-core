@@ -12,7 +12,8 @@ import { type Theme, useTheme } from '@/lib/theme'
 import { cn } from '@/lib/utils'
 
 import { useAudit, useSaveSetting } from './api'
-import { Field, NumberInput, SettingsCard, SwitchRow, validNumbers } from './form'
+import { Field, NumberInput, SettingsCard, SwitchRow } from './form'
+import { validNumbers } from './validation'
 import type { AlertsSettings, AuditRow, BusinessSettings, LoyaltySettings } from './types'
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)

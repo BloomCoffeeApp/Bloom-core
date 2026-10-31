@@ -8,8 +8,8 @@ import App from '@/App'
 import { Toaster } from '@/components/ui/sonner'
 import { DesktopProvider } from '@/components/window-controls'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import { AuthProvider } from '@/lib/auth'
-import { ThemeProvider } from '@/lib/theme'
+import { AuthProvider } from '@/lib/auth-provider'
+import { ThemeProvider } from '@/lib/theme-provider'
 
 const queryClient = new QueryClient({
   defaultOptions: {

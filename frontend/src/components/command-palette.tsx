@@ -9,7 +9,7 @@ import {
   CommandItem,
   CommandList,
 } from '@/components/ui/command'
-import { useTour } from '@/features/tutorial/tour'
+import { useTour } from '@/features/tutorial/use-tour'
 import { useAuth } from '@/lib/auth'
 import { NAV } from '@/lib/nav'
 

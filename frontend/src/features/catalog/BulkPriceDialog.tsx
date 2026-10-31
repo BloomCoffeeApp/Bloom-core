@@ -1,5 +1,5 @@
 import { ArrowRight, Eye, Percent } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { useDepsChanged } from '@/hooks/use-deps-changed'
 import { fmtMoney, fmtPct } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
@@ -29,17 +30,15 @@ export function BulkPriceDialog({ open, onOpenChange }: { open: boolean; onOpenC
   const [rounding, setRounding] = useState('5000')
   const [preview, setPreview] = useState<BulkPriceResult | null>(null)
 
-  useEffect(() => {
-    if (open) {
-      setPreview(null)
-      setPercent('10')
-      setCategory('all')
-      setRounding('5000')
-    }
-  }, [open])
-
+  // Reset the form each time the dialog opens.
+  if (useDepsChanged([open]) && open) {
+    setPreview(null)
+    setPercent('10')
+    setCategory('all')
+    setRounding('5000')
+  }
   // Any parameter change invalidates the preview.
-  useEffect(() => setPreview(null), [category, percent, rounding])
+  if (useDepsChanged([category, percent, rounding])) setPreview(null)
 
   const pct = Number(percent.replace(',', '.'))
   const valid = Number.isFinite(pct) && pct !== 0 && pct > -90

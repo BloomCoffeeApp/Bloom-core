@@ -94,6 +94,8 @@ export interface SystemInfo {
   lan_url: string | null
   port: number
   lan_enabled: boolean
+  lan_active: boolean
+  network_public: boolean
 }
 
 export interface RestoreResult {

@@ -1,35 +1,13 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 
 import { api, setUnauthorizedHandler, tokenStore } from '@/lib/api'
-
-export type Role = 'admin' | 'encargado' | 'cajero' | 'barista'
-export interface AuthUser {
-  id: number
-  name: string
-  role: Role
-  color: string
-}
-interface LoginResponse {
-  token: string
-  user: AuthUser
-}
-
-interface AuthState {
-  user: AuthUser | null
-  loading: boolean
-  login: (userId: number, pin: string) => Promise<void>
-  completeLogin: (res: LoginResponse) => void
-  logout: () => Promise<void>
-  /** True when the user's role is allowed (admin always passes). */
-  can: (...roles: Role[]) => boolean
-}
-
-const AuthContext = createContext<AuthState | null>(null)
+import { AuthContext, type AuthUser, type LoginResponse, type Role } from '@/lib/auth'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
-  const [loading, setLoading] = useState(true)
+  // Without a stored token there is no session to restore, so we start out not loading.
+  const [loading, setLoading] = useState(() => !!tokenStore.get())
   const qc = useQueryClient()
 
   const clear = useCallback(() => {
@@ -40,10 +18,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     setUnauthorizedHandler(clear)
-    if (!tokenStore.get()) {
-      setLoading(false)
-      return
-    }
+    if (!tokenStore.get()) return
     api
       .get<AuthUser>('/auth/me')
       .then(setUser)
@@ -78,10 +53,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [user, loading, login, completeLogin, logout, can],
   )
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
-}
-
-export function useAuth() {
-  const ctx = useContext(AuthContext)
-  if (!ctx) throw new Error('useAuth must be used inside AuthProvider')
-  return ctx
 }

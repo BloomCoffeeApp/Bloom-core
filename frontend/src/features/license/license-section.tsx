@@ -7,7 +7,6 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
-import { fmtDate } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 import { SettingsCard } from '../settings/form'
@@ -22,27 +21,12 @@ import {
   useRefreshLicense,
   useStartTrial,
 } from './api'
+import { describePlan } from './describe-plan'
 import { ProBadge } from './pro-gate'
 import { CheckoutDialog, type CheckoutRef, SubscribeCard } from './subscribe-card'
 
-const fromUnix = (s: number | null) => (s ? new Date(s * 1000) : null)
-
 function PlanSummary({ info }: { info: LicenseInfo }) {
-  const until = fromUnix(info.expires_at)
-  let title = 'Plan gratuito'
-  let detail = 'Punto de venta, caja, productos, stock, clientes y avisos. Sin vencimiento.'
-  if (info.valid && info.perpetual) {
-    title = `${info.pro_label} · licencia perpetua`
-    detail = `A nombre de ${info.customer}. No vence.`
-  } else if (info.valid && info.plan === 'trial') {
-    title = `Prueba de ${info.pro_label}`
-    detail = `Termina el ${fmtDate(until)} (${info.days_left} día/s).`
-  } else if (info.valid) {
-    title = info.pro_label
-    detail = info.in_grace
-      ? `Vencida el ${fmtDate(until)}: sigue activa ${info.days_left} día(s) más mientras se renueva.`
-      : `A nombre de ${info.customer}. Paga hasta el ${fmtDate(until)}.`
-  }
+  const { title, detail } = describePlan(info)
   return (
     <div
       className={cn(

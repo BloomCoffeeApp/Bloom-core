@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import JSON, DateTime, Float, ForeignKey, String, Text
+from sqlalchemy import JSON, DateTime, Float, ForeignKey, String, Text, false
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, IdMixin, TimestampMixin, utcnow
@@ -63,6 +63,11 @@ class Sale(IdMixin, Base):
     points_earned: Mapped[int] = mapped_column(default=0)
     points_redeemed: Mapped[int] = mapped_column(default=0)
     status: Mapped[str] = mapped_column(String(12), default="completed")  # completed|voided
+    # Courtesy ("invita la casa"): stock moves as a normal sale but nothing is charged. Totals are 0 and
+    # the menu value given away is kept in courtesy_cents; revenue/ticket aggregates exclude these sales.
+    is_courtesy: Mapped[bool] = mapped_column(default=False, server_default=false())
+    courtesy_cents: Mapped[int] = mapped_column(default=0, server_default="0")
+    courtesy_reason: Mapped[str | None] = mapped_column(String(200))
     notes: Mapped[str | None] = mapped_column(Text)
     void_reason: Mapped[str | None] = mapped_column(Text)
     voided_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))

@@ -17,7 +17,8 @@ import { cn } from '@/lib/utils'
 import { useProductCategories, useProducts } from './api'
 import { BulkPriceDialog } from './BulkPriceDialog'
 import { ProductEditor } from './ProductEditor'
-import { CategoryChip, categoryIcon, MarginBadge, marginTextClass, palette } from './shared'
+import { categoryIcon, marginTextClass, palette } from './catalog-utils'
+import { CategoryChip, MarginBadge } from './shared'
 import type { Product } from './types'
 
 export function ProductsTab() {

@@ -35,14 +35,13 @@ import { fmtDate, fmtMoney, fmtQty } from '@/lib/format'
 import { useDeactivateStockItem, useStockCategories, useStockItems, useStockSummary } from './api'
 import {
   AdjustDialog,
-  bulkCost,
-  bulkUnit,
   LevelBar,
   MovementsSheet,
   StatusBadge,
   StockItemDialog,
   WasteDialog,
 } from './components'
+import { bulkCost, bulkUnit } from './stock-utils'
 import type { StockItem, StockStatus } from './types'
 
 type StatusFilter = 'all' | StockStatus

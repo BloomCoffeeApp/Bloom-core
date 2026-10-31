@@ -1,39 +1,11 @@
 import { Copy, Minus, Square, X } from 'lucide-react'
-import { createContext, type MouseEvent, type ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
 
+import { type DesktopApi, DesktopContext, type Edge, readApi, useDesktop, useTitleBarDrag } from '@/components/use-desktop'
 import { BRAND } from '@/lib/brand'
 import { cn } from '@/lib/utils'
 
 import { Logo } from './logo'
-
-/** Python API exposed by desktop_window.py when running inside the desktop app. */
-interface DesktopApi {
-  is_desktop: () => Promise<boolean>
-  minimize: () => Promise<void>
-  toggle_maximize: () => Promise<boolean>
-  is_maximized: () => Promise<boolean>
-  close: () => Promise<void>
-  start_drag: () => Promise<void>
-  start_resize: (edge: Edge) => Promise<void>
-}
-
-type Edge = 'top' | 'bottom' | 'left' | 'right' | 'topleft' | 'topright' | 'bottomleft' | 'bottomright'
-
-declare global {
-  interface Window {
-    pywebview?: { api?: Partial<DesktopApi> }
-  }
-}
-
-interface DesktopState {
-  api: DesktopApi | null
-  maximized: boolean
-  toggleMaximize: () => void
-}
-
-const DesktopContext = createContext<DesktopState>({ api: null, maximized: false, toggleMaximize: () => {} })
-
-const readApi = () => (window.pywebview?.api?.start_drag ? (window.pywebview.api as DesktopApi) : null)
 
 /** Wrap the app once. Outside the desktop window (browser, tablet) everything is a no-op. */
 export function DesktopProvider({ children }: { children: ReactNode }) {
@@ -67,36 +39,6 @@ export function DesktopProvider({ children }: { children: ReactNode }) {
       {api && !maximized && <ResizeEdges api={api} />}
     </DesktopContext.Provider>
   )
-}
-
-export const useDesktop = () => useContext(DesktopContext)
-
-const INTERACTIVE = 'button, a, input, textarea, select, [role="button"], [role="menuitem"], [data-no-drag]'
-
-/** Mouse handlers that make an element behave like a native title bar. */
-export function useTitleBarDrag({ selfOnly = false }: { selfOnly?: boolean } = {}) {
-  const { api, toggleMaximize } = useDesktop()
-  return useMemo(() => {
-    if (!api) return {}
-    let lastDown = 0
-    return {
-      onMouseDown: (e: MouseEvent) => {
-        if (e.button !== 0 || (e.target as Element).closest(INTERACTIVE)) return
-        // selfOnly: drag only from the element's own background (e.g. the window margin).
-        if (selfOnly && e.target !== e.currentTarget) return
-        const now = performance.now()
-        // Windows' drag loop swallows the second click, so detect double-click here.
-        if (now - lastDown < 350) {
-          lastDown = 0
-          toggleMaximize()
-          return
-        }
-        lastDown = now
-        e.preventDefault()
-        void api.start_drag()
-      },
-    }
-  }, [api, toggleMaximize, selfOnly])
 }
 
 /** Minimize / maximize / close, styled like Windows 11 caption buttons. */

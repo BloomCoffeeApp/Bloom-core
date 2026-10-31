@@ -1,5 +1,5 @@
 import { ArrowLeft, CheckCheck, ClipboardCheck, ClipboardList, Plus, X } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 
 import { ConfirmDialog } from '@/components/confirm-dialog'
@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label'
 import { Progress } from '@/components/ui/progress'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useDepsChanged } from '@/hooks/use-deps-changed'
 import { fmtDateTime, fmtMoney, fmtNumber, fmtQty } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
@@ -164,7 +165,8 @@ export function CountListPage() {
 
 function CountRow({ item, editable, onSave }: { item: CountItem; editable: boolean; onSave: (v: number | null) => void }) {
   const [text, setText] = useState(item.counted_qty == null ? '' : String(item.counted_qty))
-  useEffect(() => setText(item.counted_qty == null ? '' : String(item.counted_qty)), [item.counted_qty])
+  // Follow server-side changes to the counted quantity.
+  if (useDepsChanged([item.counted_qty], false)) setText(item.counted_qty == null ? '' : String(item.counted_qty))
   const commit = () => {
     const t = text.trim().replace(',', '.')
     const v = t === '' ? null : Number(t)

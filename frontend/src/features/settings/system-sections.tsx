@@ -36,12 +36,13 @@ import {
   useSystemInfo,
 } from './api'
 import { Field, NumberInput, SettingsCard, SwitchRow } from './form'
+import { LanHelp } from './lan-help'
 import type { BackupRow, BackupSettings, PaymentMethod, RestoreResult } from './types'
 import { Logo } from '@/components/logo'
 import { useHasFeature } from '@/features/license/api'
 import { BRAND } from '@/lib/brand'
 
-export function fmtBytes(n: number | null | undefined) {
+function fmtBytes(n: number | null | undefined) {
   if (n == null) return '—'
   if (n < 1024) return `${n} B`
   if (n < 1024 ** 2) return `${fmtNumber(n / 1024, 1)} KB`
@@ -120,7 +121,7 @@ export function BackupSection({ settings }: { settings: BackupSettings }) {
         ),
       },
     ],
-    [downloading],
+    [downloading, canExport],
   )
 
   return (
@@ -230,7 +231,6 @@ export function NetworkSection({ initialEnabled }: { initialEnabled: boolean }) 
   const info = useSystemInfo(true)
   const save = useSaveSetting('network', 'Modo red local actualizado')
   const [enabled, setEnabled] = useState(initialEnabled)
-  const [changed, setChanged] = useState(false)
   const qr = useLanQr(enabled && !!info.data?.lan_url)
   const url = info.data?.lan_url
   return (
@@ -249,7 +249,7 @@ export function NetworkSection({ initialEnabled }: { initialEnabled: boolean }) 
                   {
                     onSuccess: () => {
                       setEnabled(v)
-                      setChanged(true)
+                      void info.refetch()
                     },
                   },
                 )
@@ -257,10 +257,10 @@ export function NetworkSection({ initialEnabled }: { initialEnabled: boolean }) 
             />
           }
         />
-        {changed && (
+        {enabled && info.data && !info.data.lan_active && (
           <div className="flex items-start gap-3 rounded-xl border border-warning/50 bg-warning/15 p-3 text-sm">
             <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning-foreground dark:text-warning" />
-            Para que el cambio tome efecto, cerrá y volvé a abrir la aplicación.
+            Todavía no se puede entrar desde otros dispositivos. Cerrá y volvé a abrir la aplicación.
           </div>
         )}
         {info.isLoading ? (
@@ -292,9 +292,7 @@ export function NetworkSection({ initialEnabled }: { initialEnabled: boolean }) 
               {info.data && info.data.lan_ips.length > 1 && (
                 <p className="text-xs text-muted-foreground">Otras IP de este equipo: {info.data.lan_ips.slice(1).join(', ')}</p>
               )}
-              <p className="text-xs text-muted-foreground">
-                Si no abre, revisá que el firewall de Windows permita conexiones al puerto {info.data?.port}.
-              </p>
+              {enabled && <LanHelp info={info.data} />}
             </div>
           </div>
         )}

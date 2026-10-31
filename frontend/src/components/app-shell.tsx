@@ -1,10 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
-import { Bell, CircleHelp, GraduationCap, Lock, LogOut, Monitor, Moon, Search, Sun } from 'lucide-react'
+import { Bell, CircleHelp, GraduationCap, Lock, LogOut, Monitor, Moon, Search, Sparkles, Sun } from 'lucide-react'
 import { Fragment, useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 
 import { CommandPalette } from '@/components/command-palette'
-import { useDesktop, useTitleBarDrag, WindowControls } from '@/components/window-controls'
+import { useDesktop, useTitleBarDrag } from '@/components/use-desktop'
+import { WindowControls } from '@/components/window-controls'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -33,11 +34,13 @@ import {
   SidebarRail,
   SidebarSeparator,
   SidebarTrigger,
-  useSidebar,
 } from '@/components/ui/sidebar'
+import { useSidebar } from '@/components/ui/sidebar-context'
+import { AVATAR_COLORS, initials } from '@/components/avatar-utils'
 import { hasFeature, useLicense } from '@/features/license/api'
-import { LicenseBanner, ProBadge } from '@/features/license/pro-gate'
-import { useTour } from '@/features/tutorial/tour'
+import { LICENSE_TAB, LicenseBanner, ProBadge } from '@/features/license/pro-gate'
+import { describePlan } from '@/features/license/describe-plan'
+import { useTour } from '@/features/tutorial/use-tour'
 import { useIdleLock } from '@/hooks/use-idle-lock'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
@@ -47,22 +50,6 @@ import { useTheme } from '@/lib/theme'
 import { cn } from '@/lib/utils'
 import { Logo } from '@/components/logo'
 import { BRAND } from '@/lib/brand'
-
-export const AVATAR_COLORS: Record<string, string> = {
-  amber: 'bg-amber-500/20 text-amber-700 dark:text-amber-300',
-  sky: 'bg-sky-500/20 text-sky-700 dark:text-sky-300',
-  emerald: 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300',
-  violet: 'bg-violet-500/20 text-violet-700 dark:text-violet-300',
-  rose: 'bg-rose-500/20 text-rose-700 dark:text-rose-300',
-  orange: 'bg-orange-500/20 text-orange-700 dark:text-orange-300',
-}
-
-export const initials = (name: string) =>
-  name
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((p) => p[0]?.toUpperCase())
-    .join('')
 
 interface AlertSummary {
   open: number
@@ -185,11 +172,37 @@ export function AppShell() {
                 </Avatar>
                 <div className="grid text-left leading-tight group-data-[collapsible=icon]:hidden">
                   <span className="truncate text-sm font-medium">{user.name}</span>
-                  <span className="truncate text-xs text-muted-foreground">{ROLE_LABEL[user.role]}</span>
+                  <span className="flex items-center gap-1.5 truncate text-xs text-muted-foreground">
+                    {ROLE_LABEL[user.role]}
+                    {license.data?.valid && <ProBadge />}
+                  </span>
                 </div>
               </SidebarMenuButton>
             </DropdownMenuTrigger>
-            <DropdownMenuContent side="top" align="start" className="w-56">
+            <DropdownMenuContent side="top" align="start" className="w-72">
+              {license.data && (
+                <>
+                  <DropdownMenuItem asChild className="items-start gap-3 py-2">
+                    <Link to={LICENSE_TAB} aria-label={`Plan: ${describePlan(license.data).title}`}>
+                      <span
+                        className={cn(
+                          'mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg',
+                          license.data.valid ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground',
+                        )}
+                      >
+                        <Sparkles className="size-4" />
+                      </span>
+                      <span className="grid gap-0.5 leading-tight">
+                        <span className="text-sm font-medium">{describePlan(license.data).title}</span>
+                        <span className="text-xs whitespace-normal text-muted-foreground">
+                          {license.data.valid ? describePlan(license.data).detail : `Conocé ${license.data.pro_label}`}
+                        </span>
+                      </span>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              )}
               <DropdownMenuLabel>Tema</DropdownMenuLabel>
               <DropdownMenuItem onClick={() => setTheme('light')}>
                 <Sun /> Claro {theme === 'light' && '✓'}

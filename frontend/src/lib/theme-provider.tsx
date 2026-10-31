@@ -1,24 +1,9 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 
-export type Theme = 'light' | 'dark' | 'system'
-const KEY = 'cafe.theme'
-
-const ThemeContext = createContext<{ theme: Theme; setTheme: (t: Theme) => void }>({
-  theme: 'system',
-  setTheme: () => undefined,
-})
-
-function readStored(): Theme {
-  try {
-    const v = localStorage.getItem(KEY)
-    return v === 'light' || v === 'dark' ? v : 'system'
-  } catch {
-    return 'system'
-  }
-}
+import { readStoredTheme, type Theme, THEME_KEY, ThemeContext } from '@/lib/theme'
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>(readStored)
+  const [theme, setThemeState] = useState<Theme>(readStoredTheme)
 
   useEffect(() => {
     const mq = window.matchMedia('(prefers-color-scheme: dark)')
@@ -33,7 +18,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const setTheme = (t: Theme) => {
     try {
-      localStorage.setItem(KEY, t)
+      localStorage.setItem(THEME_KEY, t)
     } catch {
       /* ignore */
     }
@@ -41,5 +26,3 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }
   return <ThemeContext.Provider value={{ theme, setTheme }}>{children}</ThemeContext.Provider>
 }
-
-export const useTheme = () => useContext(ThemeContext)

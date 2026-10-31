@@ -6,7 +6,9 @@ import { useMemo, useState } from 'react'
 import { StatCard } from '@/components/stat-card'
 import { useHasFeature } from '@/features/license/api'
 import { proModules } from '@pro'
-import { presetRange, PresetToggle, type PresetKey } from '@/components/report-kit'
+import { PresetToggle } from '@/components/report-kit'
+import { useNow } from '@/hooks/use-now'
+import { presetRange, type PresetKey } from '@/components/report-utils'
 import { useAuth } from '@/lib/auth'
 import { fmtDate, fmtMoney, fmtNumber, fmtPct } from '@/lib/format'
 
@@ -47,7 +49,7 @@ export function DashboardPage() {
   const d = dash.data
   const loading = dash.isLoading
   const showCosts = d?.show_costs ?? can('encargado')
-  const now = new Date()
+  const now = useNow()
   const compareHint = d ? `vs ${d.compare_label}` : undefined
   const periodLabel =
     range.from === range.to ? fmtDate(range.from) : `${fmtDate(range.from)} al ${fmtDate(range.to)}`

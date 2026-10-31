@@ -43,6 +43,9 @@ export interface CashSession {
   avg_ticket_cents: number
   voided_count: number
   voided_total_cents: number
+  /** Courtesies ("invita la casa"): $0 charged, not in totals; courtesy_cents = menu value given away. */
+  courtesy_count: number
+  courtesy_cents: number
   discounts_cents: number
   movements_in_cents: number
   movements_out_cents: number

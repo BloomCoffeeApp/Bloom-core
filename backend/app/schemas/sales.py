@@ -88,6 +88,8 @@ class CashSessionOut(BaseModel):
     avg_ticket_cents: int
     voided_count: int
     voided_total_cents: int
+    courtesy_count: int = 0
+    courtesy_cents: int = 0
     discounts_cents: int
     movements_in_cents: int
     movements_out_cents: int
@@ -142,6 +144,9 @@ class SaleIn(BaseModel):
     points_to_redeem: int = Field(default=0, ge=0)
     payments: list[PaymentIn] = []
     notes: str | None = None
+    # Courtesy ("invita la casa"): stock moves, nothing is charged (no payments, discounts or points).
+    is_courtesy: bool = False
+    courtesy_reason: str | None = Field(default=None, max_length=200)
 
 
 class SaleVoidIn(BaseModel):
@@ -182,6 +187,9 @@ class SaleOut(BaseModel):
     number: int
     ts: datetime
     status: str
+    is_courtesy: bool = False
+    courtesy_cents: int = 0
+    courtesy_reason: str | None = None
     channel: str
     table_label: str | None
     cash_session_id: int | None

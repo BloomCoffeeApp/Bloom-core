@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft, Delete } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 
-import { AVATAR_COLORS, initials } from '@/components/app-shell'
+import { AVATAR_COLORS, initials } from '@/components/avatar-utils'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'

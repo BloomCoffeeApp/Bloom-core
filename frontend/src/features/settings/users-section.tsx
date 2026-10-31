@@ -2,7 +2,7 @@ import { KeyRound, Loader2, Pencil, Plus, UserPlus } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
 
-import { AVATAR_COLORS, initials } from '@/components/app-shell'
+import { AVATAR_COLORS, initials } from '@/components/avatar-utils'
 import { type ColumnDef, DataTable } from '@/components/data-table'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'

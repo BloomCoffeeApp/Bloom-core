@@ -54,3 +54,28 @@ def test_unknown_api_path_is_404_not_the_spa(client):
     """A Pro endpoint missing in the Free edition must not fall through to index.html."""
     r = client.get("/api/no-existe")
     assert r.status_code == 404 and "text/html" not in r.headers.get("content-type", "")
+
+
+def test_lan_mode_switches_live_and_reports_reachability(seeded, monkeypatch):
+    """LAN mode is applied when the setting is saved (no restart) and the UI learns if phones can reach us."""
+    from app import lan
+    from app.services import system
+
+    client, admin = seeded
+    calls: list[bool] = []
+    monkeypatch.setattr(lan, "apply", calls.append)
+    monkeypatch.setattr(system, "network_category", lambda ip: "Public")
+    assert client.put("/api/settings/network", json={"lan_enabled": True}, headers=admin).status_code == 200
+    assert calls == [True]
+    info = client.get("/api/system/info", headers=admin).json()
+    assert info["lan_enabled"] is True and info["lan_active"] is True  # outside the launcher: trusts the setting
+    assert info["network_public"] is bool(info["lan_ips"])
+    client.put("/api/settings/network", json={"lan_enabled": False}, headers=admin)
+    assert calls == [True, False]
+
+
+def test_lan_listener_is_a_noop_outside_the_launcher():
+    from app import lan
+
+    lan.apply(True)  # tests/dev: never opens a network socket
+    assert lan._server is None and lan.active(False) is False

@@ -49,6 +49,10 @@ export interface Sale {
   number: number
   ts: string
   status: SaleStatus
+  /** Courtesy ("invita la casa"): total 0, stock moved; courtesy_cents = menu value given away. */
+  is_courtesy: boolean
+  courtesy_cents: number
+  courtesy_reason: string | null
   channel: Channel
   table_label: string | null
   cash_session_id: number | null
@@ -125,6 +129,8 @@ export interface SaleIn {
   points_to_redeem?: number
   payments: PaymentIn[]
   notes?: string | null
+  is_courtesy?: boolean
+  courtesy_reason?: string | null
 }
 
 export interface SalesFilters {

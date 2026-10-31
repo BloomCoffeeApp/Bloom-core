@@ -4,6 +4,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app import lan
 from app.auth import AdminOnly, CurrentUser, hash_pin, revoke_sessions
 from app.db import get_db
 from app.licensing import FREE_MAX_USERS, has_feature
@@ -76,4 +77,6 @@ def put_setting(
     settings_svc.put(db, key, value)
     audit.log(db, me.id, "update", "setting", None, {"key": key})
     db.commit()
+    if key == "network":
+        lan.apply(bool(isinstance(value, dict) and value.get("lan_enabled")))
     return {"key": key, "value": settings_svc.get(db, key)}

@@ -1,5 +1,5 @@
 import { ChevronDown, Layers, Pencil, Plus, Trash2 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { EmptyState } from '@/components/empty-state'
@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { fmtMoney, fmtNumber } from '@/lib/format'
+import { useDepsChanged } from '@/hooks/use-deps-changed'
 
 import { useStockItems } from '../stock/api'
 import { StockItemPicker } from '../stock/components'
@@ -42,8 +43,7 @@ function GroupDialog({ open, onOpenChange, group }: { open: boolean; onOpenChang
   const [max, setMax] = useState('1')
   const [mods, setMods] = useState<DraftMod[]>([])
 
-  useEffect(() => {
-    if (!open) return
+  if (useDepsChanged([open, group]) && open) {
     setName(group?.name ?? '')
     setMin(String(group?.min_select ?? 0))
     setMax(String(group?.max_select ?? 1))
@@ -56,7 +56,7 @@ function GroupDialog({ open, onOpenChange, group }: { open: boolean; onOpenChang
         recipe: m.recipe_items.map((r) => ({ key: key(), stock_item_id: r.stock_item_id, qty: String(r.qty_delta) })),
       })) ?? [{ key: key(), id: null, name: '', price: 0, recipe: [] }],
     )
-  }, [open, group])
+  }
 
   const upd = (k: string, patch: Partial<DraftMod>) => setMods((ms) => ms.map((m) => (m.key === k ? { ...m, ...patch } : m)))
   const minN = Number(min) || 0

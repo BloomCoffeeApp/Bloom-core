@@ -9,6 +9,7 @@ import {
   openPos,
   pickCustomer,
   productTile,
+  statCard,
   ticketNumber,
   uid,
 } from './helpers'
@@ -194,5 +195,62 @@ test.describe('POS', () => {
     await done.getByRole('button', { name: 'Nueva venta' }).click()
     await expect(done).toBeHidden()
     await expect(page.getByText('Carrito vacío')).toBeVisible()
+  })
+
+  test('courtesy ("invita la casa"): $0 charged, badge in sales, separate line in the cash close / Z', async ({ page, request, errors }) => {
+    await openPos(page)
+    const headers = await authHeaders(page)
+    const before = await (await request.get('/api/cash/current', { headers })).json()
+
+    await productTile(page, 'Medialuna').click()
+    await cartLine(page, 'Medialuna').getByRole('button', { name: 'Sumar' }).click()
+    await openCheckout(page)
+    await page.getByRole('switch', { name: 'Cortesía (no se cobra)' }).click()
+    const dialog = page.getByRole('dialog', { name: 'Cortesía' })
+    const total = dialog.getByTestId('courtesy-total')
+    await expect(total).toContainText(money(0))
+    await expect(total.locator('.line-through')).toHaveText(money(180_000))
+    await expect(dialog.getByRole('button', { name: 'Efectivo' })).toHaveCount(0) // no payment inputs
+    const reason = `Proveedor ${uid()}`
+    await dialog.getByLabel(/Para quién \/ motivo/).fill(reason)
+    await dialog.getByRole('button', { name: 'Registrar cortesía' }).click()
+    const done = page.getByRole('dialog').filter({ hasText: '¡Cortesía registrada!' })
+    await expect(done).toBeVisible()
+    await expect(done).toContainText(money(180_000))
+    const n = await ticketNumber(done)
+    await done.getByRole('button', { name: 'Nueva venta' }).click()
+
+    // Sales list: badge + $0, detail keeps the reason and the menu value.
+    await page.goto('/ventas')
+    await page.getByPlaceholder('N° de ticket').fill(String(n))
+    const row = page.getByRole('row').filter({ hasText: `#${n}` })
+    await expect(row.getByTestId('courtesy-badge')).toBeVisible()
+    await row.click()
+    const sheet = page.getByRole('dialog', { name: new RegExp(`Ticket #${n}`) })
+    await expect(sheet.getByTestId('courtesy-note')).toContainText(reason)
+    await expect(sheet.getByTestId('courtesy-note')).toContainText(money(180_000))
+    await page.keyboard.press('Escape')
+
+    // Cash: nothing expected changed; the courtesy shows apart.
+    const cur = await (await request.get('/api/cash/current', { headers })).json()
+    expect(cur.expected_cash_cents).toBe(before.expected_cash_cents)
+    expect(cur.sales_total_cents).toBe(before.sales_total_cents)
+    expect(cur.tickets).toBe(before.tickets)
+    expect(cur.courtesy_count).toBe(before.courtesy_count + 1)
+    const line = `Cortesías: ${cur.courtesy_count} (${money(cur.courtesy_cents)} a precio de carta)`
+    await page.goto('/caja')
+    await expect(statCard(page, 'Ventas del turno')).toContainText(line)
+
+    await page.getByRole('button', { name: 'Cerrar caja' }).click()
+    const close = page.getByRole('dialog', { name: /Cerrar caja · arqueo/ })
+    await expect(close.getByTestId('close-courtesy')).toContainText(line)
+    await close.getByLabel('Contado Efectivo').fill(String(Math.round(cur.expected_cash_cents / 100)))
+    await close.getByRole('button', { name: 'Cerrar caja' }).click()
+    await expect(close).toBeHidden()
+    const z = page.getByRole('dialog', { name: /Cierre de caja #\d+/ })
+    const zLine = z.getByText(`Cortesías (${cur.courtesy_count})`).locator('..')
+    await expect(zLine).toContainText(`${money(cur.courtesy_cents)} a precio de carta`)
+    await expect(z.getByText('Ventas', { exact: true }).locator('..')).toContainText(money(cur.sales_total_cents))
+    expect(errors.consoleErrors).toEqual([])
   })
 })

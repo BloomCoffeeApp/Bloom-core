@@ -17,6 +17,7 @@ import { fmtDate, fmtDateTime, fmtMoney, fmtNumber, isoDate, PAYMENT_LABEL } fro
 import { cn } from '@/lib/utils'
 
 import { usePaymentMethods, useSales } from './api'
+import { CourtesyBadge } from './courtesy-badge'
 import { SaleDetailSheet } from './detail-sheet'
 import { CHANNEL_LABEL, type SalesFilters } from './types'
 
@@ -118,6 +119,7 @@ function SalesPage() {
             <SelectItem value="all">Todos los estados</SelectItem>
             <SelectItem value="completed">Completadas</SelectItem>
             <SelectItem value="voided">Anuladas</SelectItem>
+            <SelectItem value="courtesy">Cortesías</SelectItem>
           </SelectContent>
         </Select>
         <Select value={method} onValueChange={reset(setMethod)}>
@@ -205,7 +207,15 @@ function SalesPage() {
                     {s.status === 'voided' ? (
                       <span className="inline-flex items-center gap-2">
                         <Badge variant="destructive">Anulada</Badge>
-                        <span className="tabular text-muted-foreground line-through">{fmtMoney(s.total_cents)}</span>
+                        <span className="tabular text-muted-foreground line-through">
+                          {fmtMoney(s.is_courtesy ? s.courtesy_cents : s.total_cents)}
+                        </span>
+                      </span>
+                    ) : s.is_courtesy ? (
+                      <span className="inline-flex items-center gap-2" title={s.courtesy_reason ?? undefined}>
+                        <CourtesyBadge />
+                        <span className="tabular text-muted-foreground line-through">{fmtMoney(s.courtesy_cents)}</span>
+                        <span className="tabular font-semibold">{fmtMoney(0)}</span>
                       </span>
                     ) : (
                       <span className="tabular font-semibold">{fmtMoney(s.total_cents)}</span>

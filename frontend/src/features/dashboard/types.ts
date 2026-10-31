@@ -40,6 +40,8 @@ export interface RecentSale {
   ts: string
   total_cents: number
   status: string
+  is_courtesy?: boolean
+  courtesy_cents?: number
   channel: string
   user_name: string | null
   items_count: number

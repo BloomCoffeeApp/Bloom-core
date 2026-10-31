@@ -63,7 +63,8 @@ def local_fmt_expr(fmt: str, col: Any) -> Any:
 
 
 def _completed(a: datetime, b: datetime) -> tuple[Any, ...]:
-    return (Sale.status == "completed", Sale.ts >= a, Sale.ts < b)
+    """Revenue-bearing sales in [a, b): completed and not a courtesy (those add $0 and aren't tickets)."""
+    return (Sale.status == "completed", Sale.is_courtesy.is_(False), Sale.ts >= a, Sale.ts < b)
 
 
 def _pct(part: float | int | None, whole: float | int | None) -> float | None:
@@ -130,7 +131,7 @@ def _kpis(db: Session, a: datetime, b: datetime) -> dict[str, Any]:
 def _hourly(db: Session, conds: list[Any]) -> dict[int, int]:
     h = local_fmt_expr("%H", Sale.ts)
     rows = db.execute(
-        select(h, func.sum(Sale.total_cents)).where(Sale.status == "completed", *conds).group_by(h)
+        select(h, func.sum(Sale.total_cents)).where(Sale.status == "completed", Sale.is_courtesy.is_(False), *conds).group_by(h)
     ).all()
     return {int(k): int(v or 0) for k, v in rows}
 
@@ -268,6 +269,8 @@ def recent_sales(db: Session, limit: int, pm_names: dict[str, str] | None = None
             "ts": s.ts,
             "total_cents": s.total_cents,
             "status": s.status,
+            "is_courtesy": s.is_courtesy,
+            "courtesy_cents": s.courtesy_cents,
             "channel": s.channel,
             "user_name": users.get(s.user_id) if s.user_id else None,
             "items_count": round(sum(i.qty for i in s.items), 2),

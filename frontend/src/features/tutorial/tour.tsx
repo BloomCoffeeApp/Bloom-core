@@ -1,5 +1,5 @@
 import { ChevronLeft, ChevronRight, X } from 'lucide-react'
-import { createContext, type ReactNode, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useState } from 'react'
+import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router'
 
@@ -8,14 +8,7 @@ import { useAuth } from '@/lib/auth'
 import { cn } from '@/lib/utils'
 
 import { TOUR_STEPS, type TourStep } from './steps'
-
-interface TourContextValue {
-  start: () => void
-}
-
-const TourContext = createContext<TourContextValue>({ start: () => {} })
-
-export const useTour = () => useContext(TourContext)
+import { TourContext } from './use-tour'
 
 const doneKey = (userId: number) => `bloom.tour.done.${userId}`
 
@@ -88,9 +81,11 @@ const GAP = 14
 
 /** Tracks the target's viewport rect; null while missing or hidden (e.g. collapsed mobile menu). */
 function useTargetRect(target: string | undefined, routeKey: string) {
-  const [rect, setRect] = useState<Rect | null>(null)
+  // Measurements are tagged with the target/route they belong to, so a stale rect from the
+  // previous step is never returned (instead of resetting it to null inside the effect).
+  const key = `${target ?? ''}|${routeKey}`
+  const [measured, setMeasured] = useState<{ key: string; rect: Rect | null }>({ key, rect: null })
   useLayoutEffect(() => {
-    setRect(null)
     if (!target) return
     let el: Element | null = null
     let frame = 0
@@ -98,7 +93,7 @@ function useTargetRect(target: string | undefined, routeKey: string) {
     const measure = () => {
       if (!el) return
       const r = el.getBoundingClientRect()
-      setRect(r.width && r.height ? { top: r.top, left: r.left, width: r.width, height: r.height } : null)
+      setMeasured({ key, rect: r.width && r.height ? { top: r.top, left: r.left, width: r.width, height: r.height } : null })
     }
     // The target may appear a little later (lazy routes, sidebar animation).
     const find = () => {
@@ -123,8 +118,8 @@ function useTargetRect(target: string | undefined, routeKey: string) {
       window.removeEventListener('resize', measure)
       window.removeEventListener('scroll', measure, true)
     }
-  }, [target, routeKey])
-  return rect
+  }, [target, key])
+  return measured.key === key ? measured.rect : null
 }
 
 function cardPosition(rect: Rect | null, cardH: number) {
@@ -174,9 +169,13 @@ function TourOverlay({
 
   const rect = useTargetRect(step.target, location.pathname)
 
+  // Track the card's height (it changes with each step's text) to position it.
   useLayoutEffect(() => {
-    if (card) setCardH(card.offsetHeight)
-  }, [card, step])
+    if (!card) return
+    const ro = new ResizeObserver(() => setCardH(card.offsetHeight))
+    ro.observe(card)
+    return () => ro.disconnect()
+  }, [card])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

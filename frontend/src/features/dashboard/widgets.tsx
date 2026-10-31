@@ -19,7 +19,8 @@ import { Button } from '@/components/ui/button'
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ChartContainer, ChartTooltip, type ChartConfig } from '@/components/ui/chart'
 import { Skeleton } from '@/components/ui/skeleton'
-import { BarList, chartColor, fmtMoneyCompact, MoneyTooltip } from '@/components/report-kit'
+import { BarList, MoneyTooltip } from '@/components/report-kit'
+import { chartColor, fmtMoneyCompact } from '@/components/report-utils'
 import { fmtDate, fmtMoney, fmtNumber, fmtPct, fmtRelative, fmtTime } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
@@ -388,10 +389,16 @@ export function RecentSales({ data, loading }: { data?: RecentSale[]; loading?: 
             <p className={cn('tabular text-sm font-semibold', s.status === 'voided' && 'text-muted-foreground line-through')}>
               {fmtMoney(s.total_cents)}
             </p>
-            {s.status === 'voided' && (
+            {s.status === 'voided' ? (
               <Badge variant="destructive" className="h-4 px-1.5 text-[10px]">
                 Anulado
               </Badge>
+            ) : (
+              s.is_courtesy && (
+                <Badge variant="outline" className="h-4 border-primary/40 px-1.5 text-[10px] text-primary">
+                  Cortesía
+                </Badge>
+              )
             )}
           </div>
         </li>

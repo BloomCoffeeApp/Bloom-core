@@ -103,9 +103,18 @@ def create_sale(db: Session, data: SaleIn, user: User) -> Sale:
 
 def _create_sale(db: Session, data: SaleIn, user: User) -> Sale:
     session = require_open_session(db)
+    courtesy = data.is_courtesy
 
     wants_discount = data.discount_cents > 0 or (data.discount_pct or 0) > 0 or any(i.discount_cents > 0 for i in data.items)
-    if wants_discount and not can_discount(user):
+    if courtesy:
+        # On the house: any cashier can do it (it's audited), but nothing else about money applies.
+        if wants_discount:
+            raise HTTPException(400, "Una cortesía no lleva descuentos")
+        if data.points_to_redeem:
+            raise HTTPException(400, "Una cortesía no permite canjear puntos")
+        if any(p.amount_cents > 0 for p in data.payments):
+            raise HTTPException(400, "Una cortesía no se cobra: sacá los pagos")
+    elif wants_discount and not can_discount(user):
         raise HTTPException(403, "Solo un encargado o administrador puede aplicar descuentos")
 
     # --- Load catalog in bulk ---
@@ -128,6 +137,7 @@ def _create_sale(db: Session, data: SaleIn, user: User) -> Sale:
     consumption: dict[int, float] = defaultdict(float)
     subtotal = 0
     cost_total = 0
+    courtesy_value = 0
     for it in data.items:
         p = products[it.product_id]
         mod_ids = list(dict.fromkeys(it.modifier_ids))
@@ -150,6 +160,11 @@ def _create_sale(db: Session, data: SaleIn, user: User) -> Sale:
         if it.discount_cents > gross:
             raise HTTPException(400, f"El descuento de {p.name} supera su importe")
         line_total = gross - it.discount_cents
+        # Courtesy lines keep the list price but are fully discounted, so every revenue sum sees 0.
+        line_discount = gross if courtesy else it.discount_cents
+        if courtesy:
+            line_total = 0
+        courtesy_value += gross if courtesy else 0
         unit_cost = recipes.cost_cents(db, p, mod_ids)
         line_cost = round(unit_cost * it.qty)
         for sid, q in recipes.consumption(db, p, mod_ids).items():
@@ -162,7 +177,7 @@ def _create_sale(db: Session, data: SaleIn, user: User) -> Sale:
                 name_snapshot=p.name,
                 qty=it.qty,
                 unit_price_cents=unit,
-                discount_cents=it.discount_cents,
+                discount_cents=line_discount,
                 total_cents=line_total,
                 cost_cents=line_cost,
                 modifiers=[{"id": m.id, "name": m.name, "price_delta_cents": m.price_delta_cents} for m in mods] or None,
@@ -234,7 +249,7 @@ def _create_sale(db: Session, data: SaleIn, user: User) -> Sale:
             raise HTTPException(400, f"Supera el límite de cuenta corriente (disponible ${available / 100:,.2f})")
 
     # --- Persist ---
-    points_earned = points_for(total, cfg) if customer else 0
+    points_earned = points_for(total, cfg) if customer and not courtesy else 0
     sale = Sale(
         number=next_number(db),
         cash_session_id=session.id,
@@ -250,6 +265,9 @@ def _create_sale(db: Session, data: SaleIn, user: User) -> Sale:
         points_redeemed=points_redeemed,
         notes=(data.notes or "").strip() or None,
         status="completed",
+        is_courtesy=courtesy,
+        courtesy_cents=courtesy_value,
+        courtesy_reason=((data.courtesy_reason or "").strip() or None) if courtesy else None,
     )
     sale.items = lines
     sale.payments = payments
@@ -257,7 +275,8 @@ def _create_sale(db: Session, data: SaleIn, user: User) -> Sale:
     db.flush()
 
     for sid, q in consumption.items():
-        stock.apply_movement(db, sid, -q, "sale", ref_type="sale", ref_id=sale.id, reason=f"Venta #{sale.number}", user_id=user.id)
+        reason = f"Cortesía #{sale.number}" if courtesy else f"Venta #{sale.number}"
+        stock.apply_movement(db, sid, -q, "sale", ref_type="sale", ref_id=sale.id, reason=reason, user_id=user.id)
 
     if customer:
         if points_redeemed:
@@ -270,7 +289,13 @@ def _create_sale(db: Session, data: SaleIn, user: User) -> Sale:
             customer.balance_cents += cc_amount
             db.add(CustomerAccountMovement(customer_id=customer.id, amount_cents=cc_amount, type="charge", method=CC, sale_id=sale.id, user_id=user.id))
 
-    audit.log(db, user.id, "create", "sale", sale.id, {"number": sale.number, "total_cents": total})
+    if courtesy:
+        audit.log(
+            db, user.id, "courtesy", "sale", sale.id,
+            {"number": sale.number, "courtesy_cents": courtesy_value, "reason": sale.courtesy_reason},
+        )
+    else:
+        audit.log(db, user.id, "create", "sale", sale.id, {"number": sale.number, "total_cents": total})
     return sale
 
 
@@ -342,6 +367,9 @@ def serialize(sale: Sale, unames: dict[int, str], cnames: dict[int, str], cfg: d
         "number": sale.number,
         "ts": sale.ts,
         "status": sale.status,
+        "is_courtesy": sale.is_courtesy,
+        "courtesy_cents": sale.courtesy_cents,
+        "courtesy_reason": sale.courtesy_reason,
         "channel": sale.channel,
         "table_label": sale.table_label,
         "cash_session_id": sale.cash_session_id,
@@ -403,7 +431,9 @@ def list_sales(
     if date_from or date_to:
         start, end = range_bounds_utc(date_from or date(2000, 1, 1), date_to or date(2100, 1, 1))
         conds += [Sale.ts >= start, Sale.ts < end]
-    if status:
+    if status == "courtesy":  # pseudo-status for the list filter: completed courtesy sales
+        conds += [Sale.status == "completed", Sale.is_courtesy.is_(True)]
+    elif status:
         conds.append(Sale.status == status)
     if user_id:
         conds.append(Sale.user_id == user_id)

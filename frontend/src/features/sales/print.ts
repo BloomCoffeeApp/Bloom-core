@@ -58,7 +58,7 @@ export function ticketHtml({ business, sale, payment_names }: TicketData) {
         .map((m) => `<div class="mod">+ ${esc(m.name)}${m.price_delta_cents ? ` (${esc(fmtMoney(m.price_delta_cents))})` : ''}</div>`)
         .join('')
       const note = it.notes ? `<div class="mod">» ${esc(it.notes)}</div>` : ''
-      const disc = it.discount_cents ? `<div class="row mod"><span>Desc.</span><span>-${esc(fmtMoney(it.discount_cents))}</span></div>` : ''
+      const disc = it.discount_cents && !sale.is_courtesy ? `<div class="row mod"><span>Desc.</span><span>-${esc(fmtMoney(it.discount_cents))}</span></div>` : ''
       return `<div class="row"><span>${esc(fmtNumber(it.qty))} x ${esc(it.name_snapshot)}</span><span>${esc(fmtMoney(it.total_cents + it.discount_cents))}</span></div>${mods}${note}${disc}`
     })
     .join('')
@@ -82,6 +82,7 @@ export function ticketHtml({ business, sale, payment_names }: TicketData) {
     <div class="row s"><span>${esc(CHANNEL_LABEL[sale.channel] ?? sale.channel)}${sale.table_label ? ` · Mesa ${esc(sale.table_label)}` : ''}</span><span>${esc(sale.user_name ?? '')}</span></div>
     ${sale.customer ? `<div class="s">Cliente: ${esc(sale.customer.name)}</div>` : ''}
     ${sale.status === 'voided' ? `<div class="void">ANULADO</div>` : ''}
+    ${sale.is_courtesy ? `<div class="c b">CORTESÍA · INVITA LA CASA</div>${sale.courtesy_reason ? `<div class="c s">${esc(sale.courtesy_reason)}</div>` : ''}` : ''}
     <hr/>
     ${lines}
     <hr/>

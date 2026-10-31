@@ -1,4 +1,4 @@
-import { CircleCheckBig, Lock, Printer, Plus, Unlock } from 'lucide-react'
+import { CircleCheckBig, Gift, Lock, Printer, Plus, Unlock } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Route, Routes } from 'react-router'
 import { toast } from 'sonner'
@@ -11,10 +11,10 @@ import { useCurrentCash } from '../cash/api'
 import { OpenCashDialog } from '../cash/dialogs'
 import { useCreateSale, usePaymentMethods } from '../sales/api'
 import { printTicket } from '../sales/print'
-import type { PaymentIn, SaleDetail } from '../sales/types'
+import type { SaleDetail } from '../sales/types'
 import { usePosCatalog, usePosConfig } from './api'
 import { CartPanel } from './cart-panel'
-import { CheckoutDialog } from './checkout-dialog'
+import { CheckoutDialog, type CheckoutConfirm } from './checkout-dialog'
 import { ModifierDialog } from './modifier-dialog'
 import { ProductGrid } from './product-grid'
 import type { PosProduct } from './types'
@@ -27,12 +27,13 @@ function SuccessDialog({ sale, onNew }: { sale: SaleDetail | null; onNew: () => 
         {sale && (
           <div className="flex flex-col items-center gap-4 py-2 text-center">
             <div className="flex size-20 items-center justify-center rounded-full bg-success/15 text-success">
-              <CircleCheckBig className="size-11" />
+              {sale.is_courtesy ? <Gift className="size-11" /> : <CircleCheckBig className="size-11" />}
             </div>
             <div>
-              <DialogTitle className="font-heading text-3xl">¡Venta cobrada!</DialogTitle>
+              <DialogTitle className="font-heading text-3xl">{sale.is_courtesy ? '¡Cortesía registrada!' : '¡Venta cobrada!'}</DialogTitle>
               <DialogDescription className="mt-1 text-base">
-                Ticket <span className="tabular font-semibold text-foreground">#{sale.number}</span> · {fmtMoney(sale.total_cents)}
+                Ticket <span className="tabular font-semibold text-foreground">#{sale.number}</span> ·{' '}
+                {sale.is_courtesy ? `Invita la casa (${fmtMoney(sale.courtesy_cents)} a precio de carta)` : fmtMoney(sale.total_cents)}
               </DialogDescription>
             </div>
             {sale.change_cents > 0 && (
@@ -111,7 +112,9 @@ function PosPage() {
     return () => window.removeEventListener('keydown', onKey)
   }, [checkout, modProduct, done, startCheckout])
 
-  const confirm = (payments: PaymentIn[]) => {
+  const listTotal = useMemo(() => cartApi.cart.lines.reduce((a, l) => a + l.unit_cents * l.qty, 0), [cartApi.cart.lines])
+
+  const confirm: CheckoutConfirm = (payments, courtesy) => {
     const { cart } = cartApi
     createSale.mutate(
       {
@@ -120,14 +123,17 @@ function PosPage() {
           qty: l.qty,
           modifier_ids: l.modifiers.map((m) => m.id),
           notes: l.notes || null,
-          discount_cents: l.discount_cents,
+          // A courtesy gives the whole cart away: no discounts, points or payments.
+          discount_cents: courtesy ? 0 : l.discount_cents,
         })),
         customer_id: cart.customer?.id ?? null,
         channel: cart.channel,
         table_label: cart.channel === 'salon' ? cart.table_label.trim() || null : null,
-        discount_cents: totals.discount,
-        points_to_redeem: cart.points_to_redeem,
-        payments,
+        discount_cents: courtesy ? 0 : totals.discount,
+        points_to_redeem: courtesy ? 0 : cart.points_to_redeem,
+        payments: courtesy ? [] : payments,
+        is_courtesy: !!courtesy,
+        courtesy_reason: courtesy?.reason || null,
       },
       {
         onSuccess: (sale) => {
@@ -178,6 +184,7 @@ function PosPage() {
         open={checkout}
         onOpenChange={setCheckout}
         total={totals.total}
+        listTotal={listTotal}
         methods={methods ?? []}
         customer={cartApi.cart.customer}
         submitting={createSale.isPending}

@@ -12,7 +12,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 
 import { EmptyState } from '@/components/empty-state'
 import { Badge } from '@/components/ui/badge'
@@ -35,6 +35,7 @@ import { Switch } from '@/components/ui/switch'
 import { useAuth } from '@/lib/auth'
 import { fmtTime } from '@/lib/format'
 import { cn } from '@/lib/utils'
+import { useDepsChanged } from '@/hooks/use-deps-changed'
 
 import { useChecklists, useChecklistsToday, useSaveChecklist, useToggleRunItem } from './api'
 import type { Checklist, ChecklistKind, ChecklistRun } from './types'
@@ -249,13 +250,12 @@ function ChecklistFormDialog({
   const [items, setItems] = useState<DraftItem[]>([])
   const [newText, setNewText] = useState('')
 
-  useEffect(() => {
-    if (!open) return
+  if (useDepsChanged([open, checklist]) && open) {
     setName(checklist?.name ?? '')
     setKind(checklist?.kind ?? 'custom')
     setItems(checklist?.items.map((i) => ({ key: `i${i.id}`, id: i.id, text: i.text })) ?? [])
     setNewText('')
-  }, [open, checklist])
+  }
 
   const add = () => {
     if (!newText.trim()) return

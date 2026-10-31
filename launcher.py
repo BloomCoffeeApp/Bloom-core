@@ -102,10 +102,15 @@ def main() -> None:
     if running:
         log.info("%s already running on %s; opening a window only", APP_DISPLAY_NAME, port)
     else:
-        host = "0.0.0.0" if lan_enabled() else "127.0.0.1"
-        threading.Thread(target=run_server, args=(host, port), daemon=True).start()
+        # Always on this PC; LAN mode adds a network listener that can be switched on/off live.
+        threading.Thread(target=run_server, args=("127.0.0.1", port), daemon=True).start()
     if not wait_ready(port):
         log.error("Server did not start in time")
+    elif not running:
+        from app import lan
+
+        lan.enable_switching()
+        lan.apply(lan_enabled())
     from desktop_window import WindowApi
 
     # Frameless: the UI draws its own title bar (drag, minimize, maximize, close).
