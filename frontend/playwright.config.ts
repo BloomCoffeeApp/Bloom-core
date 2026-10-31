@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
-import { defineConfig } from '@playwright/test'
+import { defineConfig, devices } from '@playwright/test'
 
 import { ADMIN_STATE, API_PORT, E2E_MACHINE, WEB_PORT } from './e2e/constants'
 
@@ -20,6 +20,8 @@ if (!process.env.BLOOM_E2E_DIR) {
   const tmp = os.tmpdir()
   for (const name of fs.readdirSync(tmp)) {
     if (!name.startsWith('bloom-e2e-')) continue
+    // Only stale runs: another suite may be running right now on other ports.
+    if (Date.now() - fs.statSync(path.join(tmp, name)).mtimeMs < 3 * 3600_000) continue
     try {
       fs.rmSync(path.join(tmp, name), { recursive: true, force: true })
     } catch {
@@ -30,6 +32,9 @@ if (!process.env.BLOOM_E2E_DIR) {
 }
 const DATA_DIR = process.env.BLOOM_E2E_DIR
 const PRO_LINK = path.join(FRONTEND, 'e2e', 'pro')
+const MOBILE = /\.mobile\.spec\.ts$/
+// Android phone (Chromium engine = the Edge channel used here; WebKit/iPhone would need a download).
+const PHONE = { ...devices['Pixel 7'], channel: process.env.PW_CHANNEL ?? 'msedge' }
 const PRO_E2E = fs.existsSync(PRO_LINK) ? fs.realpathSync(PRO_LINK) : null
 
 // Throwaway license key pair: the setup project signs a Pro license the e2e backend accepts.
@@ -42,14 +47,14 @@ const python = path.join(BACKEND, '.venv', 'Scripts', process.platform === 'win3
 
 export default defineConfig({
   testDir: './e2e',
-  outputDir: './test-results',
+  outputDir: `./test-results/${API_PORT}`,
   fullyParallel: false,
   workers: 1, // one shared DB
   retries: process.env.CI ? 1 : 0,
   forbidOnly: !!process.env.CI,
   timeout: 45_000,
   expect: { timeout: 10_000 },
-  reporter: [['list'], ['html', { open: 'never' }]],
+  reporter: [['list'], ['html', { open: 'never', outputFolder: `playwright-report/${API_PORT}` }]],
   use: {
     baseURL: `http://localhost:${WEB_PORT}`,
     channel: process.env.PW_CHANNEL ?? 'msedge',
@@ -65,15 +70,30 @@ export default defineConfig({
     {
       name: 'e2e',
       dependencies: ['setup'],
-      testIgnore: [/lockout\.spec\.ts/, /[\/]pro[\/]/],
+      testIgnore: [/lockout\.spec\.ts/, MOBILE],
       use: { storageState: ADMIN_STATE },
     },
+    // Phone-sized, touch: `*.mobile.spec.ts` (Android emulation on the same Edge engine).
+    { name: 'mobile', dependencies: ['setup'], testMatch: MOBILE, use: { ...PHONE, storageState: ADMIN_STATE } },
     // Pro edition specs (private repo, linked as a junction that Playwright doesn't follow).
     ...(PRO_E2E
-      ? [{ name: 'pro', testDir: PRO_E2E, dependencies: ['setup'], use: { storageState: ADMIN_STATE } }]
+      ? [
+          { name: 'pro', testDir: PRO_E2E, dependencies: ['setup'], testIgnore: MOBILE, use: { storageState: ADMIN_STATE } },
+          {
+            name: 'pro-mobile',
+            testDir: PRO_E2E,
+            dependencies: ['setup'],
+            testMatch: MOBILE,
+            use: { ...PHONE, storageState: ADMIN_STATE },
+          },
+        ]
       : []),
     // Locks the login for every user from this device (per-IP throttle), so it runs last.
-    { name: 'lockout', dependencies: PRO_E2E ? ['e2e', 'pro'] : ['e2e'], testMatch: /lockout\.spec\.ts/ },
+    {
+      name: 'lockout',
+      dependencies: PRO_E2E ? ['e2e', 'mobile', 'pro', 'pro-mobile'] : ['e2e', 'mobile'],
+      testMatch: /lockout\.spec\.ts/,
+    },
   ],
   webServer: [
     {
@@ -97,7 +117,7 @@ export default defineConfig({
       command: `npx vite --port ${WEB_PORT} --strictPort`,
       cwd: FRONTEND,
       url: `http://localhost:${WEB_PORT}`,
-      env: { CAFE_PORT: String(API_PORT), VITE_CACHE_DIR: 'node_modules/.vite-e2e' },
+      env: { CAFE_PORT: String(API_PORT), VITE_CACHE_DIR: `node_modules/.vite-e2e-${WEB_PORT}` },
       reuseExistingServer: false,
       timeout: 120_000,
     },
