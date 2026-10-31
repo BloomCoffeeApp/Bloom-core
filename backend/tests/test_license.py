@@ -136,3 +136,80 @@ def test_free_plan_limits(seeded):
     # Core keeps working on Free
     assert client.get("/api/dashboard", headers=h).status_code == 200
     assert client.get("/api/pos/catalog", headers=h).status_code == 200
+
+
+def test_subscription_checkout_activates_when_paid(seeded, signer, monkeypatch):
+    """The app side of Mercado Pago billing, with the license server simulated."""
+    from app.licensing import client as lc
+
+    client, h = seeded
+    state = {"status": "pending"}
+    calls = []
+
+    def fake_post(path, body):
+        calls.append((path, body))
+        return {"checkout_id": "co-1", "url": "https://www.mercadopago.com.ar/subscriptions/checkout?preapproval_id=x"}
+
+    def fake_get(path, query=None):
+        if path == "/v1/plans":
+            return {"currency": "ARS", "enabled": True, "plans": {"pro_mensual": {"label": "Pro mensual", "amount_cents": 1500000}}}
+        resp = {"status": state["status"], "plan": "pro_mensual"}
+        if state["status"] == "authorized":
+            resp |= {"key": "BLOOM-AAAAA-BBBBB-CCCCC-DDDDD", "token": signer()}
+        return resp
+
+    monkeypatch.setattr(lc, "_post", fake_post)
+    monkeypatch.setattr(lc, "_get", fake_get)
+
+    assert client.get("/api/license/plans", headers=h).json()["plans"]["pro_mensual"]["amount_cents"] == 1500000
+    r = client.post("/api/license/checkout", json={"plan": "pro_mensual", "email": "dueno@example.com"}, headers=h)
+    assert r.status_code == 200 and r.json()["url"].startswith("https://www.mercadopago.com.ar/")
+    assert calls[0][1]["email"] == "dueno@example.com" and calls[0][1]["machine_id"]
+    assert client.get("/api/license/checkout/co-1", headers=h).json()["status"] == "pending"
+    assert not client.get("/api/license", headers=h).json()["valid"]
+
+    state["status"] = "authorized"
+    r = client.get("/api/license/checkout/co-1", headers=h).json()
+    assert r["status"] == "authorized" and r["license"]["valid"] and r["key"].startswith("BLOOM-")
+    assert {"catalog", "pro_label", "pending_checkout"} <= r["license"].keys()  # full shape, like GET /license
+    assert client.get("/api/license", headers=h).json()["valid"]
+    # Bad email never reaches the server
+    assert client.post("/api/license/checkout", json={"plan": "pro_mensual", "email": "nope"}, headers=h).status_code == 422
+
+
+def test_pending_checkout_activates_in_background(seeded, signer, monkeypatch):
+    """Paid while the app was closed (or the dialog dismissed): the background job finishes it."""
+    from app.licensing import client as lc
+    from app.licensing import status as st
+
+    client, h = seeded
+    st.write_state(pending_checkout=None)
+    paid = {"done": False}
+    monkeypatch.setattr(lc, "server_url", lambda: "https://licencias.example.com")
+    monkeypatch.setattr(lc, "_post", lambda path, body: {"checkout_id": "co-9", "url": "https://mp.example/x"})
+
+    def fake_get(path, query=None):
+        if not paid["done"]:
+            return {"status": "pending", "plan": "pro_mensual"}
+        return {"status": "authorized", "plan": "pro_mensual", "key": "BLOOM-K", "token": signer()}
+
+    monkeypatch.setattr(lc, "_get", fake_get)
+    client.post("/api/license/checkout", json={"plan": "pro_mensual", "email": "a@example.com"}, headers=h)
+    assert client.get("/api/license", headers=h).json()["pending_checkout"] == "co-9"
+    lc.check_pending_checkout()
+    assert not st.current_status(force=True).valid  # not paid yet
+    paid["done"] = True
+    lc.check_pending_checkout()
+    assert st.current_status(force=True).valid
+    assert client.get("/api/license", headers=h).json()["pending_checkout"] is None
+
+
+def test_bad_token_from_server_never_replaces_a_working_license(seeded, signer, monkeypatch):
+    from app.licensing import client as lc
+    from app.licensing import status as st
+
+    st.store_token(signer())
+    monkeypatch.setattr(lc, "_post", lambda path, body: {"token": "BLOOM1.bad.token"})
+    with pytest.raises(lc.LicenseServerError):
+        lc.activate("BLOOM-XXXXX")
+    assert st.current_status(force=True).valid

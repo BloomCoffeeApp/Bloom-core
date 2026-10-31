@@ -22,8 +22,9 @@ def run_once() -> None:
             log.exception("alerts evaluation failed")
         cfg = settings_svc.get(db, "backup")
     try:
-        from app.licensing.client import refresh_if_due
+        from app.licensing.client import check_pending_checkout, refresh_if_due
 
+        check_pending_checkout()
         refresh_if_due()
     except Exception:
         log.exception("license refresh failed")

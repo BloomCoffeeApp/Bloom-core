@@ -23,6 +23,7 @@ import {
   useStartTrial,
 } from './api'
 import { ProBadge } from './pro-gate'
+import { CheckoutDialog, type CheckoutRef, SubscribeCard } from './subscribe-card'
 
 const fromUnix = (s: number | null) => (s ? new Date(s * 1000) : null)
 
@@ -75,9 +76,15 @@ export function LicenseSection() {
   const deactivate = useDeactivateLicense()
   const [key, setKey] = useState('')
   const [confirmOff, setConfirmOff] = useState(false)
+  const [checkout, setCheckout] = useState<CheckoutRef | null>(null)
+  const [resumed, setResumed] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   if (isLoading || !info) return <Skeleton className="h-64 rounded-2xl" />
+
+  // A purchase started earlier (e.g. the app was closed while paying) resumes its wait here.
+  const shownCheckout: CheckoutRef | null =
+    checkout ?? (info.pending_checkout && resumed !== info.pending_checkout ? { id: info.pending_checkout, url: null } : null)
 
   const onFile = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -115,9 +122,11 @@ export function LicenseSection() {
         )}
       </SettingsCard>
 
+      {info.server_configured && (!info.valid || info.plan === 'trial') && <SubscribeCard proLabel={info.pro_label} onStarted={setCheckout} />}
+
       {!(info.valid && info.perpetual) && (
         <SettingsCard
-          title={info.valid ? 'Cambiar de licencia' : `Activar ${info.pro_label}`}
+          title={info.valid ? 'Cambiar de licencia' : 'Ya tengo una clave'}
           description="Ingresá la clave que recibiste al suscribirte."
         >
           <form
@@ -182,6 +191,16 @@ export function LicenseSection() {
           </div>
         )}
       </SettingsCard>
+
+      {shownCheckout && (
+        <CheckoutDialog
+          checkout={shownCheckout}
+          onClose={() => {
+            setResumed(shownCheckout.id)
+            setCheckout(null)
+          }}
+        />
+      )}
 
       <ConfirmDialog
         open={confirmOff}

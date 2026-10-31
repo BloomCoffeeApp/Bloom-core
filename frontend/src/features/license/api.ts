@@ -32,6 +32,8 @@ export interface LicenseInfo {
   catalog: Record<ProFeature, string>
   free_max_users: number
   server_configured: boolean
+  /** A Mercado Pago purchase started on this PC that hasn't been confirmed yet. */
+  pending_checkout: string | null
 }
 
 export const licenseKey = ['license'] as const
@@ -83,3 +85,63 @@ export const useRefreshLicense = () =>
 
 export const useDeactivateLicense = () =>
   useLicenseMutation(() => api.delete<LicenseInfo>('/license'), () => 'Licencia desactivada en esta computadora.')
+
+// ---- subscriptions (paid in Mercado Pago through the license server)
+
+export interface Plan {
+  label: string
+  description?: string
+  amount_cents: number
+  frequency: number
+  frequency_type: 'months' | 'days'
+  devices: number
+}
+
+export interface PlansInfo {
+  currency: string
+  enabled: boolean
+  plans: Record<string, Plan>
+}
+
+export interface CheckoutStatus {
+  status: 'pending' | 'authorized' | 'paused' | 'cancelled'
+  key: string | null
+  license?: LicenseInfo
+}
+
+export function usePlans(enabled: boolean) {
+  return useQuery({
+    queryKey: ['license', 'plans'],
+    queryFn: () => api.get<PlansInfo>('/license/plans'),
+    enabled,
+    retry: false,
+    staleTime: 10 * 60_000,
+  })
+}
+
+export function useStartCheckout() {
+  return useMutation({
+    mutationFn: (data: { plan: string; email: string }) =>
+      api.post<{ checkout_id: string; url: string }>('/license/checkout', data),
+    onError: (e: Error) => toast.error(e.message),
+  })
+}
+
+/** Polls while the customer pays in Mercado Pago; the backend activates the license when authorized. */
+export function useCheckoutStatus(checkoutId: string | null) {
+  const qc = useQueryClient()
+  return useQuery({
+    queryKey: ['license', 'checkout', checkoutId],
+    queryFn: async () => {
+      const s = await api.get<CheckoutStatus>(`/license/checkout/${checkoutId}`)
+      if (s.license) {
+        qc.setQueryData(licenseKey, s.license)
+        qc.invalidateQueries({ predicate: (q) => q.queryKey[0] !== 'license' })
+      }
+      return s
+    },
+    enabled: !!checkoutId,
+    refetchInterval: (q) => (q.state.data?.status === 'authorized' ? false : 4000),
+    retry: true,
+  })
+}

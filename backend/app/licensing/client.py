@@ -5,11 +5,20 @@ import logging
 import os
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 
 from app.config import APP_VERSION, BRAND
 from app.licensing.machine import machine_id, machine_name
-from app.licensing.status import LicenseStatus, current_status, read_state, store_token, token_path, write_state
+from app.licensing.status import (
+    LicenseStatus,
+    current_status,
+    evaluate,
+    read_state,
+    store_token,
+    token_path,
+    write_state,
+)
 
 log = logging.getLogger("cafeteria.license")
 TIMEOUT_S = 12
@@ -49,6 +58,25 @@ def _post(path: str, body: dict) -> dict:
         raise LicenseServerError("No se pudo conectar con el servidor de licencias. Revisá la conexión a internet.") from e
 
 
+def _get(path: str, query: dict | None = None) -> dict:
+    url = server_url()
+    if not url:
+        raise LicenseServerError("Esta instalación no tiene servidor de licencias configurado.")
+    qs = f"?{urllib.parse.urlencode(query)}" if query else ""
+    req = urllib.request.Request(f"{url}{path}{qs}", headers={"User-Agent": f"{BRAND.get('appId')}/{APP_VERSION}"})
+    try:
+        with urllib.request.urlopen(req, timeout=TIMEOUT_S) as r:
+            return json.loads(r.read())
+    except urllib.error.HTTPError as e:
+        try:
+            detail = json.loads(e.read()).get("detail")
+        except Exception:
+            detail = None
+        raise LicenseServerError(detail or f"El servidor de licencias respondió {e.code}.") from e
+    except (urllib.error.URLError, TimeoutError, OSError) as e:
+        raise LicenseServerError("No se pudo conectar con el servidor de licencias. Revisá la conexión a internet.") from e
+
+
 def _device() -> dict:
     return {"machine_id": machine_id(), "machine_name": machine_name(), "app_version": APP_VERSION}
 
@@ -57,9 +85,11 @@ def _accept(resp: dict) -> LicenseStatus:
     token = resp.get("token")
     if not token:
         raise LicenseServerError("Respuesta inválida del servidor de licencias.")
+    # Validate before saving: a bad token must never replace a working license.
+    problem = evaluate(token).problem
+    if problem:
+        raise LicenseServerError(problem)
     status = store_token(token)
-    if status.problem:
-        raise LicenseServerError(status.problem)
     write_state(last_refresh=time.time(), last_error=None)
     return status
 
@@ -106,3 +136,50 @@ def refresh_if_due() -> None:
         refresh()
     except LicenseServerError as e:
         log.info("License refresh skipped: %s", e)
+
+
+# ---------------------------------------------------------------- subscriptions (paid in Mercado Pago)
+
+
+def plans() -> dict:
+    return _get("/v1/plans")
+
+
+def start_checkout(plan: str, email: str, business_name: str | None) -> dict:
+    """Returns {checkout_id, url}: the url is Mercado Pago's payment page."""
+    resp = _post("/v1/checkout", {"plan": plan, "email": email, "business_name": business_name, **_device()})
+    # Remembered so the license still activates if the app is closed while paying.
+    write_state(pending_checkout={"id": resp["checkout_id"], "at": time.time()})
+    return resp
+
+
+def checkout_status(checkout_id: str) -> dict:
+    """Polled by the app while the customer pays; activates the license as soon as it's authorized."""
+    resp = _get(f"/v1/checkout/{urllib.parse.quote(checkout_id)}", {"machine_id": machine_id()})
+    out = {"status": resp.get("status", "pending"), "key": resp.get("key")}
+    if resp.get("token"):
+        out["license"] = _accept(resp).as_dict()
+    if out.get("license") or out["status"] == "cancelled":
+        write_state(pending_checkout=None)
+    return out
+
+
+PENDING_CHECKOUT_DAYS = 7
+
+
+def pending_checkout_id() -> str | None:
+    pending = read_state().get("pending_checkout") or {}
+    if pending.get("id") and time.time() - float(pending.get("at", 0)) < PENDING_CHECKOUT_DAYS * 86_400:
+        return str(pending["id"])
+    return None
+
+
+def check_pending_checkout() -> None:
+    """Background job: finishes an activation whose payment completed while the app wasn't looking."""
+    checkout_id = pending_checkout_id()
+    if not checkout_id or not server_url():
+        return
+    try:
+        checkout_status(checkout_id)
+    except LicenseServerError as e:
+        log.info("Pending checkout not resolved yet: %s", e)
