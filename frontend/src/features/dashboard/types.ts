@@ -1,3 +1,5 @@
+import type { OrdersSummary } from '../orders/types'
+
 export interface Kpis {
   sales_cents: number
   tickets: number
@@ -74,6 +76,8 @@ export interface Dashboard {
   category_mix: MixRow[]
   channel_mix: MixRow[]
   recent_sales: RecentSale[]
+  /** Order screen in the range (null when there were no orders). */
+  orders?: OrdersSummary | null
 }
 
 /* ---- Contracts from other modules (tolerant: every field optional) ---- */

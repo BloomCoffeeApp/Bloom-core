@@ -9,11 +9,12 @@ Nothing here ever blocks access to the business' own day-to-day operation: when 
 license lapses only Pro features turn off.
 """
 
-from app.licensing.features import FREE_MAX_USERS, PRO_FEATURES, has_feature, require_feature
+from app.licensing.features import PRO_FEATURES, check_free_limit, free_limits, has_feature, require_feature
 from app.licensing.status import LicenseStatus, current_status
 
 __all__ = [
-    "FREE_MAX_USERS",
+    "check_free_limit",
+    "free_limits",
     "PRO_FEATURES",
     "LicenseStatus",
     "current_status",

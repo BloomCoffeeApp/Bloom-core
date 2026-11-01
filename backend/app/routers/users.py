@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app import lan
 from app.auth import AdminOnly, CurrentUser, hash_pin, revoke_sessions
 from app.db import get_db
-from app.licensing import FREE_MAX_USERS, has_feature
+from app.licensing import check_free_limit, has_feature
 from app.licensing.features import PRO_LABEL
 from app.models import User
 from app.schemas.users import UserCreate, UserOut, UserUpdate
@@ -25,8 +25,8 @@ def list_users(db: Session = Depends(get_db), _: User = AdminOnly) -> list[User]
 @router.post("/users", response_model=UserOut)
 def create_user(data: UserCreate, db: Session = Depends(get_db), me: User = AdminOnly) -> User:
     active = db.scalar(select(func.count(User.id)).where(User.active.is_(True))) or 0
-    if active >= FREE_MAX_USERS and not has_feature("users"):
-        raise HTTPException(402, f"El plan gratuito permite {FREE_MAX_USERS} usuarios. Con {PRO_LABEL} son ilimitados.")
+    if not has_feature("users"):
+        check_free_limit("users", active)
     user = User(name=data.name, pin_hash=hash_pin(data.pin), role=data.role, color=data.color)
     db.add(user)
     db.flush()

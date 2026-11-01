@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import JSON, DateTime, Float, ForeignKey, String, Text, UniqueConstraint, false
+from sqlalchemy import JSON, DateTime, Float, ForeignKey, String, Text, UniqueConstraint, false, true
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, IdMixin, TimestampMixin, utcnow
@@ -13,6 +13,10 @@ class ProductCategory(IdMixin, TimestampMixin, Base):
     icon: Mapped[str] = mapped_column(String(40), default="coffee")
     sort_order: Mapped[int] = mapped_column(default=0)
     active: Mapped[bool] = mapped_column(default=True)
+    # Whether its products go to the order screen (bar/kitchen); e.g. bakery handed over at the counter: no.
+    send_to_orders: Mapped[bool] = mapped_column(default=True, server_default=true())
+    # Pro (`orders_pro`): station whose screen prepares this category (None = the first station).
+    station_id: Mapped[int | None] = mapped_column(ForeignKey("order_stations.id", ondelete="SET NULL"))
 
 
 class Product(IdMixin, TimestampMixin, Base):
@@ -32,6 +36,8 @@ class Product(IdMixin, TimestampMixin, Base):
     long_description: Mapped[str | None] = mapped_column(Text)
     tags: Mapped[list[str] | None] = mapped_column(JSON)  # codes from catalog.PRODUCT_TAGS
     featured: Mapped[bool] = mapped_column(default=False, server_default=false())
+    # Target preparation time on the order screen (None = the channel's default).
+    prep_minutes: Mapped[int | None]
 
     recipe_items: Mapped[list["RecipeItem"]] = relationship(
         back_populates="product", cascade="all, delete-orphan"

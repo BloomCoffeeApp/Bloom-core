@@ -187,6 +187,7 @@ def product_out(
         long_description=p.long_description,
         tags=list(p.tags or []),
         featured=bool(p.featured),
+        prep_minutes=p.prep_minutes,
         cost_cents=cost,
         margin_pct=margin_pct(p.price_cents, cost),
         recipe_items=lines,

@@ -30,7 +30,7 @@ from app.models import (
     User,
 )
 from app.models.stock import MOVEMENT_TYPES
-from app.services import recipes
+from app.services import orders, recipes
 from app.services.timeutil import day_bounds_utc, local_now, local_today, range_bounds_utc
 
 _OFFSET_MIN = int((local_now().utcoffset() or timedelta(hours=-3)).total_seconds() // 60)
@@ -265,6 +265,7 @@ def dashboard(db: Session, start: date, end: date, show_costs: bool) -> dict[str
         "category_mix": category_mix,
         "channel_mix": channel_mix,
         "recent_sales": recent_sales(db, 8, pm_names),
+        "orders": orders.summary(db, start, end),
     }
 
 

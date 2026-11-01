@@ -116,6 +116,8 @@ export interface SaleItemIn {
   modifier_ids: number[]
   notes?: string | null
   discount_cents?: number
+  /** false = already sent to the bar (a table's tab). */
+  to_bar?: boolean
 }
 
 export interface PaymentIn {
@@ -136,6 +138,8 @@ export interface SaleIn {
   notes?: string | null
   is_courtesy?: boolean
   courtesy_reason?: string | null
+  /** Charging a table's open tab: it closes with this sale. */
+  tab_id?: number | null
 }
 
 export interface SalesFilters {

@@ -2,6 +2,7 @@ import {
   BarChart3,
   Bell,
   Boxes,
+  ClipboardList,
   Coffee,
   LayoutDashboard,
   type LucideIcon,
@@ -32,6 +33,7 @@ export interface NavItem {
 export const NAV: NavItem[] = [
   { to: '/', label: 'Inicio', icon: LayoutDashboard, roles: [], group: 'operacion' },
   { to: '/pos', label: 'Punto de venta', icon: ShoppingCart, roles: ['cajero', 'encargado'], group: 'operacion', shortcut: 'F1' },
+  { to: '/pedidos', label: 'Pedidos', icon: ClipboardList, roles: [], group: 'operacion' },
   { to: '/caja', label: 'Caja', icon: Wallet, roles: ['cajero', 'encargado'], group: 'operacion' },
   { to: '/barista', label: 'Barista', icon: Coffee, roles: ['barista', 'encargado'], group: 'operacion', feature: 'barista' },
   { to: '/productos', label: 'Productos', icon: Package, roles: ['encargado'], group: 'gestion' },

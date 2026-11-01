@@ -15,4 +15,8 @@ export interface ProModules {
   Reports?: Lazy
   PublicMenuApp?: Lazy
   PublicMenuSettings?: Lazy<{ initial: PublicMenuSettings }>
+  /** Configuración → Mesas: tables, QR sheet and ordering-from-the-table limits (public_menu). */
+  TablesSettings?: Lazy
+  /** Configuración → Pedidos: stations and pickup screen (orders_pro). */
+  OrdersStationsSettings?: Lazy
 }

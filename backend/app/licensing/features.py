@@ -11,15 +11,42 @@ PRO_LABEL = f"{APP_DISPLAY_NAME} Pro"
 PRO_FEATURES: dict[str, str] = {
     "barista": "Asistente de barista y guía de bebidas",
     "purchases": "Compras, proveedores y cuenta corriente",
-    "reports": "Reportes avanzados",
-    "exports": "Exportar a Excel y CSV",
+    "reports": "Reportes avanzados y exportación a Excel/CSV",
     "public_menu": "Menú para clientes (QR y pantalla)",
     "lan": "Modo red local (tablets y otras PCs)",
     "users": "Usuarios ilimitados",
     "backup_export": "Descargar y restaurar respaldos",
+    "orders_pro": "Pedidos avanzados (estaciones, tiempos por producto, pantalla de retiro)",
 }
 
-FREE_MAX_USERS = 2
+# Free plan caps. The vendor can change them without a new .exe through the signed remote config
+# ("free_limits"); these built-in values apply offline or before the first config arrives.
+FREE_LIMITS_DEFAULT: dict[str, int] = {"products": 5, "users": 1, "customers": 20, "stock_items": 15, "sales_history_days": 30}
+FREE_LIMIT_LABELS = {"products": "productos", "users": "usuarios activos", "customers": "clientes", "stock_items": "insumos"}
+FREE_LIMIT_LABELS_ONE = {"products": "producto", "users": "usuario activo", "customers": "cliente", "stock_items": "insumo"}
+
+
+def free_limits() -> dict[str, int]:
+    from app import remote_config
+
+    limits = dict(FREE_LIMITS_DEFAULT)
+    for key, value in remote_config.free_limits().items():
+        if key in limits and isinstance(value, int) and not isinstance(value, bool) and value >= 1:
+            limits[key] = value
+    return limits
+
+
+def check_free_limit(kind: str, current: int) -> None:
+    """Raises 402 when the free plan already has `current` >= its cap (Pro and trials: no caps)."""
+    if current_status().valid:
+        return
+    limit = free_limits()[kind]
+    if current >= limit:
+        raise HTTPException(
+            status.HTTP_402_PAYMENT_REQUIRED,
+            f"El plan gratuito permite hasta {limit} "
+            f"{(FREE_LIMIT_LABELS_ONE if limit == 1 else FREE_LIMIT_LABELS)[kind]}. Con {PRO_LABEL} no hay límite.",
+        )
 
 
 def has_feature(feature: str) -> bool:

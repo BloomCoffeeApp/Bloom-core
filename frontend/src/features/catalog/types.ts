@@ -7,6 +7,8 @@ export interface ProductCategory {
   icon: string
   sort_order: number
   active: boolean
+  /** Its products go to the order screen (bar/kitchen). */
+  send_to_orders: boolean
   product_count: number
 }
 
@@ -88,6 +90,8 @@ export interface Product {
   long_description: string | null
   tags: string[]
   featured: boolean
+  /** Target prep minutes on the order screen (null = channel default; used with orders_pro). */
+  prep_minutes: number | null
   cost_cents: number
   margin_pct: number | null
   recipe_items: RecipeLine[]
@@ -109,6 +113,7 @@ export interface ProductInput {
   long_description: string | null
   tags: string[]
   featured: boolean
+  prep_minutes?: number | null
   recipe_items: { stock_item_id: number; qty: number }[]
   modifier_group_ids: number[]
   /** [] = no sizes (single price). */

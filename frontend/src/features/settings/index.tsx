@@ -1,15 +1,19 @@
 import {
   Bell,
   Building2,
+  ClipboardList,
   CreditCard,
   Gift,
   HardDrive,
   Info,
+  LayoutGrid,
+  Mail,
   type LucideIcon,
   Palette,
   QrCode,
   ShieldCheck,
   Sparkles,
+  UserRound,
   Users,
   Wifi,
 } from 'lucide-react'
@@ -23,12 +27,15 @@ import { useAuth } from '@/lib/auth'
 import { usePaymentMethods, useSettings } from './api'
 import { CardSkeleton } from './form'
 import { AlertsSection, AppearanceSection, BusinessSection, LoyaltySection, SecuritySection } from './general-sections'
+import { AccountSection } from '../account/account-section'
+import { NotificationsSection } from '../account/notifications-section'
 import { LicenseSection } from '../license/license-section'
 import { UpgradeCard } from '../license/pro-gate'
 import { useHasFeature } from '../license/api'
 import { proModules } from '@pro'
 import { AboutSection, BackupSection, NetworkSection, PaymentMethodsSection } from './system-sections'
 import { UsersSection } from './users-section'
+import { OrdersSettingsSection } from '../orders/settings-section'
 
 interface TabDef {
   value: string
@@ -46,6 +53,7 @@ function SettingsPage() {
   const s = settings.data
   const lanPro = useHasFeature('lan')
   const menuPro = useHasFeature('public_menu')
+  const ordersPro = useHasFeature('orders_pro')
 
   const withSettings = (fn: () => ReactNode) => () => (s ? fn() : <CardSkeleton />)
 
@@ -53,6 +61,8 @@ function SettingsPage() {
     ? [
         { value: 'negocio', label: 'Negocio', icon: Building2, render: withSettings(() => <BusinessSection initial={s!.business} />) },
         { value: 'licencia', label: 'Licencia', icon: Sparkles, render: () => <LicenseSection /> },
+        { value: 'cuenta', label: 'Cuenta', icon: UserRound, render: () => <AccountSection /> },
+        { value: 'notificaciones', label: 'Notificaciones', icon: Mail, render: () => <NotificationsSection /> },
         { value: 'usuarios', label: 'Usuarios', icon: Users, render: () => <UsersSection /> },
         ...(payments.isSuccess
           ? [{ value: 'pagos', label: 'Medios de pago', icon: CreditCard, render: () => <PaymentMethodsSection query={payments} /> }]
@@ -64,6 +74,31 @@ function SettingsPage() {
         { value: 'red', label: 'Red local', icon: Wifi, render: withSettings(() =>
           lanPro === false ? <UpgradeCard feature="lan" compact /> : <NetworkSection initialEnabled={!!s!.network?.lan_enabled} />,
         ) },
+        { value: 'pedidos', label: 'Pedidos', icon: ClipboardList, render: () => (
+          <div className="space-y-6">
+            <OrdersSettingsSection />
+            {!proModules.OrdersStationsSettings ? (
+              <UpgradeCard feature="orders_pro" compact notIncluded />
+            ) : ordersPro === false ? (
+              <UpgradeCard feature="orders_pro" compact />
+            ) : (
+              <Suspense fallback={<CardSkeleton />}>
+                <proModules.OrdersStationsSettings />
+              </Suspense>
+            )}
+          </div>
+        ) },
+        { value: 'mesas', label: 'Mesas y pedidos QR', icon: LayoutGrid, render: () =>
+          !proModules.TablesSettings ? (
+            <UpgradeCard feature="public_menu" compact notIncluded />
+          ) : menuPro === false ? (
+            <UpgradeCard feature="public_menu" compact />
+          ) : (
+            <Suspense fallback={<CardSkeleton />}>
+              <proModules.TablesSettings />
+            </Suspense>
+          ),
+        },
         { value: 'menu-clientes', label: 'Menú para clientes', icon: QrCode, render: withSettings(() =>
           !proModules.PublicMenuSettings ? (
             <UpgradeCard feature="public_menu" compact notIncluded />

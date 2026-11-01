@@ -128,6 +128,8 @@ class SaleItemIn(BaseModel):
     modifier_ids: list[int] = []
     notes: str | None = Field(default=None, max_length=200)
     discount_cents: int = Field(default=0, ge=0)
+    # False for lines that already reached the bar (e.g. charged from a table's tab).
+    to_bar: bool = True
 
 
 class PaymentIn(BaseModel):
@@ -149,6 +151,8 @@ class SaleIn(BaseModel):
     # Courtesy ("invita la casa"): stock moves, nothing is charged (no payments, discounts or points).
     is_courtesy: bool = False
     courtesy_reason: str | None = Field(default=None, max_length=200)
+    # Charging a table's open tab ("mesa abierta"): the tab closes with this sale.
+    tab_id: int | None = None
 
 
 class SaleVoidIn(BaseModel):

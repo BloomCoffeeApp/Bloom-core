@@ -72,6 +72,8 @@ export interface CartLine {
   qty: number
   notes: string
   discount_cents: number
+  /** false = already sent to the bar (loaded from a table's open tab). */
+  to_bar?: boolean
 }
 
 export interface CartState {
@@ -81,4 +83,6 @@ export interface CartState {
   customer: PosCustomer | null
   discount: { mode: 'amount' | 'pct'; value: number }
   points_to_redeem: number
+  /** Charging a table's open tab ("mesa abierta"). */
+  tab?: { id: number; label: string } | null
 }

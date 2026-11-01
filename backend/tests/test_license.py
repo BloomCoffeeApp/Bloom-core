@@ -70,6 +70,7 @@ def test_grace_period_then_expired(signer):
 
 def test_trial_has_no_grace(signer):
     s = lic_status.evaluate(signer(plan="trial", exp=int(time.time()) - 60, grace=0))
+    assert s.trial_ended and not s.valid
     assert not s.valid and "prueba" in s.problem
 
 
@@ -147,14 +148,37 @@ def test_free_plan_limits(seeded):
 
     client, h = seeded
     status.store_token(None)  # Free
-    # Demo data already has more than 2 users: creating another needs Pro
+    # Demo data already has more than the free caps: creating more needs Pro
     r = client.post("/api/users", json={"name": "Nuevo", "pin": "4321", "role": "cajero", "color": "blue"}, headers=h)
-    assert r.status_code == 402
+    assert r.status_code == 402 and "1 usuario activo" in r.json()["detail"]
+    r = client.post("/api/products", json={"name": "Producto nuevo", "price_cents": 1000}, headers=h)
+    assert r.status_code == 402 and "hasta 5 productos" in r.json()["detail"]
+    lic = client.get("/api/license", headers=h).json()
+    assert lic["free_limits"]["products"] == 5 and "exports" not in lic["catalog"]
     assert client.put("/api/settings/network", json={"lan_enabled": True}, headers=h).status_code == 402
     assert client.put("/api/settings/network", json={"lan_enabled": False}, headers=h).status_code == 200
     # Core keeps working on Free
     assert client.get("/api/dashboard", headers=h).status_code == 200
     assert client.get("/api/pos/catalog", headers=h).status_code == 200
+
+
+def test_free_limits_come_from_the_signed_remote_config(seeded, monkeypatch):
+    """The vendor can tune the caps without a new .exe; nonsense values are ignored."""
+    from app import remote_config
+    from app.licensing import features, status
+
+    client, h = seeded
+    status.store_token(None)
+    monkeypatch.setattr(remote_config, "free_limits", lambda: {"products": 500, "customers": 0, "users": True})
+    limits = features.free_limits()
+    assert limits["products"] == 500 and limits["customers"] == 20 and limits["users"] == 1
+    r = client.post("/api/products", json={"name": "Producto nuevo", "price_cents": 1000}, headers=h)
+    assert r.status_code != 402, r.text
+    monkeypatch.setattr(remote_config, "free_limits", lambda: {"products": 1})
+    assert client.post("/api/products", json={"name": "Otro", "price_cents": 1000}, headers=h).status_code == 402
+    # Only the recent sales are browsable on Free
+    old = client.get("/api/sales", params={"date_from": "2020-01-01"}, headers=h).json()
+    assert all(s["ts"] >= "2020-01-02" for s in old["items"])
 
 
 def test_subscription_checkout_activates_when_paid(seeded, signer, monkeypatch):

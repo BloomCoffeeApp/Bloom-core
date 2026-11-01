@@ -24,6 +24,7 @@ import {
   RecipeCard,
   TopProducts,
 } from './widgets'
+import { OrdersStrip } from '../orders/dashboard-strip'
 
 function greeting(d: Date) {
   const h = d.getHours()
@@ -112,6 +113,8 @@ export function DashboardPage() {
           />
         )}
       </div>
+
+      <OrdersStrip data={d?.orders} periodLabel={periodLabel} />
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Panel

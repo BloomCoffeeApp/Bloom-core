@@ -75,7 +75,7 @@ test.describe('Configuración', () => {
       await dlg.getByLabel('PIN', { exact: true }).fill('4444')
       await dlg.getByLabel('Repetí el PIN').fill('4444')
       await dlg.getByRole('button', { name: 'Crear usuario' }).click()
-      await expect(page.getByText(/El plan gratuito permite 2 usuarios\. Con .* Pro son ilimitados\./)).toBeVisible()
+      await expect(page.getByText(/El plan gratuito permite hasta 1 usuario activo\. Con .* Pro no hay límite\./)).toBeVisible()
       await expect(dlg).toBeVisible() // stays open
     })
     await page.goto('/config?tab=licencia')

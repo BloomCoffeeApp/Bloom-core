@@ -12,6 +12,7 @@ class CategoryIn(BaseModel):
     icon: str = "coffee"
     sort_order: int = 0
     active: bool = True
+    send_to_orders: bool = True
 
 
 class CategoryUpdate(BaseModel):
@@ -20,6 +21,7 @@ class CategoryUpdate(BaseModel):
     icon: str | None = None
     sort_order: int | None = None
     active: bool | None = None
+    send_to_orders: bool | None = None
 
 
 class CategoryOut(ORM):
@@ -29,6 +31,7 @@ class CategoryOut(ORM):
     icon: str
     sort_order: int
     active: bool
+    send_to_orders: bool = True
     product_count: int = 0
 
 
@@ -123,6 +126,7 @@ class ProductIn(BaseModel):
     long_description: str | None = Field(default=None, max_length=2000)
     tags: list[str] = []
     featured: bool = False
+    prep_minutes: int | None = Field(default=None, ge=1, le=240)
     recipe_items: list[RecipeItemIn] = []
     modifier_group_ids: list[int] = []
     sizes: list[ProductSizeIn] = []
@@ -141,6 +145,7 @@ class ProductUpdate(BaseModel):
     long_description: str | None = Field(default=None, max_length=2000)
     tags: list[str] | None = None
     featured: bool | None = None
+    prep_minutes: int | None = Field(default=None, ge=1, le=240)
     recipe_items: list[RecipeItemIn] | None = None
     modifier_group_ids: list[int] | None = None
     sizes: list[ProductSizeIn] | None = None  # [] removes every size (back to a single price)
@@ -164,6 +169,7 @@ class ProductOut(BaseModel):
     long_description: str | None = None
     tags: list[str] = []
     featured: bool = False
+    prep_minutes: int | None = None
     cost_cents: int
     margin_pct: float | None
     recipe_items: list[RecipeItemOut]

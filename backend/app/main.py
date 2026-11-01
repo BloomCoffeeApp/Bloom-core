@@ -7,12 +7,14 @@ from fastapi.staticfiles import StaticFiles
 
 from app.config import APP_DISPLAY_NAME, APP_ID, APP_VERSION, FROZEN, FRONTEND_DIST, UPLOAD_DIR
 from app.routers import (
+    account,
     alerts,
     auth,
     catalog,
     customers,
     dashboard,
     license,
+    orders,
     remote_config,
     sales,
     stock,
@@ -26,7 +28,10 @@ try:  # Pro edition only: private package, absent from the public repo.
 except ImportError:
     bloom_pro = None
 
-ROUTER_MODULES = (auth, license, remote_config, users, dashboard, catalog, stock, sales, customers, alerts, system, updates)
+ROUTER_MODULES = (
+    account,
+    auth, license, remote_config, users, dashboard, catalog, stock, sales, orders, customers, alerts, system, updates,
+)
 EDITION = "pro" if bloom_pro else "free"
 
 

@@ -43,6 +43,7 @@ export function useCreateSale() {
       qc.invalidateQueries({ queryKey: salesKeys.all })
       qc.invalidateQueries({ queryKey: ['cash'] })
       qc.invalidateQueries({ queryKey: ['pos', 'customers'] })
+      qc.invalidateQueries({ queryKey: ['orders'] }) // open tabs + the order screen
     },
   })
 }

@@ -18,7 +18,7 @@ import { CATEGORY_ICONS, palette } from './catalog-utils'
 import { ColorSwatches } from './shared'
 import type { CategoryInput, ProductCategory } from './types'
 
-const EMPTY: CategoryInput = { name: '', color: 'amber', icon: 'coffee', sort_order: 0, active: true }
+const EMPTY: CategoryInput = { name: '', color: 'amber', icon: 'coffee', sort_order: 0, active: true, send_to_orders: true }
 
 function CategoryDialog({
   open,
@@ -100,6 +100,17 @@ function CategoryDialog({
               <Switch checked={form.active} onCheckedChange={(active) => setForm((f) => ({ ...f, active }))} />
             </label>
           </div>
+          <label className="flex items-center justify-between gap-3 rounded-xl border px-3 py-2">
+            <span>
+              <span className="block text-sm font-medium">Va a la pantalla de pedidos</span>
+              <span className="block text-xs text-muted-foreground">Apagalo para lo que se entrega en el mostrador (p. ej. panadería).</span>
+            </span>
+            <Switch
+              checked={form.send_to_orders}
+              onCheckedChange={(send_to_orders) => setForm((f) => ({ ...f, send_to_orders }))}
+              aria-label="Va a la pantalla de pedidos"
+            />
+          </label>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
@@ -156,6 +167,7 @@ export function CategoriesTab() {
                       {c.product_count} {c.product_count === 1 ? 'producto' : 'productos'} · orden {c.sort_order}
                     </p>
                   </div>
+                  {!c.send_to_orders && <Badge variant="secondary">Sin pantalla de pedidos</Badge>}
                   {!c.active && <Badge variant="outline">Inactiva</Badge>}
                   <Button variant="ghost" size="icon" aria-label="Editar" onClick={() => show(c)}>
                     <Pencil />

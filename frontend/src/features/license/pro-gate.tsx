@@ -1,9 +1,18 @@
 import { AlertTriangle, Check, Sparkles } from 'lucide-react'
+import { useState } from 'react'
 import type { ComponentType, LazyExoticComponent, ReactNode } from 'react'
-import { Link } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { useAuth } from '@/lib/auth'
 import { cn } from '@/lib/utils'
 
@@ -126,11 +135,15 @@ export function LicenseBanner() {
   if (data.valid && data.in_grace) {
     text = `Tu suscripción venció. Las funciones Pro siguen activas ${data.days_left} día(s) más mientras se renueva.`
     urgent = true
-  } else if (data.valid && data.plan === 'trial' && (data.days_left ?? 99) <= 5) {
-    text = `Te quedan ${data.days_left} día(s) de prueba de ${data.pro_label}.`
+  } else if (data.valid && data.plan === 'trial' && (data.days_left ?? 99) <= 3) {
+    text =
+      data.days_left === 1
+        ? `Mañana termina tu prueba de ${data.pro_label}. Suscribite para no perder las funciones Pro.`
+        : `Te quedan ${data.days_left} días de prueba de ${data.pro_label}.`
+    urgent = (data.days_left ?? 99) <= 1
   } else if (data.valid && !data.perpetual && data.plan === 'pro' && (data.days_left ?? 99) <= 3) {
     text = `Tu suscripción se renueva en ${data.days_left} día(s).`
-  } else if (!data.valid && data.problem) {
+  } else if (!data.valid && data.problem && !data.trial_ended) {
     text = data.problem
     urgent = true
   }
@@ -150,5 +163,64 @@ export function LicenseBanner() {
         </Link>
       )}
     </div>
+  )
+}
+
+const trialSeenKey = (id: string | null) => `bloom.trial-ended-seen.${id ?? 'local'}`
+
+function seenTrialEnd(id: string | null) {
+  try {
+    return localStorage.getItem(trialSeenKey(id)) === '1'
+  } catch {
+    return false
+  }
+}
+
+/** Once, when the Pro trial runs out: offer to subscribe or keep the free plan. */
+export function TrialEndedDialog() {
+  const { data } = useLicense()
+  const { can } = useAuth()
+  const navigate = useNavigate()
+  const [closed, setClosed] = useState(false)
+  if (!data?.trial_ended || data.valid || closed || seenTrialEnd(data.license_id)) return null
+  const close = () => {
+    try {
+      localStorage.setItem(trialSeenKey(data.license_id), '1')
+    } catch {
+      /* private mode: it just shows again next time */
+    }
+    setClosed(true)
+  }
+  const admin = can()
+  return (
+    <Dialog open onOpenChange={(o) => !o && close()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="font-heading text-2xl">Terminó tu prueba de {data.pro_label}</DialogTitle>
+          <DialogDescription>
+            Tus datos quedan intactos. Seguís con el plan gratuito: punto de venta, caja, stock y clientes, con
+            hasta {data.free_limits.products} productos y {data.free_limits.customers} clientes. Barista, compras,
+            reportes, menú para clientes y modo red local quedan bloqueados.
+          </DialogDescription>
+        </DialogHeader>
+        {!admin && <p className="text-sm text-muted-foreground">Pedile al administrador que active {data.pro_label}.</p>}
+        <DialogFooter className="gap-2 sm:justify-between">
+          <Button variant="ghost" className="h-11" onClick={close}>
+            Seguir con el plan gratis
+          </Button>
+          {admin && (
+            <Button
+              className="h-11"
+              onClick={() => {
+                close()
+                void navigate(LICENSE_TAB)
+              }}
+            >
+              <Sparkles /> Suscribirme a Pro
+            </Button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

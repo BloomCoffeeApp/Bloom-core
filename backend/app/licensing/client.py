@@ -37,6 +37,14 @@ def server_url() -> str | None:
 
 
 def _post(path: str, body: dict) -> dict:
+    return _send("POST", path, body)
+
+
+def _put(path: str, body: dict) -> dict:
+    return _send("PUT", path, body)
+
+
+def _send(method: str, path: str, body: dict) -> dict:
     url = server_url()
     if not url:
         raise LicenseServerError("Esta instalación no tiene servidor de licencias configurado.")
@@ -44,7 +52,7 @@ def _post(path: str, body: dict) -> dict:
         f"{url}{path}",
         data=json.dumps(body).encode(),
         headers={"Content-Type": "application/json", "User-Agent": f"{BRAND.get('appId')}/{APP_VERSION}"},
-        method="POST",
+        method=method,
     )
     try:
         with urllib.request.urlopen(req, timeout=TIMEOUT_S) as r:
@@ -233,3 +241,75 @@ def check_pending_checkout() -> None:
         checkout_status(checkout_id)
     except LicenseServerError as e:
         log.info("Pending checkout not resolved yet: %s", e)
+
+
+# ---------------------------------------------------------------- account (optional; the app works without one)
+#
+# Linking proves the email with a one-time code and returns an account token (prefix BLOOMACCT1),
+# kept in license_state.json. It only authenticates the email preferences and unlinking: licensing
+# never depends on it, so an account is never needed to keep selling (free plan offline).
+
+
+def account_info() -> dict | None:
+    acc = read_state().get("account")
+    if not isinstance(acc, dict) or not acc.get("token"):
+        return None
+    return {k: acc.get(k) for k in ("email", "business_name", "name", "linked_at")}
+
+
+def link_start(email: str, name: str | None, business_name: str | None, accept_terms: bool,
+               marketing_opt_in: bool | None = None, product_updates_opt_in: bool | None = None) -> dict:
+    return _post("/v1/account/link/start", {
+        "email": email.strip(), "name": name, "business_name": business_name, "accept_terms": accept_terms,
+        "marketing_opt_in": marketing_opt_in, "product_updates_opt_in": product_updates_opt_in,
+        "machine_id": machine_id(), "machine_name": machine_name(),
+    })
+
+
+def link_confirm(email: str, code: str) -> dict:
+    """Stores the account token; if the server started a trial and this PC is on the free plan, it's activated."""
+    resp = _post("/v1/account/link/confirm", {"email": email.strip(), "code": code.strip(),
+                                              "machine_id": machine_id(), "machine_name": machine_name()})
+    token = resp.get("account_token")
+    if not token or not str(token).startswith("BLOOMACCT1."):
+        raise LicenseServerError("Respuesta inválida del servidor de licencias.")
+    acc = resp.get("account") or {}
+    write_state(account={"token": token, "email": acc.get("email") or email.strip().lower(),
+                         "business_name": acc.get("business_name"), "name": acc.get("name"), "linked_at": time.time()})
+    trial_started = False
+    if resp.get("trial_token") and not current_status().valid:
+        try:
+            _accept({"token": resp["trial_token"]})
+            trial_started = True
+        except LicenseServerError as e:
+            log.info("Trial from the account not applied: %s", e)
+    return {"account": account_info(), "trial_status": resp.get("trial_status"), "trial_started": trial_started}
+
+
+def unlink_account() -> None:
+    acc = read_state().get("account") or {}
+    if acc.get("token"):
+        try:
+            _post("/v1/account/unlink", {"token": acc["token"], "machine_id": machine_id()})
+        except LicenseServerError as e:
+            log.info("Unlink not confirmed by the server: %s", e)
+    write_state(account=None)
+
+
+def _account_auth() -> dict:
+    """The account token if linked, else the license token (a paid license also identifies the customer)."""
+    acc = read_state().get("account") or {}
+    if acc.get("token"):
+        return {"token": acc["token"], "machine_id": machine_id()}
+    try:
+        return _token_body()
+    except LicenseServerError as e:
+        raise LicenseServerError("Vinculá esta computadora a tu cuenta para elegir qué mails recibís.") from e
+
+
+def email_preferences() -> dict:
+    return _post("/v1/account/preferences", _account_auth())
+
+
+def update_email_preferences(news: bool | None, updates: bool | None) -> dict:
+    return _put("/v1/account/preferences", {**_account_auth(), "news": news, "updates": updates})

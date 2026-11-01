@@ -164,6 +164,10 @@ def _str(value: object) -> str | None:
     return value.strip() if isinstance(value, str) and value.strip() else None
 
 
+def free_limits() -> dict:
+    return _section("free_limits")
+
+
 def manifest_url() -> str | None:
     return _str(_section("updates").get("manifest_url"))
 

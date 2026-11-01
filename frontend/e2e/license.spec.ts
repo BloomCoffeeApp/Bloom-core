@@ -24,3 +24,36 @@ test('license tab shows Pro; going Free shows the upgrade card; re-importing res
   await page.goto('/config?tab=licencia')
   await expect(page.getByText('licencia perpetua')).toBeVisible()
 })
+
+test('when the Pro trial ends: one dialog to subscribe or stay free, then it never nags again', async ({ page }) => {
+  // Simulate a PC whose trial just ran out (the e2e stack can't wait 7 days).
+  await page.route('**/api/license', async (route) => {
+    const res = await route.fetch()
+    const body = await res.json()
+    await route.fulfill({
+      response: res,
+      json: { ...body, plan: 'free', valid: false, features: [], trial_ended: true, license_id: 'trial-e2e', problem: 'Terminó la prueba gratuita.' },
+    })
+  })
+  await page.goto('/')
+  const dialog = page.getByRole('dialog', { name: /Terminó tu prueba de .* Pro/ })
+  await expect(dialog).toBeVisible()
+  await expect(dialog).toContainText('Tus datos quedan intactos')
+  await expect(dialog.getByRole('button', { name: 'Suscribirme a Pro' })).toBeVisible()
+  await dialog.getByRole('button', { name: 'Seguir con el plan gratis' }).click()
+  await expect(dialog).toBeHidden()
+  await expect(page.getByText('Terminó la prueba gratuita.')).toHaveCount(0) // no permanent alarm banner
+  await page.reload()
+  await expect(page.getByRole('heading', { level: 1 }).first()).toBeVisible()
+  await expect(dialog).toHaveCount(0)
+})
+
+test('the last days of the trial show a heads-up', async ({ page }) => {
+  await page.route('**/api/license', async (route) => {
+    const res = await route.fetch()
+    const body = await res.json()
+    await route.fulfill({ response: res, json: { ...body, plan: 'trial', valid: true, perpetual: false, days_left: 1, in_grace: false } })
+  })
+  await page.goto('/')
+  await expect(page.getByText(/Mañana termina tu prueba de .* Pro/)).toBeVisible()
+})

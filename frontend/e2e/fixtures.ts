@@ -1,6 +1,8 @@
 import { type ConsoleMessage, expect, type Page, test as base } from '@playwright/test'
 
 export { expect }
+/** Re-exported for the Pro specs (their real path can't resolve @playwright/test). */
+export { devices } from '@playwright/test'
 
 /** Console messages that are expected noise, not app bugs. */
 const IGNORED_CONSOLE = [/Download the React DevTools/i, /\[vite\]/i]

@@ -38,7 +38,7 @@ import {
 import { useSidebar } from '@/components/ui/sidebar-context'
 import { AVATAR_COLORS, initials } from '@/components/avatar-utils'
 import { hasFeature, useLicense } from '@/features/license/api'
-import { LICENSE_TAB, LicenseBanner, ProBadge } from '@/features/license/pro-gate'
+import { LICENSE_TAB, LicenseBanner, ProBadge, TrialEndedDialog } from '@/features/license/pro-gate'
 import { describePlan } from '@/features/license/describe-plan'
 import { PriceChangeBanner } from '@/features/license/price-change-banner'
 import { AnnouncementsBanner } from '@/features/remote-config/announcements-banner'
@@ -274,6 +274,7 @@ export function AppShell() {
           </div>
         </header>
         <LicenseBanner />
+        <TrialEndedDialog />
         <PriceChangeBanner />
         <AnnouncementsBanner />
         <main className={cn('flex-1', fullBleed ? 'p-0' : 'mx-auto w-full max-w-[1500px] p-4 md:p-6')}>

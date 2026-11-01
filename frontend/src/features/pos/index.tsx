@@ -12,7 +12,9 @@ import { OpenCashDialog } from '../cash/dialogs'
 import { useCreateSale, usePaymentMethods } from '../sales/api'
 import { printTicket } from '../sales/print'
 import type { SaleDetail } from '../sales/types'
+import { useOpenTabs } from '../orders/api'
 import { usePosCatalog, usePosConfig } from './api'
+import { TabsDialog } from './tabs-dialog'
 import { CartPanel } from './cart-panel'
 import { CheckoutDialog, type CheckoutConfirm } from './checkout-dialog'
 import { ModifierDialog } from './modifier-dialog'
@@ -75,6 +77,8 @@ function PosPage() {
   const [checkout, setCheckout] = useState(false)
   const [done, setDone] = useState<SaleDetail | null>(null)
   const [openCash, setOpenCash] = useState(false)
+  const [tabsOpen, setTabsOpen] = useState(false)
+  const tabs = useOpenTabs()
 
   const totals = useMemo(() => computeTotals(cartApi.cart, config.data), [cartApi.cart, config.data])
   const cashOpen = !!cash.data
@@ -126,6 +130,7 @@ function PosPage() {
           notes: l.notes || null,
           // A courtesy gives the whole cart away: no discounts, points or payments.
           discount_cents: courtesy ? 0 : l.discount_cents,
+          to_bar: l.to_bar !== false,
         })),
         customer_id: cart.customer?.id ?? null,
         channel: cart.channel,
@@ -135,6 +140,7 @@ function PosPage() {
         payments: courtesy ? [] : payments,
         is_courtesy: !!courtesy,
         courtesy_reason: courtesy?.reason || null,
+        tab_id: cart.tab?.id ?? null,
       },
       {
         onSuccess: (sale) => {
@@ -157,7 +163,15 @@ function PosPage() {
         searchRef={searchRef}
       />
       <div className="relative flex min-h-0 flex-col">
-        <CartPanel cartApi={cartApi} totals={totals} config={config.data} cashOpen={cashOpen} onCheckout={startCheckout} />
+        <CartPanel
+          cartApi={cartApi}
+          totals={totals}
+          config={config.data}
+          cashOpen={cashOpen}
+          onCheckout={startCheckout}
+          openTabs={tabs.data?.length ?? 0}
+          onOpenTabs={() => setTabsOpen(true)}
+        />
         {cashKnownClosed && (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/80 p-6 backdrop-blur-sm">
             <div className="flex flex-col items-center gap-3 rounded-2xl border bg-card p-6 text-center shadow-lg">
@@ -199,6 +213,16 @@ function PosPage() {
         }}
       />
       <OpenCashDialog open={openCash} onOpenChange={setOpenCash} />
+      <TabsDialog
+        open={tabsOpen}
+        onOpenChange={setTabsOpen}
+        tabs={tabs.data ?? []}
+        onPick={(tab) => {
+          const missing = cartApi.loadTab(tab, catalog.data?.products ?? [])
+          if (missing.length) toast.warning(`No están en el catálogo: ${missing.join(', ')}`)
+          setTabsOpen(false)
+        }}
+      />
     </div>
   )
 }

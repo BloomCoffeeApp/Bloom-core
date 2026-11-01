@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import type { PosConfig, CartLine, CartState, PosCustomer, PosModifier, PosProduct, PosSize } from './types'
 import type { Channel } from '../sales/types'
+import type { Tab } from '../orders/types'
 
 const KEY = 'pos.cart.v2' // v2: lines carry the chosen size
 
@@ -12,6 +13,7 @@ const EMPTY: CartState = {
   customer: null,
   discount: { mode: 'amount', value: 0 },
   points_to_redeem: 0,
+  tab: null,
 }
 
 function load(): CartState {
@@ -115,7 +117,7 @@ export function useCart() {
         const next = { ...l, ...patch }
         next.discount_cents = Math.min(Math.max(next.discount_cents, 0), next.unit_cents * next.qty)
         // Notes are part of the identity of a line.
-        next.key = lineKey(next.product_id, next.size?.size_id ?? null, next.modifiers, next.notes)
+        next.key = `${next.to_bar === false ? 'tab|' : ''}${lineKey(next.product_id, next.size?.size_id ?? null, next.modifiers, next.notes)}`
         return next
       })
       return { ...c, lines: lines.filter((l) => l.qty > 0) }
@@ -133,9 +135,39 @@ export function useCart() {
   const setPoints = useCallback((points_to_redeem: number) => setCart((c) => ({ ...c, points_to_redeem })), [])
   const clear = useCallback(() => setCart(EMPTY), [])
 
+  /** Replaces the cart with a table's open tab, priced with the current catalog. Returns lines it couldn't load. */
+  const loadTab = useCallback((tab: Tab, products: PosProduct[]) => {
+    const missing: string[] = []
+    const lines: CartLine[] = []
+    for (const ln of tab.lines) {
+      const p = products.find((x) => x.id === ln.product_id)
+      if (!p) {
+        missing.push(ln.name)
+        continue
+      }
+      const size = ln.size_id != null ? (p.sizes.find((s) => s.size_id === ln.size_id) ?? null) : null
+      const mods = p.modifier_groups.flatMap((g) => g.modifiers).filter((m) => ln.modifier_ids.includes(m.id))
+      lines.push({
+        key: `tab|${lineKey(p.id, size?.size_id ?? null, mods, ln.notes ?? '')}`,
+        product_id: p.id,
+        category_id: p.category_id,
+        name: p.name,
+        size: size ? { size_id: size.size_id, name: size.name, short_label: size.short_label } : null,
+        unit_cents: (size ? size.price_cents : p.price_cents) + mods.reduce((a, m) => a + m.price_delta_cents, 0),
+        modifiers: mods,
+        qty: ln.qty,
+        notes: ln.notes ?? '',
+        discount_cents: 0,
+        to_bar: false,
+      })
+    }
+    setCart({ ...EMPTY, lines, channel: 'salon', table_label: tab.table_label, tab: { id: tab.id, label: tab.table_label } })
+    return missing
+  }, [])
+
   return useMemo(
-    () => ({ cart, add, setQty, updateLine, remove, setChannel, setTable, setCustomer, setDiscount, setPoints, clear }),
-    [cart, add, setQty, updateLine, remove, setChannel, setTable, setCustomer, setDiscount, setPoints, clear],
+    () => ({ cart, add, setQty, updateLine, remove, setChannel, setTable, setCustomer, setDiscount, setPoints, clear, loadTab }),
+    [cart, add, setQty, updateLine, remove, setChannel, setTable, setCustomer, setDiscount, setPoints, clear, loadTab],
   )
 }
 

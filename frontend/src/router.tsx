@@ -13,6 +13,7 @@ import { type Role, useAuth } from '@/lib/auth'
 const Dashboard = lazy(() => import('@/features/dashboard'))
 const Pos = lazy(() => import('@/features/pos'))
 const Cash = lazy(() => import('@/features/cash'))
+const Orders = lazy(() => import('@/features/orders'))
 const Sales = lazy(() => import('@/features/sales'))
 const Catalog = lazy(() => import('@/features/catalog'))
 const Stock = lazy(() => import('@/features/stock'))
@@ -48,6 +49,7 @@ export function AppRoutes() {
         >
           <Route index element={<Dashboard />} />
           <Route path="pos/*" element={<Guard roles={['cajero', 'encargado']}><Pos /></Guard>} />
+          <Route path="pedidos/*" element={<Orders />} />
           <Route path="caja/*" element={<Guard roles={['cajero', 'encargado']}><Cash /></Guard>} />
           <Route path="ventas/*" element={<Guard roles={['cajero', 'encargado']}><Sales /></Guard>} />
           <Route path="barista/*" element={<Guard roles={['barista', 'encargado']}><ProModule feature="barista" component={pro.Barista} /></Guard>} />

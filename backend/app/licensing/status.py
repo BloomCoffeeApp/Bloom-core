@@ -43,6 +43,7 @@ class LicenseStatus:
     days_left: int | None = None
     machine_id: str = ""
     problem: str | None = None  # why a stored license isn't being honoured
+    trial_ended: bool = False  # this PC already used its one Pro trial and it ran out
 
     def has(self, feature: str) -> bool:
         return self.valid and ("*" in self.features or feature in self.features)
@@ -137,6 +138,7 @@ def evaluate(token: str | None, now: float | None = None) -> LicenseStatus:
         status.expires_at = int(exp)
         status.grace_until = int(exp) + grace_days * DAY
         if now > status.grace_until:
+            status.trial_ended = status.plan == "trial"
             status.problem = (
                 "Terminó la prueba gratuita." if status.plan == "trial" else "La suscripción venció."
             )

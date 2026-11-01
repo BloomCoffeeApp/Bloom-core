@@ -11,6 +11,7 @@ import {
   Trash2,
   UserRound,
   UtensilsCrossed,
+  LayoutGrid,
   X,
 } from 'lucide-react'
 import { useState } from 'react'
@@ -209,12 +210,17 @@ export function CartPanel({
   config,
   cashOpen,
   onCheckout,
+  openTabs = 0,
+  onOpenTabs,
 }: {
   cartApi: CartApi
   totals: CartTotals
   config: PosConfig | undefined
   cashOpen: boolean
   onCheckout: () => void
+  /** Open tables waiting to be charged (0 hides the button). */
+  openTabs?: number
+  onOpenTabs?: () => void
 }) {
   const { cart } = cartApi
   const [editing, setEditing] = useState<CartLine | null>(null)
@@ -243,6 +249,25 @@ export function CartPanel({
             </button>
           ))}
         </div>
+        {cart.tab ? (
+          <div className="flex items-center gap-2 rounded-xl border border-info/40 bg-info/10 px-3 py-2 text-sm" data-testid="pos-tab-banner">
+            <LayoutGrid className="size-4 shrink-0 text-info" />
+            <span className="flex-1">
+              Cobrando <span className="font-semibold">Mesa {cart.tab.label}</span>: lo pedido ya está en la barra.
+            </span>
+            <button onClick={cartApi.clear} className="text-muted-foreground hover:text-foreground" aria-label="Dejar de cobrar la mesa">
+              <X className="size-4" />
+            </button>
+          </div>
+        ) : (
+          openTabs > 0 &&
+          onOpenTabs && (
+            <Button variant="outline" className="h-11 w-full justify-start border-info/40" onClick={onOpenTabs}>
+              <LayoutGrid className="text-info" /> Mesas abiertas
+              <span className="ml-auto rounded-full bg-info px-2 text-xs font-semibold text-info-foreground">{openTabs}</span>
+            </Button>
+          )
+        )}
         <div className="flex gap-2">
           {cart.channel === 'salon' && (
             <Input

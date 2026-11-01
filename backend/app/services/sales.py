@@ -22,11 +22,13 @@ from app.models import (
     SaleItem,
     SalePayment,
     StockMovement,
+    TableTab,
     User,
     utcnow,
 )
 from app.schemas.sales import PaymentMethodUpdate, SaleIn
-from app.services import audit, recipes, settings, stock
+from app.services import audit, orders, recipes, settings, stock
+from app.services.orders import close_tab, tab_label
 from app.services.cash import CASH, method_names, require_open_session, user_names
 from app.services.timeutil import range_bounds_utc
 
@@ -118,22 +120,8 @@ def _create_sale(db: Session, data: SaleIn, user: User) -> Sale:
     elif wants_discount and not can_discount(user):
         raise HTTPException(403, "Solo un encargado o administrador puede aplicar descuentos")
 
-    # --- Load catalog in bulk ---
-    pids = {i.product_id for i in data.items}
-    products = {
-        p.id: p for p in db.scalars(select(Product).options(selectinload(Product.sizes)).where(Product.id.in_(pids)))
-    }
-    for pid in pids:
-        p = products.get(pid)
-        if p is None or not p.active:
-            raise HTTPException(400, f"Producto {pid} inexistente o inactivo")
-    allowed_groups: dict[int, set[int]] = defaultdict(set)
-    for pmg in db.scalars(select(ProductModifierGroup).where(ProductModifierGroup.product_id.in_(pids))):
-        allowed_groups[pmg.product_id].add(pmg.group_id)
-    all_mod_ids = {m for i in data.items for m in i.modifier_ids}
-    modifiers = {m.id: m for m in db.scalars(select(Modifier).where(Modifier.id.in_(all_mod_ids)))} if all_mod_ids else {}
-    group_ids = {g for gs in allowed_groups.values() for g in gs}
-    groups = {g.id: g for g in db.scalars(select(ModifierGroup).where(ModifierGroup.id.in_(group_ids)))} if group_ids else {}
+    tab = _open_tab(db, data.tab_id) if data.tab_id is not None else None
+    ctx = LineContext(db, data.items)
 
     # --- Lines ---
     lines: list[SaleItem] = []
@@ -142,25 +130,9 @@ def _create_sale(db: Session, data: SaleIn, user: User) -> Sale:
     cost_total = 0
     courtesy_value = 0
     for it in data.items:
-        p = products[it.product_id]
-        size = _pick_size(p, it.size_id)
-        mod_ids = list(dict.fromkeys(it.modifier_ids))
-        per_group: dict[int, int] = defaultdict(int)
-        for mid in mod_ids:
-            m = modifiers.get(mid)
-            if m is None or m.group_id not in allowed_groups[p.id]:
-                raise HTTPException(400, f"Modificador {mid} no válido para {p.name}")
-            per_group[m.group_id] += 1
-        for gid in allowed_groups[p.id]:
-            g = groups[gid]
-            n = per_group.get(gid, 0)
-            if n < g.min_select:
-                raise HTTPException(400, f"{p.name}: elegí al menos {g.min_select} en «{g.name}»")
-            if g.max_select > 0 and n > g.max_select:
-                raise HTTPException(400, f"{p.name}: máximo {g.max_select} en «{g.name}»")
-        mods = [modifiers[mid] for mid in mod_ids]
-        # Price at the time of sale: the chosen size's price (or the product's) plus modifiers.
-        unit = (size.price_cents if size else p.price_cents) + sum(m.price_delta_cents for m in mods)
+        p, size, mods = ctx.check(it.product_id, it.size_id, it.modifier_ids)
+        mod_ids = [m.id for m in mods]
+        unit = unit_price(p, size, mods)
         gross = round(unit * it.qty)
         if it.discount_cents > gross:
             raise HTTPException(400, f"El descuento de {p.name} supera su importe")
@@ -278,8 +250,15 @@ def _create_sale(db: Session, data: SaleIn, user: User) -> Sale:
     )
     sale.items = lines
     sale.payments = payments
+    if tab is not None and not sale.table_label:
+        sale.table_label = tab_label(db, tab)
     db.add(sale)
     db.flush()
+
+    if tab is not None:
+        close_tab(db, tab, sale)
+    # Lines charged from a table's tab already went to the bar as that table's orders.
+    orders.create_from_sale(db, sale, [it.to_bar for it in data.items], user)
 
     for sid, q in consumption.items():
         reason = f"Cortesía #{sale.number}" if courtesy else f"Venta #{sale.number}"
@@ -304,6 +283,61 @@ def _create_sale(db: Session, data: SaleIn, user: User) -> Sale:
     else:
         audit.log(db, user.id, "create", "sale", sale.id, {"number": sale.number, "total_cents": total})
     return sale
+
+
+class LineContext:
+    """Catalog loaded in bulk for a set of lines, plus the size/modifier rules every order line obeys
+    (POS sales and customer orders from the table use the same checks)."""
+
+    def __init__(self, db: Session, items: list[Any]) -> None:
+        pids = {i.product_id for i in items}
+        self.products = {
+            p.id: p for p in db.scalars(select(Product).options(selectinload(Product.sizes)).where(Product.id.in_(pids)))
+        }
+        for pid in pids:
+            p = self.products.get(pid)
+            if p is None or not p.active:
+                raise HTTPException(400, f"Producto {pid} inexistente o inactivo")
+        self.allowed_groups: dict[int, set[int]] = defaultdict(set)
+        for pmg in db.scalars(select(ProductModifierGroup).where(ProductModifierGroup.product_id.in_(pids))):
+            self.allowed_groups[pmg.product_id].add(pmg.group_id)
+        mod_ids = {m for i in items for m in i.modifier_ids}
+        self.modifiers = {m.id: m for m in db.scalars(select(Modifier).where(Modifier.id.in_(mod_ids)))} if mod_ids else {}
+        group_ids = {g for gs in self.allowed_groups.values() for g in gs}
+        self.groups = (
+            {g.id: g for g in db.scalars(select(ModifierGroup).where(ModifierGroup.id.in_(group_ids)))} if group_ids else {}
+        )
+
+    def check(self, product_id: int, size_id: int | None, modifier_ids: list[int]) -> tuple[Product, ProductSize | None, list[Modifier]]:
+        p = self.products[product_id]
+        size = _pick_size(p, size_id)
+        mod_ids = list(dict.fromkeys(modifier_ids))
+        per_group: dict[int, int] = defaultdict(int)
+        for mid in mod_ids:
+            m = self.modifiers.get(mid)
+            if m is None or m.group_id not in self.allowed_groups[p.id]:
+                raise HTTPException(400, f"Modificador {mid} no válido para {p.name}")
+            per_group[m.group_id] += 1
+        for gid in self.allowed_groups[p.id]:
+            g = self.groups[gid]
+            n = per_group.get(gid, 0)
+            if n < g.min_select:
+                raise HTTPException(400, f"{p.name}: elegí al menos {g.min_select} en «{g.name}»")
+            if g.max_select > 0 and n > g.max_select:
+                raise HTTPException(400, f"{p.name}: máximo {g.max_select} en «{g.name}»")
+        return p, size, [self.modifiers[mid] for mid in mod_ids]
+
+
+def unit_price(p: Product, size: ProductSize | None, mods: list[Modifier]) -> int:
+    """Price now: the chosen size's price (or the product's) plus modifiers."""
+    return (size.price_cents if size else p.price_cents) + sum(m.price_delta_cents for m in mods)
+
+
+def _open_tab(db: Session, tab_id: int) -> TableTab:
+    tab = db.get(TableTab, tab_id)
+    if tab is None or tab.status != "open":
+        raise HTTPException(409, "Esa mesa ya fue cobrada o no existe")
+    return tab
 
 
 def _pick_size(p: Product, size_id: int | None) -> ProductSize | None:

@@ -13,6 +13,21 @@ DEFAULTS: dict[str, Any] = {
     "backup": {"enabled": True, "keep": 30},
     "network": {"lan_enabled": False},
     "public_menu": {"enabled": True, "show_prices": True, "message": ""},
+    # Order screen (bar/kitchen): which POS channels send their sales and the target minutes of each.
+    "orders": {
+        "enabled": True,
+        "channels": {"salon": True, "llevar": True, "delivery": True},
+        "targets": {"salon": 8, "llevar": 5, "delivery": 15},
+        "warn_pct": 75,
+    },
+    # Customers ordering from their table (Pro, `public_menu`): limits against abuse.
+    "table_ordering": {
+        "enabled": False,
+        "max_items": 20,
+        "orders_per_10min": 3,
+        "max_pending": 3,
+        "call_minutes": 10,
+    },
     "setup_done": False,
 }
 

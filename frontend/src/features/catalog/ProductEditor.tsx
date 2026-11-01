@@ -25,6 +25,8 @@ import { ColorSwatches } from './shared'
 import { draftsFor, type SizeDraft, toInput } from './size-utils'
 import { SizesEditor } from './SizesEditor'
 import type { Product, ProductInput } from './types'
+import { ProBadge } from '../license/pro-gate'
+import { useHasFeature } from '../license/api'
 
 interface DraftRecipe {
   key: string
@@ -117,6 +119,8 @@ export function ProductEditor({
   const [longDescription, setLongDescription] = useState('')
   const [tags, setTags] = useState<string[]>([])
   const [featured, setFeatured] = useState(false)
+  const [prepMinutes, setPrepMinutes] = useState('')
+  const ordersPro = useHasFeature('orders_pro')
 
   if (useDepsChanged([open, product, defaultCategoryId]) && open) {
     setName(product?.name ?? '')
@@ -136,6 +140,7 @@ export function ProductEditor({
     setLongDescription(product?.long_description ?? '')
     setTags(product?.tags ?? [])
     setFeatured(product?.featured ?? false)
+    setPrepMinutes(product?.prep_minutes ? String(product.prep_minutes) : '')
   }
   // Sizes may load after the editor opened (or a size was created meanwhile): rebuild untouched rows.
   if (useDepsChanged([sizesQ.data]) && open && sizesQ.data && !sizeDrafts.some((d) => d.enabled)) {
@@ -160,7 +165,9 @@ export function ProductEditor({
   const effectiveDefault = enabledSizes.some((d) => d.size_id === defaultSize) ? defaultSize : (enabledSizes[0]?.size_id ?? null)
   const sizesValid = !sized || (enabledSizes.length > 0 && enabledSizes.every((d) => d.price != null && d.price >= 0))
 
-  const valid = name.trim() && (sized || (price != null && price >= 0)) && (!resale || stockItemId) && sizesValid
+  const prep = prepMinutes.trim() ? Math.round(Number(prepMinutes)) : null
+  const prepValid = prep == null || (Number.isFinite(prep) && prep >= 1 && prep <= 240)
+  const valid = prepValid && name.trim() && (sized || (price != null && price >= 0)) && (!resale || stockItemId) && sizesValid
 
   const submit = () => {
     if (!valid) return
@@ -181,6 +188,7 @@ export function ProductEditor({
       long_description: longDescription.trim() || null,
       tags,
       featured,
+      prep_minutes: prep,
       sizes: sized ? toInput(sizeDrafts, effectiveDefault) : [],
     }
     save.mutate({ id: product?.id, data }, { onSuccess: () => onOpenChange(false) })
@@ -349,6 +357,33 @@ export function ProductEditor({
                 />
               )}
               {sized && !sizesValid && <p className="text-xs text-destructive">Elegí al menos un tamaño y poné el precio de cada uno.</p>}
+            </Section>
+
+            <Separator />
+
+            <Section title="Pantalla de pedidos" description="Tiempo objetivo de preparación: si se pasa, el pedido se marca atrasado.">
+              <div className="flex flex-wrap items-end gap-3">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="prod-prep" className="flex items-center gap-2">
+                    Minutos de preparación {ordersPro === false && <ProBadge />}
+                  </Label>
+                  <Input
+                    id="prod-prep"
+                    inputMode="numeric"
+                    className="tabular h-9 w-32"
+                    placeholder="Del canal"
+                    value={prepMinutes}
+                    disabled={ordersPro === false}
+                    onChange={(e) => setPrepMinutes(e.target.value.replace(/[^0-9]/g, ''))}
+                  />
+                </div>
+                <p className="max-w-sm text-xs text-muted-foreground">
+                  {ordersPro === false
+                    ? 'Con Pedidos avanzados cada producto tiene su tiempo; si no, se usa el tiempo del canal.'
+                    : 'Vacío = el tiempo del canal (salón, para llevar, delivery). El pedido toma el mayor de sus productos.'}
+                </p>
+              </div>
+              {!prepValid && <p className="text-xs text-destructive">Entre 1 y 240 minutos.</p>}
             </Section>
 
             <Separator />

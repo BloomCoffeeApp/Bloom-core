@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from app.auth import AdminOnly, CurrentUser
 from app.config import APP_DISPLAY_NAME
 from app.db import get_db
-from app.licensing import FREE_MAX_USERS, PRO_FEATURES, current_status
+from app.licensing import PRO_FEATURES, current_status, free_limits
 from app.licensing import client as license_client
 from app.licensing.features import PRO_LABEL
 from app.licensing.status import store_token
@@ -36,7 +36,7 @@ def _out(status=None) -> dict:
         "pro_label": PRO_LABEL,
         "app_name": APP_DISPLAY_NAME,
         "catalog": PRO_FEATURES,
-        "free_max_users": FREE_MAX_USERS,
+        "free_limits": free_limits(),
         "server_configured": bool(license_client.server_url()),
         "pending_checkout": license_client.pending_checkout_id(),
         "pending_price_change": license_client.pending_price_change() if s.valid else None,

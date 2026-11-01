@@ -101,7 +101,10 @@ export function LicenseSection() {
         </div>
         {!info.valid && (
           <p className="text-xs text-muted-foreground">
-            En el plan gratuito podés tener hasta {info.free_max_users} usuarios activos.
+            Plan gratuito: hasta {info.free_limits.products} productos, {info.free_limits.stock_items} insumos,{' '}
+            {info.free_limits.customers} clientes y {info.free_limits.users}{' '}
+            {info.free_limits.users === 1 ? 'usuario' : 'usuarios'}; historial de ventas de los últimos{' '}
+            {info.free_limits.sales_history_days} días.
           </p>
         )}
       </SettingsCard>
@@ -143,7 +146,7 @@ export function LicenseSection() {
           <div className="flex flex-wrap gap-2">
             {!hasStored && info.server_configured && (
               <Button variant="outline" onClick={() => trial.mutate(undefined)} disabled={busy}>
-                <Sparkles /> Probar Pro 14 días gratis
+                <Sparkles /> Probar Pro 7 días gratis
               </Button>
             )}
             <Button variant="outline" onClick={() => fileRef.current?.click()} disabled={busy}>

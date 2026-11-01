@@ -1,9 +1,11 @@
 from fastapi import APIRouter, Depends
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.auth import Manager, require_role
 from app.db import get_db
-from app.models import User
+from app.licensing import check_free_limit
+from app.models import StockItem, User
 from app.schemas.common import Ok
 from app.schemas.stock import (
     AdjustIn,
@@ -81,6 +83,7 @@ def get_item(item_id: int, db: Session = Depends(get_db), _: User = Reader) -> S
 
 @router.post("/stock/items", response_model=StockItemOut)
 def create_item(data: StockItemIn, db: Session = Depends(get_db), me: User = Manager) -> StockItemOut:
+    check_free_limit("stock_items", db.scalar(select(func.count(StockItem.id)).where(StockItem.active.is_(True))) or 0)
     return svc.create_item(db, data, me)
 
 

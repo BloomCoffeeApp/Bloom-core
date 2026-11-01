@@ -132,6 +132,7 @@ def seed_demo(db: Session, admin_id: int | None = None) -> None:
              ("Panadería", "yellow", "croissant"), ("Salado", "rose", "sandwich")]
         )
     }
+    pc["Panadería"].send_to_orders = False  # handed over at the counter: not for the order screen
     db.add_all(pc.values())
     db.flush()
 
@@ -145,6 +146,7 @@ def seed_demo(db: Session, admin_id: int | None = None) -> None:
     doble = prod("Espresso doble", "Cafetería", 2800, [(cafe_blend, 20), (azucar, 1)])
     americano = prod("Americano", "Cafetería", 2600, [(cafe_blend, 18), (vaso_grande, 1), (tapa, 1)])
     filtrado = prod("Filtrado de especialidad (V60)", "Cafetería", 3800, [(cafe_origen, 15)])
+    filtrado.prep_minutes = 6
     cortado = prod("Cortado", "Con leche", 2600, [(cafe_blend, 18), (leche, 40), (azucar, 1)])
     latte = prod("Latte", "Con leche", 3400, [(cafe_blend, 18), (leche, 200), (vaso_grande, 1), (tapa, 1)])
     capuccino = prod("Capuccino", "Con leche", 3400, [(cafe_blend, 18), (leche, 150), (chocolate, 2), (vaso_chico, 1), (tapa, 1)])
@@ -154,7 +156,7 @@ def seed_demo(db: Session, admin_id: int | None = None) -> None:
     prod("Cold brew", "Frías", 3700, [(cafe_origen, 25), (vaso_grande, 1), (tapa, 1)])
     prod("Medialuna", "Panadería", 900, [], medialuna)
     prod("Budín de limón", "Panadería", 2500, [], budin)
-    prod("Tostado de jamón y queso", "Salado", 5200, [(tostado_pan, 2), (jamon_queso, 2)])
+    prod("Tostado de jamón y queso", "Salado", 5200, [(tostado_pan, 2), (jamon_queso, 2)]).prep_minutes = 12
     db.flush()
 
     leche_grp = ModifierGroup(name="Tipo de leche", min_select=0, max_select=1)

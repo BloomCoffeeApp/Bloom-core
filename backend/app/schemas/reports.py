@@ -5,6 +5,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from app.schemas.orders import OrdersSummary
+
 
 class Kpis(BaseModel):
     sales_cents: int
@@ -90,6 +92,7 @@ class DashboardOut(BaseModel):
     category_mix: list[MixRow]
     channel_mix: list[MixRow]
     recent_sales: list[RecentSale]
+    orders: OrdersSummary | None = None  # order screen: prep times and late orders in the range
 
 
 class SalesRow(BaseModel):

@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.auth import AdminOnly, CurrentUser, require_role
 from app.db import get_db
+from app.licensing import current_status, free_limits
 from app.models import CashSession, PaymentMethod, User
 from app.schemas.sales import (
     CashCloseIn,
@@ -25,6 +26,7 @@ from app.schemas.sales import (
 )
 from app.services import cash as cash_svc
 from app.services import sales as sales_svc
+from app.services.timeutil import local_today
 
 router = APIRouter(prefix="/api", tags=["sales"])
 
@@ -122,6 +124,9 @@ def list_sales(
     db: Session = Depends(get_db),
     _: User = Seller,
 ) -> dict:
+    if not current_status().valid:  # free plan: only the recent history is browsable
+        earliest = local_today() - timedelta(days=free_limits()["sales_history_days"])
+        date_from = max(date_from or earliest, earliest)
     return sales_svc.list_sales(
         db,
         date_from=date_from,

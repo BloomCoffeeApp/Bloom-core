@@ -7,11 +7,11 @@ export type ProFeature =
   | 'barista'
   | 'purchases'
   | 'reports'
-  | 'exports'
   | 'public_menu'
   | 'lan'
   | 'users'
   | 'backup_export'
+  | 'orders_pro'
 
 /** Mirrors backend app/routers/license.py `_out`. */
 export interface LicenseInfo {
@@ -29,10 +29,13 @@ export interface LicenseInfo {
   days_left: number | null
   machine_id: string
   problem: string | null
+  /** The one Pro trial of this PC was used and ran out. */
+  trial_ended: boolean
   pro_label: string
   app_name: string
   catalog: Record<ProFeature, string>
-  free_max_users: number
+  /** Free plan caps (signed remote config, or built-in defaults). */
+  free_limits: { products: number; users: number; customers: number; stock_items: number; sales_history_days: number }
   server_configured: boolean
   /** A Mercado Pago purchase started on this PC that hasn't been confirmed yet. */
   pending_checkout: string | null
