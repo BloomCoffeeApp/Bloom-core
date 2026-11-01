@@ -67,6 +67,7 @@ export function ProductsTab() {
                 {row.original.stock_item_id
                   ? `Reventa · ${row.original.stock_item_name}`
                   : `${row.original.recipe_items.length} insumos`}
+                {row.original.sizes.length > 0 && ` · ${row.original.sizes.map((x) => x.short_label).join('/')}`}
                 {!row.original.show_in_pos && ' · oculto en POS'}
               </p>
             </div>
@@ -82,7 +83,7 @@ export function ProductsTab() {
       {
         accessorKey: 'price_cents',
         header: 'Precio',
-        cell: ({ row }) => <span className="tabular font-semibold">{fmtMoney(row.original.price_cents)}</span>,
+        cell: ({ row }) => <PriceCell product={row.original} />,
       },
       {
         accessorKey: 'cost_cents',
@@ -233,7 +234,7 @@ export function ProductsTab() {
                       <p className="truncate text-xs text-muted-foreground">{p.category?.name ?? 'Sin categoría'}</p>
                     </div>
                     <div className="flex items-end justify-between">
-                      <span className="tabular text-lg font-semibold">{fmtMoney(p.price_cents)}</span>
+                      <PriceCell product={p} className="text-lg" />
                       <span className="tabular text-xs text-muted-foreground">costo {fmtMoney(p.cost_cents)}</span>
                     </div>
                   </Card>
@@ -252,5 +253,17 @@ export function ProductsTab() {
       />
       <BulkPriceDialog open={bulkOpen} onOpenChange={setBulkOpen} />
     </div>
+  )
+}
+
+function PriceCell({ product, className }: { product: Product; className?: string }) {
+  if (!product.sizes.length) return <span className={cn('tabular font-semibold', className)}>{fmtMoney(product.price_cents)}</span>
+  const prices = product.sizes.map((s) => s.price_cents)
+  const min = Math.min(...prices)
+  const max = Math.max(...prices)
+  return (
+    <span className={cn('tabular font-semibold', className)} title={product.sizes.map((s) => `${s.name}: ${fmtMoney(s.price_cents)}`).join(' · ')}>
+      {min === max ? fmtMoney(min) : `${fmtMoney(min)} – ${fmtMoney(max)}`}
+    </span>
   )
 }

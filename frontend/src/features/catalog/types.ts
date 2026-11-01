@@ -22,6 +22,54 @@ export interface RecipeLine {
   line_cost_cents: number
 }
 
+export interface Size {
+  id: number
+  name: string
+  short_label: string
+  volume_ml: number | null
+  sort_order: number
+  active: boolean
+  product_count: number
+}
+
+export type SizeInput = Omit<Size, 'id' | 'product_count'>
+
+export interface SizeRecipeOverride {
+  stock_item_id: number
+  /** Replaces the scaled base qty of this stock item for the size (0 = not used). */
+  qty: number
+}
+
+export interface ProductSize {
+  size_id: number
+  name: string
+  short_label: string
+  volume_ml: number | null
+  active: boolean
+  price_cents: number
+  recipe_scale: number
+  is_default: boolean
+  recipe_overrides: SizeRecipeOverride[]
+  /** Effective recipe of this size (base × scale + overrides). */
+  recipe_items: RecipeLine[]
+  cost_cents: number
+  margin_pct: number | null
+}
+
+export interface ProductSizeInput {
+  size_id: number
+  price_cents: number
+  recipe_scale: number
+  is_default: boolean
+  recipe_overrides: SizeRecipeOverride[]
+}
+
+/** Allergen/diet tags (fixed list, GET /product-tags). */
+export interface ProductTag {
+  code: string
+  label: string
+}
+
 export interface Product {
   id: number
   name: string
@@ -30,16 +78,21 @@ export interface Product {
   description: string | null
   price_cents: number
   image_path: string | null
+  image_url: string | null
   color: string | null
   active: boolean
   show_in_pos: boolean
   stock_item_id: number | null
   stock_item_name: string | null
   sort_order: number
+  long_description: string | null
+  tags: string[]
+  featured: boolean
   cost_cents: number
   margin_pct: number | null
   recipe_items: RecipeLine[]
   modifier_group_ids: number[]
+  sizes: ProductSize[]
   updated_at: string | null
 }
 
@@ -53,13 +106,20 @@ export interface ProductInput {
   show_in_pos: boolean
   stock_item_id: number | null
   sort_order: number
+  long_description: string | null
+  tags: string[]
+  featured: boolean
   recipe_items: { stock_item_id: number; qty: number }[]
   modifier_group_ids: number[]
+  /** [] = no sizes (single price). */
+  sizes: ProductSizeInput[]
 }
 
 export interface BulkPriceRow {
   product_id: number
   name: string
+  size_id: number | null
+  size_name: string | null
   category_id: number | null
   old_cents: number
   new_cents: number
@@ -76,6 +136,8 @@ export interface PriceHistoryEntry {
   product_id: number
   old_cents: number
   new_cents: number
+  size_id: number | null
+  size_name: string | null
   change_pct: number | null
   user_id: number | null
   user_name: string | null

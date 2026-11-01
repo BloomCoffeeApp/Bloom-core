@@ -79,7 +79,7 @@ def test_pos_catalog_shape(seeded):
     data = client.get("/api/pos/catalog", headers=cajero).json()
     assert set(data["categories"][0]) == {"id", "name", "color", "icon"}
     latte = next(p for p in data["products"] if p["name"] == "Latte")
-    assert set(latte) == {"id", "name", "price_cents", "category_id", "color", "image_path", "modifier_groups"}
+    assert set(latte) == {"id", "name", "price_cents", "category_id", "color", "image_path", "modifier_groups", "sizes"}
     grp = next(g for g in latte["modifier_groups"] if g["name"] == "Tipo de leche")
     assert set(grp) == {"id", "name", "min_select", "max_select", "modifiers"}
     assert {m["name"] for m in grp["modifiers"]} == {"Leche entera", "Bebida de avena"}

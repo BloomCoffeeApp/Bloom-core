@@ -1,4 +1,15 @@
-import { CircleCheckBig, CircleSlash, Copy, ExternalLink, Loader2, Monitor, Repeat, ShieldCheck } from 'lucide-react'
+import {
+  BadgeCheck,
+  CircleCheckBig,
+  CircleSlash,
+  Copy,
+  ExternalLink,
+  Loader2,
+  Monitor,
+  Repeat,
+  ShieldCheck,
+  TrendingUp,
+} from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 
@@ -19,7 +30,16 @@ import { fmtDate, fmtMoney } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 import { SettingsCard } from '../settings/form'
-import { type Plan, useCancelSubscription, useCheckoutStatus, usePlans, useStartCheckout, useSubscription } from './api'
+import {
+  type Plan,
+  type PriceChange,
+  useAcceptPrice,
+  useCancelSubscription,
+  useCheckoutStatus,
+  usePlans,
+  useStartCheckout,
+  useSubscription,
+} from './api'
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
 
@@ -197,6 +217,60 @@ export function CheckoutDialog({ checkout, onClose }: { checkout: CheckoutRef; o
   )
 }
 
+/** A new price announced by the vendor: accept it, or the subscription ends on that date. */
+function PriceChangeNotice({ change, every, onCancel }: { change: PriceChange; every: string; onCancel: () => void }) {
+  const accept = useAcceptPrice()
+  const [confirm, setConfirm] = useState(false)
+  const from = fmtDate(change.effective_at)
+  if (change.accepted) {
+    return (
+      <p className="flex items-start gap-2 rounded-xl border bg-muted/40 p-3 text-sm" data-testid="price-change">
+        <BadgeCheck className="mt-0.5 size-4 shrink-0 text-success" />
+        <span>
+          {change.needs_acceptance ? 'Aceptaste el nuevo precio: ' : 'Baja el precio: '}
+          desde el {from} se debitan <b className="tabular">{fmtMoney(change.new_amount_cents)}</b> {every}.
+        </span>
+      </p>
+    )
+  }
+  return (
+    <div className="space-y-3 rounded-xl border border-warning/40 bg-warning/10 p-3 text-sm" data-testid="price-change">
+      <p className="flex items-start gap-2">
+        <TrendingUp className="mt-0.5 size-4 shrink-0" />
+        <span>
+          <b>Cambia el precio de tu suscripción.</b> Desde el {from} pasa de{' '}
+          <span className="tabular">{fmtMoney(change.old_amount_cents)}</span> a{' '}
+          <b className="tabular">{fmtMoney(change.new_amount_cents)}</b> {every}. Si no lo aceptás antes de esa fecha no se
+          te cobra el precio nuevo: la suscripción se cancela sola y Pro sigue hasta el final del período que ya pagaste.
+        </span>
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <Button className="h-11" onClick={() => setConfirm(true)} disabled={accept.isPending}>
+          {accept.isPending && <Loader2 className="animate-spin" />} Aceptar nuevo precio
+        </Button>
+        <Button variant="outline" className="h-11 text-destructive hover:text-destructive" onClick={onCancel}>
+          <CircleSlash /> Cancelar suscripción
+        </Button>
+      </div>
+      <ConfirmDialog
+        open={confirm}
+        onOpenChange={setConfirm}
+        title="¿Aceptar el nuevo precio?"
+        description={`Desde el ${from} se van a debitar ${fmtMoney(change.new_amount_cents)} ${every} de tu tarjeta. Podés cancelar la suscripción cuando quieras, sin costo.`}
+        confirmLabel="Aceptar"
+        onConfirm={() =>
+          accept.mutate(undefined, {
+            onSuccess: () => {
+              setConfirm(false)
+              toast.success('Listo, aceptaste el nuevo precio.')
+            },
+          })
+        }
+      />
+    </div>
+  )
+}
+
 /** The subscription behind a paid license, with a visible way to cancel it ("botón de baja"). */
 export function SubscriptionCard() {
   const sub = useSubscription(true)
@@ -243,12 +317,17 @@ export function SubscriptionCard() {
             querés volver, suscribite de nuevo cuando quieras.
           </span>
         </p>
+      ) : s.pending_price_change && !s.pending_price_change.accepted ? (
+        <PriceChangeNotice change={s.pending_price_change} every={every} onCancel={() => setConfirm(true)} />
       ) : (
-        <div>
-          <Button variant="outline" className="h-11 text-destructive hover:text-destructive" onClick={() => setConfirm(true)}>
-            <CircleSlash /> Cancelar suscripción
-          </Button>
-        </div>
+        <>
+          {s.pending_price_change && <PriceChangeNotice change={s.pending_price_change} every={every} onCancel={() => setConfirm(true)} />}
+          <div>
+            <Button variant="outline" className="h-11 text-destructive hover:text-destructive" onClick={() => setConfirm(true)}>
+              <CircleSlash /> Cancelar suscripción
+            </Button>
+          </div>
+        </>
       )}
       <ConfirmDialog
         open={confirm}

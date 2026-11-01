@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, Float, ForeignKey, String, Text
+from sqlalchemy import JSON, DateTime, Float, ForeignKey, String, Text, UniqueConstraint, false
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, IdMixin, TimestampMixin, utcnow
@@ -28,10 +28,52 @@ class Product(IdMixin, TimestampMixin, Base):
     # Products resold as-is (e.g. a bought croissant) point directly to one stock item.
     stock_item_id: Mapped[int | None] = mapped_column(ForeignKey("stock_items.id"))
     sort_order: Mapped[int] = mapped_column(default=0)
+    # Customer-facing extras (menu detail sheet). `description` is the short line shown on the card.
+    long_description: Mapped[str | None] = mapped_column(Text)
+    tags: Mapped[list[str] | None] = mapped_column(JSON)  # codes from catalog.PRODUCT_TAGS
+    featured: Mapped[bool] = mapped_column(default=False, server_default=false())
 
     recipe_items: Mapped[list["RecipeItem"]] = relationship(
         back_populates="product", cascade="all, delete-orphan"
     )
+    # Sizes this product is sold in (empty = single price/recipe, the classic behaviour).
+    sizes: Mapped[list["ProductSize"]] = relationship(
+        back_populates="product", cascade="all, delete-orphan", order_by="ProductSize.id"
+    )
+
+
+class Size(IdMixin, TimestampMixin, Base):
+    """Reusable size list defined by each business (\"Chico 8 oz\", \"Grande 16 oz\"…)."""
+
+    __tablename__ = "sizes"
+    name: Mapped[str] = mapped_column(String(60))
+    short_label: Mapped[str] = mapped_column(String(12))
+    volume_ml: Mapped[int | None]
+    sort_order: Mapped[int] = mapped_column(default=0)
+    active: Mapped[bool] = mapped_column(default=True)
+
+
+class ProductSize(IdMixin, Base):
+    """A size a product is sold in: own price, and its recipe = base recipe × recipe_scale with
+    per-stock-item overrides (ProductSizeRecipeItem replaces the scaled qty; 0 = not used)."""
+
+    __tablename__ = "product_sizes"
+    __table_args__ = (UniqueConstraint("product_id", "size_id"),)
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"), index=True)
+    size_id: Mapped[int] = mapped_column(ForeignKey("sizes.id"))
+    price_cents: Mapped[int] = mapped_column(default=0)
+    recipe_scale: Mapped[float] = mapped_column(Float, default=1.0)
+    is_default: Mapped[bool] = mapped_column(default=False)
+    product: Mapped[Product] = relationship(back_populates="sizes")
+    size: Mapped[Size] = relationship(lazy="joined")
+    recipe_items: Mapped[list["ProductSizeRecipeItem"]] = relationship(cascade="all, delete-orphan")
+
+
+class ProductSizeRecipeItem(IdMixin, Base):
+    __tablename__ = "product_size_recipe_items"
+    product_size_id: Mapped[int] = mapped_column(ForeignKey("product_sizes.id", ondelete="CASCADE"), index=True)
+    stock_item_id: Mapped[int] = mapped_column(ForeignKey("stock_items.id"))
+    qty: Mapped[float] = mapped_column(Float)
 
 
 class ModifierGroup(IdMixin, TimestampMixin, Base):
@@ -86,5 +128,6 @@ class PriceHistory(IdMixin, Base):
     product_id: Mapped[int] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"))
     old_cents: Mapped[int]
     new_cents: Mapped[int]
+    size_id: Mapped[int | None]  # set when the change was the price of one size (no FK: history outlives it)
     user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
     ts: Mapped[datetime] = mapped_column(DateTime, default=utcnow)

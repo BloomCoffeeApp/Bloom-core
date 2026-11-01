@@ -59,7 +59,7 @@ export function ticketHtml({ business, sale, payment_names }: TicketData) {
         .join('')
       const note = it.notes ? `<div class="mod">» ${esc(it.notes)}</div>` : ''
       const disc = it.discount_cents && !sale.is_courtesy ? `<div class="row mod"><span>Desc.</span><span>-${esc(fmtMoney(it.discount_cents))}</span></div>` : ''
-      return `<div class="row"><span>${esc(fmtNumber(it.qty))} x ${esc(it.name_snapshot)}</span><span>${esc(fmtMoney(it.total_cents + it.discount_cents))}</span></div>${mods}${note}${disc}`
+      return `<div class="row"><span>${esc(fmtNumber(it.qty))} x ${esc(it.name_snapshot)}${it.size_name ? ` ${esc(it.size_name)}` : ''}</span><span>${esc(fmtMoney(it.total_cents + it.discount_cents))}</span></div>${mods}${note}${disc}`
     })
     .join('')
   const manualDisc = sale.discount_cents - sale.points_discount_cents

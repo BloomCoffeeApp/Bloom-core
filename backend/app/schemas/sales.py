@@ -124,6 +124,7 @@ class CashSessionListItem(BaseModel):
 class SaleItemIn(BaseModel):
     product_id: int
     qty: float = Field(default=1, gt=0, le=1000)
+    size_id: int | None = None  # required choice for sized products (defaults to the product's default size)
     modifier_ids: list[int] = []
     notes: str | None = Field(default=None, max_length=200)
     discount_cents: int = Field(default=0, ge=0)
@@ -158,6 +159,8 @@ class SaleItemOut(ORM):
     id: int
     product_id: int | None
     name_snapshot: str
+    size_id: int | None = None
+    size_name: str | None = None
     qty: float
     unit_price_cents: int
     discount_cents: int

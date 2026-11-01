@@ -1,4 +1,4 @@
-import { Layers, Package, Tags } from 'lucide-react'
+import { CupSoda, Layers, Package, Tags } from 'lucide-react'
 import { Route, Routes, useSearchParams } from 'react-router'
 
 import { PageHeader } from '@/components/page-header'
@@ -7,13 +7,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { CategoriesTab } from './CategoriesTab'
 import { ModifiersTab } from './ModifiersTab'
 import { ProductsTab } from './ProductsTab'
+import { SizesTab } from './SizesTab'
 
 function CatalogPage() {
   const [params, setParams] = useSearchParams()
   const tab = params.get('tab') || 'productos'
   return (
     <div>
-      <PageHeader title="Productos" description="Carta, recetas, costos y márgenes." />
+      <PageHeader title="Productos" description="Carta, tamaños, recetas, costos y márgenes." />
       <Tabs value={tab} onValueChange={(v) => setParams({ tab: v }, { replace: true })} className="gap-4">
         <TabsList>
           <TabsTrigger value="productos">
@@ -21,6 +22,9 @@ function CatalogPage() {
           </TabsTrigger>
           <TabsTrigger value="categorias">
             <Tags /> Categorías
+          </TabsTrigger>
+          <TabsTrigger value="tamanos">
+            <CupSoda /> Tamaños
           </TabsTrigger>
           <TabsTrigger value="modificadores">
             <Layers /> Modificadores
@@ -31,6 +35,9 @@ function CatalogPage() {
         </TabsContent>
         <TabsContent value="categorias">
           <CategoriesTab />
+        </TabsContent>
+        <TabsContent value="tamanos">
+          <SizesTab />
         </TabsContent>
         <TabsContent value="modificadores">
           <ModifiersTab />

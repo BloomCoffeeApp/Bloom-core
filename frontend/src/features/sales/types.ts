@@ -27,6 +27,9 @@ export interface SaleItem {
   id: number
   product_id: number | null
   name_snapshot: string
+  /** Size sold (snapshot at sale time), null for products without sizes. */
+  size_id: number | null
+  size_name: string | null
   qty: number
   unit_price_cents: number
   discount_cents: number
@@ -108,6 +111,8 @@ export interface TicketData {
 export interface SaleItemIn {
   product_id: number
   qty: number
+  /** Required for sized products (null/absent = the default size). */
+  size_id?: number | null
   modifier_ids: number[]
   notes?: string | null
   discount_cents?: number

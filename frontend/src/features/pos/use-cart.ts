@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
-import type { PosConfig, CartLine, CartState, PosCustomer, PosModifier, PosProduct } from './types'
+import type { PosConfig, CartLine, CartState, PosCustomer, PosModifier, PosProduct, PosSize } from './types'
 import type { Channel } from '../sales/types'
 
-const KEY = 'pos.cart.v1'
+const KEY = 'pos.cart.v2' // v2: lines carry the chosen size
 
 const EMPTY: CartState = {
   lines: [],
@@ -25,8 +25,8 @@ function load(): CartState {
   }
 }
 
-const lineKey = (productId: number, mods: PosModifier[], notes: string) =>
-  `${productId}|${mods.map((m) => m.id).sort((a, b) => a - b).join(',')}|${notes.trim().toLowerCase()}`
+const lineKey = (productId: number, sizeId: number | null, mods: PosModifier[], notes: string) =>
+  `${productId}|${sizeId ?? ''}|${mods.map((m) => m.id).sort((a, b) => a - b).join(',')}|${notes.trim().toLowerCase()}`
 
 export interface CartTotals {
   subtotal: number
@@ -71,8 +71,10 @@ export function useCart() {
     }
   }, [cart])
 
-  const add = useCallback((p: PosProduct, mods: PosModifier[] = [], qty = 1, notes = '') => {
-    const key = lineKey(p.id, mods, notes)
+  const add = useCallback((p: PosProduct, mods: PosModifier[] = [], qty = 1, notes = '', size: PosSize | null = null) => {
+    // A sized product added without choosing (e.g. a quick tap) takes its default size.
+    const sz = size ?? p.sizes.find((s) => s.is_default) ?? p.sizes[0] ?? null
+    const key = lineKey(p.id, sz?.size_id ?? null, mods, notes)
     setCart((c) => {
       const existing = c.lines.find((l) => l.key === key)
       if (existing) {
@@ -83,7 +85,8 @@ export function useCart() {
         product_id: p.id,
         category_id: p.category_id,
         name: p.name,
-        unit_cents: p.price_cents + mods.reduce((a, m) => a + m.price_delta_cents, 0),
+        size: sz ? { size_id: sz.size_id, name: sz.name, short_label: sz.short_label } : null,
+        unit_cents: (sz ? sz.price_cents : p.price_cents) + mods.reduce((a, m) => a + m.price_delta_cents, 0),
         modifiers: mods,
         qty,
         notes: notes.trim(),
@@ -112,7 +115,7 @@ export function useCart() {
         const next = { ...l, ...patch }
         next.discount_cents = Math.min(Math.max(next.discount_cents, 0), next.unit_cents * next.qty)
         // Notes are part of the identity of a line.
-        next.key = lineKey(next.product_id, next.modifiers, next.notes)
+        next.key = lineKey(next.product_id, next.size?.size_id ?? null, next.modifiers, next.notes)
         return next
       })
       return { ...c, lines: lines.filter((l) => l.qty > 0) }

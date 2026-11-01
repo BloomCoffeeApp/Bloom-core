@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { fmtMoney } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
-import type { PosModifier, PosModifierGroup, PosProduct } from './types'
+import type { PosModifier, PosModifierGroup, PosProduct, PosSize } from './types'
 
 function groupHint(g: PosModifierGroup) {
   if (g.min_select > 0 && g.min_select === g.max_select) return `Elegí ${g.min_select}`
@@ -23,9 +23,13 @@ function ModifierBody({
   onCancel,
 }: {
   product: PosProduct
-  onConfirm: (mods: PosModifier[], qty: number, notes: string) => void
+  onConfirm: (mods: PosModifier[], qty: number, notes: string, size: PosSize | null) => void
   onCancel: () => void
 }) {
+  const [sizeId, setSizeId] = useState<number | null>(
+    () => (product.sizes.find((s) => s.is_default) ?? product.sizes[0])?.size_id ?? null,
+  )
+  const size = product.sizes.find((s) => s.size_id === sizeId) ?? null
   const [selected, setSelected] = useState<Record<number, number[]>>(() => {
     // Preselect the first option of required single-choice groups.
     const init: Record<number, number[]> = {}
@@ -51,16 +55,46 @@ function ModifierBody({
   }
 
   const mods = product.modifier_groups.flatMap((g) => g.modifiers.filter((m) => (selected[g.id] ?? []).includes(m.id)))
-  const unit = product.price_cents + mods.reduce((a, m) => a + m.price_delta_cents, 0)
+  const unit = (size ? size.price_cents : product.price_cents) + mods.reduce((a, m) => a + m.price_delta_cents, 0)
   const missing = product.modifier_groups.filter((g) => (selected[g.id]?.length ?? 0) < g.min_select)
 
   return (
     <>
       <DialogHeader>
         <DialogTitle className="font-heading text-2xl">{product.name}</DialogTitle>
-        <DialogDescription>Precio base {fmtMoney(product.price_cents)}</DialogDescription>
+        <DialogDescription>
+          {size ? `${size.name} · ${fmtMoney(size.price_cents)}` : `Precio base ${fmtMoney(product.price_cents)}`}
+        </DialogDescription>
       </DialogHeader>
       <div className="max-h-[55vh] space-y-5 overflow-y-auto pr-1">
+        {product.sizes.length > 0 && (
+          <div className="space-y-2" role="radiogroup" aria-label="Tamaño">
+            <p className="font-medium">Tamaño</p>
+            <div className={cn('grid gap-2', product.sizes.length > 3 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3')}>
+              {product.sizes.map((s) => {
+                const on = s.size_id === sizeId
+                return (
+                  <button
+                    key={s.size_id}
+                    type="button"
+                    role="radio"
+                    aria-checked={on}
+                    aria-label={`${s.name} ${fmtMoney(s.price_cents)}`}
+                    onClick={() => setSizeId(s.size_id)}
+                    className={cn(
+                      'touch-target flex min-h-20 flex-col items-center justify-center gap-0.5 rounded-2xl border px-2 py-2 text-center transition-colors',
+                      on ? 'border-primary bg-primary/10 ring-2 ring-primary/30' : 'hover:bg-muted',
+                    )}
+                  >
+                    <span className={cn('font-heading text-2xl leading-none font-semibold', on && 'text-primary')}>{s.short_label}</span>
+                    <span className="text-xs leading-tight text-muted-foreground">{s.name}</span>
+                    <span className="tabular text-sm font-semibold">{fmtMoney(s.price_cents, { short: true })}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
         {product.modifier_groups.map((g) => {
           const cur = selected[g.id] ?? []
           const full = g.max_select > 1 && cur.length >= g.max_select
@@ -117,7 +151,7 @@ function ModifierBody({
           <Button variant="ghost" className="h-12 px-4" onClick={onCancel}>
             Cancelar
           </Button>
-          <Button className="h-12 px-6 text-base" disabled={missing.length > 0} onClick={() => onConfirm(mods, qty, notes)}>
+          <Button className="h-12 px-6 text-base" disabled={missing.length > 0} onClick={() => onConfirm(mods, qty, notes, size)}>
             Agregar · {fmtMoney(unit * qty)}
           </Button>
         </div>
@@ -133,7 +167,7 @@ export function ModifierDialog({
 }: {
   product: PosProduct | null
   onOpenChange: (o: boolean) => void
-  onConfirm: (p: PosProduct, mods: PosModifier[], qty: number, notes: string) => void
+  onConfirm: (p: PosProduct, mods: PosModifier[], qty: number, notes: string, size: PosSize | null) => void
 }) {
   return (
     <Dialog open={product != null} onOpenChange={onOpenChange}>
@@ -143,8 +177,8 @@ export function ModifierDialog({
             key={product.id}
             product={product}
             onCancel={() => onOpenChange(false)}
-            onConfirm={(mods, qty, notes) => {
-              onConfirm(product, mods, qty, notes)
+            onConfirm={(mods, qty, notes, size) => {
+              onConfirm(product, mods, qty, notes, size)
               onOpenChange(false)
             }}
           />

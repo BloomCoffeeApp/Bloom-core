@@ -48,6 +48,9 @@ export function BulkPriceDialog({ open, onOpenChange }: { open: boolean; onOpenC
     round_to_cents: Number(rounding),
   }
   const changed = preview?.items.filter((i) => i.old_cents !== i.new_cents) ?? []
+  // Sized products have one price per size: count prices instead of products then.
+  const unit = preview?.items.some((i) => i.size_id != null) ? 'precios' : 'productos'
+
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -102,15 +105,18 @@ export function BulkPriceDialog({ open, onOpenChange }: { open: boolean; onOpenC
         {preview ? (
           <div className="space-y-2">
             <p className="text-sm text-muted-foreground">
-              {changed.length} de {preview.count} productos cambian de precio.
+              {changed.length} de {preview.count} {unit} cambian de precio.
             </p>
             <ScrollArea className="h-72 rounded-xl border">
               <div className="divide-y">
                 {preview.items.map((i) => {
                   const diff = i.old_cents ? ((i.new_cents - i.old_cents) / i.old_cents) * 100 : 0
                   return (
-                    <div key={i.product_id} className="flex items-center gap-3 px-3 py-2 text-sm">
-                      <span className="min-w-0 flex-1 truncate">{i.name}</span>
+                    <div key={`${i.product_id}-${i.size_id ?? ''}`} className="flex items-center gap-3 px-3 py-2 text-sm">
+                      <span className="min-w-0 flex-1 truncate">
+                        {i.name}
+                        {i.size_name && <span className="ml-1.5 text-xs text-muted-foreground">· {i.size_name}</span>}
+                      </span>
                       <span className="tabular text-muted-foreground">{fmtMoney(i.old_cents)}</span>
                       <ArrowRight className="size-3.5 text-muted-foreground" />
                       <span className="tabular w-28 text-right font-semibold">{fmtMoney(i.new_cents)}</span>
@@ -143,7 +149,7 @@ export function BulkPriceDialog({ open, onOpenChange }: { open: boolean; onOpenC
               disabled={!changed.length || bulk.isPending}
               onClick={() => bulk.mutate({ ...body, dry_run: false }, { onSuccess: () => onOpenChange(false) })}
             >
-              Aplicar a {changed.length} productos
+              Aplicar a {changed.length} {unit}
             </Button>
           )}
         </DialogFooter>

@@ -19,6 +19,15 @@ export interface PosCategory {
   color: string
   icon: string
 }
+/** A size the product is sold in (price of the size; modifiers add on top). */
+export interface PosSize {
+  size_id: number
+  name: string
+  short_label: string
+  volume_ml: number | null
+  price_cents: number
+  is_default: boolean
+}
 export interface PosProduct {
   id: number
   name: string
@@ -27,6 +36,8 @@ export interface PosProduct {
   color: string | null
   image_path: string | null
   modifier_groups: PosModifierGroup[]
+  /** Empty = no size choice. */
+  sizes: PosSize[]
 }
 export interface PosCatalog {
   categories: PosCategory[]
@@ -54,6 +65,8 @@ export interface CartLine {
   product_id: number
   category_id: number | null
   name: string
+  /** Chosen size (null for products without sizes). */
+  size: { size_id: number; name: string; short_label: string } | null
   unit_cents: number
   modifiers: PosModifier[]
   qty: number

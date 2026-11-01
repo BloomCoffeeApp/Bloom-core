@@ -134,9 +134,15 @@ def refresh_if_due() -> None:
         return
     write_state(last_attempt=now)
     try:
-        refresh()
+        status = refresh()
     except LicenseServerError as e:
         log.info("License refresh skipped: %s", e)
+        return
+    if status.valid and status.plan == "pro" and not status.perpetual:
+        try:  # keeps the price-change banner up to date
+            subscription()
+        except LicenseServerError as e:
+            log.info("Subscription status skipped: %s", e)
 
 
 # ---------------------------------------------------------------- subscriptions (paid in Mercado Pago)
@@ -174,13 +180,33 @@ def _token_body() -> dict:
 
 
 def subscription() -> dict:
-    """The automatic-charge subscription behind this license (plan, status, paid date)."""
-    return _post("/v1/subscription", _token_body())
+    """The automatic-charge subscription behind this license (plan, status, paid date, pending
+    price change). Remembered so the app can show a price-change banner without going online."""
+    resp = _post("/v1/subscription", _token_body())
+    write_state(subscription={"at": time.time(), "data": resp})
+    return resp
+
+
+def accept_price() -> dict:
+    """Accepts the scheduled price change of the subscription (otherwise it's cancelled on that date)."""
+    resp = _post("/v1/subscription/accept-price", _token_body())
+    write_state(subscription={"at": time.time(), "data": resp})
+    return resp
+
+
+def pending_price_change() -> dict | None:
+    """From the last subscription status seen (no network): a price change still to accept."""
+    data = (read_state().get("subscription") or {}).get("data") or {}
+    change = data.get("pending_price_change")
+    if not isinstance(change, dict) or data.get("status") == "cancelled":
+        return None
+    return change
 
 
 def cancel_subscription() -> dict:
     """'Botón de baja': stops future charges; the time already paid keeps working."""
     resp = _post("/v1/subscription/cancel", _token_body())
+    write_state(subscription={"at": time.time(), "data": resp})
     try:  # the paid date doesn't change, but keep the local token fresh
         refresh()
     except LicenseServerError as e:

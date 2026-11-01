@@ -102,7 +102,10 @@ export function SaleDetailSheet({ id, onOpenChange }: { id: number | null; onOpe
                   <div key={it.id} className="flex gap-3">
                     <span className="tabular w-8 shrink-0 text-muted-foreground">{fmtNumber(it.qty)}×</span>
                     <div className="min-w-0 flex-1">
-                      <p className="font-medium">{it.name_snapshot}</p>
+                      <p className="font-medium">
+                        <span>{it.name_snapshot}</span>
+                        {it.size_name && <span className="ml-1.5 text-sm font-normal text-muted-foreground">{it.size_name}</span>}
+                      </p>
                       {it.modifiers?.length ? (
                         <p className="text-xs text-muted-foreground">{it.modifiers.map((m) => m.name).join(' · ')}</p>
                       ) : null}

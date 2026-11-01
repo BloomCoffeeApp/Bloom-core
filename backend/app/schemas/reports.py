@@ -35,11 +35,19 @@ class DayPoint(BaseModel):
     sales_cents: int
 
 
+class SizeBreakdown(BaseModel):
+    size_id: int | None
+    name: str
+    qty: float
+    sales_cents: int
+
+
 class TopProduct(BaseModel):
     product_id: int | None
     name: str
     qty: float
     sales_cents: int
+    sizes: list[SizeBreakdown] = []  # only for products sold by size
 
 
 class MixRow(BaseModel):
@@ -110,6 +118,7 @@ class ProductRow(SalesRow):
     unit_margin_cents: int
     unit_margin_pct: float | None
     rank: int
+    sizes: list[dict[str, Any]] = []  # per-size rows (sold in the period and/or current sizes)
 
 
 class ProductsReport(BaseModel):

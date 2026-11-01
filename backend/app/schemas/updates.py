@@ -29,3 +29,6 @@ class UpdateStatus(BaseModel):
     message: str | None
     progress: UpdateProgress
     can_install: bool
+    min_version: str | None = None
+    required: bool = False
+    release_notes_url: str | None = None

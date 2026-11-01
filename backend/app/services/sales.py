@@ -17,6 +17,7 @@ from app.models import (
     PaymentMethod,
     Product,
     ProductModifierGroup,
+    ProductSize,
     Sale,
     SaleItem,
     SalePayment,
@@ -119,7 +120,9 @@ def _create_sale(db: Session, data: SaleIn, user: User) -> Sale:
 
     # --- Load catalog in bulk ---
     pids = {i.product_id for i in data.items}
-    products = {p.id: p for p in db.scalars(select(Product).where(Product.id.in_(pids)))}
+    products = {
+        p.id: p for p in db.scalars(select(Product).options(selectinload(Product.sizes)).where(Product.id.in_(pids)))
+    }
     for pid in pids:
         p = products.get(pid)
         if p is None or not p.active:
@@ -140,6 +143,7 @@ def _create_sale(db: Session, data: SaleIn, user: User) -> Sale:
     courtesy_value = 0
     for it in data.items:
         p = products[it.product_id]
+        size = _pick_size(p, it.size_id)
         mod_ids = list(dict.fromkeys(it.modifier_ids))
         per_group: dict[int, int] = defaultdict(int)
         for mid in mod_ids:
@@ -155,7 +159,8 @@ def _create_sale(db: Session, data: SaleIn, user: User) -> Sale:
             if g.max_select > 0 and n > g.max_select:
                 raise HTTPException(400, f"{p.name}: máximo {g.max_select} en «{g.name}»")
         mods = [modifiers[mid] for mid in mod_ids]
-        unit = p.price_cents + sum(m.price_delta_cents for m in mods)
+        # Price at the time of sale: the chosen size's price (or the product's) plus modifiers.
+        unit = (size.price_cents if size else p.price_cents) + sum(m.price_delta_cents for m in mods)
         gross = round(unit * it.qty)
         if it.discount_cents > gross:
             raise HTTPException(400, f"El descuento de {p.name} supera su importe")
@@ -165,9 +170,9 @@ def _create_sale(db: Session, data: SaleIn, user: User) -> Sale:
         if courtesy:
             line_total = 0
         courtesy_value += gross if courtesy else 0
-        unit_cost = recipes.cost_cents(db, p, mod_ids)
+        unit_cost = recipes.cost_cents(db, p, mod_ids, size)
         line_cost = round(unit_cost * it.qty)
-        for sid, q in recipes.consumption(db, p, mod_ids).items():
+        for sid, q in recipes.consumption(db, p, mod_ids, size).items():
             consumption[sid] += q * it.qty
         subtotal += line_total
         cost_total += line_cost
@@ -175,6 +180,8 @@ def _create_sale(db: Session, data: SaleIn, user: User) -> Sale:
             SaleItem(
                 product_id=p.id,
                 name_snapshot=p.name,
+                size_id=size.size_id if size else None,
+                size_name=size.size.name if size else None,
                 qty=it.qty,
                 unit_price_cents=unit,
                 discount_cents=line_discount,
@@ -299,6 +306,25 @@ def _create_sale(db: Session, data: SaleIn, user: User) -> Sale:
     return sale
 
 
+def _pick_size(p: Product, size_id: int | None) -> ProductSize | None:
+    """The ProductSize sold. Sized products need one (missing = the default); others must not get one."""
+    if not p.sizes:
+        if size_id is not None:
+            raise HTTPException(400, f"{p.name} no se vende por tamaño")
+        return None
+    if size_id is None:
+        size = recipes.default_size(p)
+        if size is not None and not size.size.active:
+            size = next((ps for ps in p.sizes if ps.size.active), None)
+    else:
+        size = next((ps for ps in p.sizes if ps.size_id == size_id), None)
+        if size is None:
+            raise HTTPException(400, f"Tamaño no válido para {p.name}")
+    if size is None or not size.size.active:
+        raise HTTPException(400, f"El tamaño elegido de {p.name} no está disponible")
+    return size
+
+
 def void_sale(db: Session, sale_id: int, reason: str, user: User) -> Sale:
     sale = db.get(Sale, sale_id)
     if sale is None:
@@ -321,7 +347,8 @@ def void_sale(db: Session, sale_id: int, reason: str, user: User) -> Sale:
                 if p is None:
                     continue
                 mids = [m["id"] for m in (it.modifiers or []) if "id" in m]
-                for sid, q in recipes.consumption(db, p, mids).items():
+                size = next((ps for ps in p.sizes if ps.size_id == it.size_id), None) if it.size_id else None
+                for sid, q in recipes.consumption(db, p, mids, size).items():
                     back[sid] += q * it.qty
             for sid, q in back.items():
                 stock.apply_movement(db, sid, q, "void", ref_type="sale", ref_id=sale.id, reason=label, user_id=user.id)

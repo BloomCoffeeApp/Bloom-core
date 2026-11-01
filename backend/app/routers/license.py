@@ -39,6 +39,7 @@ def _out(status=None) -> dict:
         "free_max_users": FREE_MAX_USERS,
         "server_configured": bool(license_client.server_url()),
         "pending_checkout": license_client.pending_checkout_id(),
+        "pending_price_change": license_client.pending_price_change() if s.valid else None,
     }
 
 
@@ -118,6 +119,20 @@ def subscription(_: User = AdminOnly) -> dict:
         return license_client.subscription()
     except license_client.LicenseServerError as e:
         raise HTTPException(400, str(e)) from e
+
+
+@router.post("/subscription/accept-price")
+def accept_price(me: User = AdminOnly, db: Session = Depends(get_db)) -> dict:
+    """Accepts the new price of the subscription announced by the vendor."""
+    try:
+        result = license_client.accept_price()
+    except license_client.LicenseServerError as e:
+        raise HTTPException(400, str(e)) from e
+    change = result.get("pending_price_change") or {}
+    audit.log(db, me.id, "accept_price", "subscription", None,
+              {"new_amount_cents": change.get("new_amount_cents"), "effective_at": change.get("effective_at")})
+    db.commit()
+    return result
 
 
 @router.post("/subscription/cancel")

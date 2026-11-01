@@ -127,7 +127,7 @@ export function TopProducts({ data, loading }: { data?: TopProduct[]; loading?: 
         key: String(p.product_id ?? p.name),
         label: p.name,
         value: p.sales_cents,
-        hint: `× ${fmtNumber(p.qty, 0)}`,
+        hint: [`× ${fmtNumber(p.qty, 0)}`, ...(p.sizes ?? []).map((s) => `${s.name} ${fmtNumber(s.qty, 0)}`)].join(' · '),
       }))}
     />
   )

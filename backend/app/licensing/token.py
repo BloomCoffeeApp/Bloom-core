@@ -10,6 +10,7 @@ The signature covers `BLOOM1.<payload>`. Payload fields:
   iat      issued at (unix seconds)
   exp      paid/valid through (unix seconds), null = perpetual
   grace    days the token keeps working after `exp` while offline
+  pkey     (optional) the subscription plan it was sold under, e.g. "pro_mensual"
 """
 
 import base64

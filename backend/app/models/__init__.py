@@ -9,7 +9,10 @@ from app.models.catalog import (
     Product,
     ProductCategory,
     ProductModifierGroup,
+    ProductSize,
+    ProductSizeRecipeItem,
     RecipeItem,
+    Size,
 )
 from app.models.customers import Customer, CustomerAccountMovement, LoyaltyTransaction
 from app.models.purchases import (

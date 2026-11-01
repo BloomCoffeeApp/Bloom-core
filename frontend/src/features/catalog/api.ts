@@ -12,6 +12,9 @@ import type {
   Product,
   ProductCategory,
   ProductInput,
+  ProductTag,
+  Size,
+  SizeInput,
 } from './types'
 
 export const catalogKeys = {
@@ -19,6 +22,8 @@ export const catalogKeys = {
   products: (includeInactive: boolean) => ['catalog', 'products', includeInactive] as const,
   categories: ['catalog', 'categories'] as const,
   groups: ['catalog', 'modifier-groups'] as const,
+  sizes: ['catalog', 'sizes'] as const,
+  tags: ['catalog', 'tags'] as const,
   history: (id: number) => ['catalog', 'price-history', id] as const,
 }
 
@@ -89,7 +94,7 @@ export function useBulkPrice() {
     onSuccess: (r) => {
       if (r.applied) {
         invalidate()
-        toast.success(`Precios actualizados (${r.items.filter((i) => i.old_cents !== i.new_cents).length} productos)`)
+        toast.success(`Precios actualizados (${r.items.filter((i) => i.old_cents !== i.new_cents).length})`)
       }
     },
     onError,
@@ -129,6 +134,41 @@ export function useDeleteGroup() {
     onSuccess: () => {
       invalidate()
       toast.success('Grupo eliminado')
+    },
+    onError,
+  })
+}
+
+export function useSizes() {
+  return useQuery({ queryKey: catalogKeys.sizes, queryFn: () => api.get<Size[]>('/sizes') })
+}
+
+export function useProductTags() {
+  return useQuery({ queryKey: catalogKeys.tags, queryFn: () => api.get<ProductTag[]>('/product-tags'), staleTime: Infinity })
+}
+
+export function useSaveSize() {
+  const invalidate = useInvalidate()
+  return useMutation({
+    mutationFn: ({ id, data }: { id?: number; data: Partial<SizeInput> }) =>
+      id ? api.patch<Size>(`/sizes/${id}`, data) : api.post<Size>('/sizes', data),
+    onSuccess: (_d, v) => {
+      invalidate()
+      toast.success(v.id ? 'Tamaño actualizado' : 'Tamaño creado')
+    },
+    onError,
+  })
+}
+
+/** Uploads a photo (raw body; the server validates, resizes and re-encodes it). */
+export function useProductPhoto() {
+  const invalidate = useInvalidate()
+  return useMutation({
+    mutationFn: ({ id, file }: { id: number; file: File | null }) =>
+      file ? api.put<Product>(`/products/${id}/photo`, file) : api.delete<Product>(`/products/${id}/photo`),
+    onSuccess: (_d, v) => {
+      invalidate()
+      toast.success(v.file ? 'Foto actualizada' : 'Foto eliminada')
     },
     onError,
   })

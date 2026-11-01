@@ -82,7 +82,7 @@ function PosPage() {
 
   const pick = useCallback(
     (p: PosProduct) => {
-      if (p.modifier_groups.length > 0) setModProduct(p)
+      if (p.modifier_groups.length > 0 || p.sizes.length > 1) setModProduct(p)
       else cartApi.add(p)
     },
     [cartApi],
@@ -120,6 +120,7 @@ function PosPage() {
       {
         items: cart.lines.map((l) => ({
           product_id: l.product_id,
+          size_id: l.size?.size_id ?? null,
           qty: l.qty,
           modifier_ids: l.modifiers.map((m) => m.id),
           notes: l.notes || null,
@@ -178,7 +179,7 @@ function PosPage() {
       <ModifierDialog
         product={modProduct}
         onOpenChange={(o) => !o && setModProduct(null)}
-        onConfirm={(p, mods, qty, notes) => cartApi.add(p, mods, qty, notes)}
+        onConfirm={(p, mods, qty, notes, size) => cartApi.add(p, mods, qty, notes, size)}
       />
       <CheckoutDialog
         open={checkout}

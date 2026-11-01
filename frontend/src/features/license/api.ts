@@ -20,6 +20,8 @@ export interface LicenseInfo {
   features: string[]
   customer: string | null
   license_id: string | null
+  /** Subscription plan the license was sold under (e.g. "pro_mensual"). */
+  plan_key: string | null
   perpetual: boolean
   expires_at: number | null
   grace_until: number | null
@@ -34,6 +36,17 @@ export interface LicenseInfo {
   server_configured: boolean
   /** A Mercado Pago purchase started on this PC that hasn't been confirmed yet. */
   pending_checkout: string | null
+  /** Last known price change of the subscription (cached by the backend, no network). */
+  pending_price_change: PriceChange | null
+}
+
+/** A new price announced by the vendor; without acceptance the subscription ends on that date. */
+export interface PriceChange {
+  old_amount_cents: number
+  new_amount_cents: number
+  effective_at: string
+  accepted: boolean
+  needs_acceptance: boolean
 }
 
 export const licenseKey = ['license'] as const
@@ -156,6 +169,7 @@ export interface SubscriptionInfo {
   days?: number | null
   paid_through: string | null
   cancellation_code?: string | null
+  pending_price_change?: PriceChange | null
 }
 
 const subscriptionKey = ['license', 'subscription'] as const
@@ -174,6 +188,18 @@ export function useCancelSubscription() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: () => api.post<SubscriptionInfo>('/license/subscription/cancel'),
+    onSuccess: (s) => {
+      qc.setQueryData(subscriptionKey, s)
+      void qc.invalidateQueries({ queryKey: licenseKey })
+    },
+    onError: (e: Error) => toast.error(e.message),
+  })
+}
+
+export function useAcceptPrice() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => api.post<SubscriptionInfo>('/license/subscription/accept-price'),
     onSuccess: (s) => {
       qc.setQueryData(subscriptionKey, s)
       void qc.invalidateQueries({ queryKey: licenseKey })

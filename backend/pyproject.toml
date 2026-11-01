@@ -6,7 +6,7 @@ requires-python = ">=3.12"
 license = "MIT"
 dependencies = [
   "fastapi", "uvicorn[standard]", "sqlalchemy>=2.0", "alembic", "pydantic>=2", "argon2-cffi",
-  "openpyxl", "pywebview", "qrcode[pil]", "tzdata",
+  "openpyxl", "pillow", "pywebview", "qrcode[pil]", "tzdata",
 ]
 
 [project.optional-dependencies]

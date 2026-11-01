@@ -13,6 +13,7 @@ from app.routers import (
     customers,
     dashboard,
     license,
+    remote_config,
     sales,
     stock,
     system,
@@ -25,7 +26,7 @@ try:  # Pro edition only: private package, absent from the public repo.
 except ImportError:
     bloom_pro = None
 
-ROUTER_MODULES = (auth, license, users, dashboard, catalog, stock, sales, customers, alerts, system, updates)
+ROUTER_MODULES = (auth, license, remote_config, users, dashboard, catalog, stock, sales, customers, alerts, system, updates)
 EDITION = "pro" if bloom_pro else "free"
 
 

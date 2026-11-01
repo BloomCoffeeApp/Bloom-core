@@ -40,6 +40,8 @@ import { AVATAR_COLORS, initials } from '@/components/avatar-utils'
 import { hasFeature, useLicense } from '@/features/license/api'
 import { LICENSE_TAB, LicenseBanner, ProBadge } from '@/features/license/pro-gate'
 import { describePlan } from '@/features/license/describe-plan'
+import { PriceChangeBanner } from '@/features/license/price-change-banner'
+import { AnnouncementsBanner } from '@/features/remote-config/announcements-banner'
 import { useTour } from '@/features/tutorial/use-tour'
 import { UpdateBadge } from '@/features/updates/update-badge'
 import { useIdleLock } from '@/hooks/use-idle-lock'
@@ -272,6 +274,8 @@ export function AppShell() {
           </div>
         </header>
         <LicenseBanner />
+        <PriceChangeBanner />
+        <AnnouncementsBanner />
         <main className={cn('flex-1', fullBleed ? 'p-0' : 'mx-auto w-full max-w-[1500px] p-4 md:p-6')}>
           <Outlet />
         </main>

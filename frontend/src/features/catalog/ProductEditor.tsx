@@ -18,9 +18,12 @@ import { useDepsChanged } from '@/hooks/use-deps-changed'
 
 import { useStockItems } from '../stock/api'
 import { StockItemPicker } from '../stock/components'
-import { useDeactivateProduct, useModifierGroups, usePriceHistory, useProductCategories, useSaveProduct } from './api'
+import { useDeactivateProduct, useModifierGroups, usePriceHistory, useProductCategories, useSaveProduct, useSizes } from './api'
 import { marginOf, marginTextClass } from './catalog-utils'
+import { MenuDetailsEditor } from './MenuDetailsEditor'
 import { ColorSwatches } from './shared'
+import { draftsFor, type SizeDraft, toInput } from './size-utils'
+import { SizesEditor } from './SizesEditor'
 import type { Product, ProductInput } from './types'
 
 interface DraftRecipe {
@@ -61,6 +64,7 @@ function PriceHistoryList({ productId }: { productId: number }) {
             {up ? <TrendingUp className="size-4 text-destructive" /> : <TrendingDown className="size-4 text-success" />}
             <span className="tabular text-muted-foreground line-through">{fmtMoney(h.old_cents)}</span>
             <span className="tabular font-medium">{fmtMoney(h.new_cents)}</span>
+            {h.size_name && <span className="text-xs text-muted-foreground">{h.size_name}</span>}
             {h.change_pct != null && (
               <span className={cn('tabular text-xs', up ? 'text-destructive' : 'text-success')}>
                 {up ? '+' : ''}
@@ -92,6 +96,7 @@ export function ProductEditor({
   const cats = useProductCategories()
   const groups = useModifierGroups()
   const stock = useStockItems({ enabled: open })
+  const sizesQ = useSizes()
   const save = useSaveProduct()
   const deactivate = useDeactivateProduct()
 
@@ -106,6 +111,12 @@ export function ProductEditor({
   const [stockItemId, setStockItemId] = useState<number | null>(null)
   const [recipe, setRecipe] = useState<DraftRecipe[]>([])
   const [groupIds, setGroupIds] = useState<number[]>([])
+  const [sized, setSized] = useState(false)
+  const [sizeDrafts, setSizeDrafts] = useState<SizeDraft[]>([])
+  const [defaultSize, setDefaultSize] = useState<number | null>(null)
+  const [longDescription, setLongDescription] = useState('')
+  const [tags, setTags] = useState<string[]>([])
+  const [featured, setFeatured] = useState(false)
 
   if (useDepsChanged([open, product, defaultCategoryId]) && open) {
     setName(product?.name ?? '')
@@ -119,6 +130,16 @@ export function ProductEditor({
     setStockItemId(product?.stock_item_id ?? null)
     setRecipe(product?.recipe_items.map((r) => newRecipe({ stock_item_id: r.stock_item_id, qty: String(r.qty) })) ?? [])
     setGroupIds(product?.modifier_group_ids ?? [])
+    setSized(!!product?.sizes.length)
+    setSizeDrafts(draftsFor(sizesQ.data ?? [], product))
+    setDefaultSize(product?.sizes.find((s) => s.is_default)?.size_id ?? null)
+    setLongDescription(product?.long_description ?? '')
+    setTags(product?.tags ?? [])
+    setFeatured(product?.featured ?? false)
+  }
+  // Sizes may load after the editor opened (or a size was created meanwhile): rebuild untouched rows.
+  if (useDepsChanged([sizesQ.data]) && open && sizesQ.data && !sizeDrafts.some((d) => d.enabled)) {
+    setSizeDrafts(draftsFor(sizesQ.data, product))
   }
 
   const byId = useMemo(() => new Map(stock.data?.map((s) => [s.id, s])), [stock.data])
@@ -129,7 +150,17 @@ export function ProductEditor({
   const updateRecipe = (key: string, patch: Partial<DraftRecipe>) =>
     setRecipe((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r)))
 
-  const valid = name.trim() && price != null && price >= 0 && (!resale || stockItemId)
+  const baseRecipe = useMemo(() => {
+    const m = new Map<number, number>()
+    if (resale && stockItemId) m.set(stockItemId, 1)
+    for (const r of recipe) if (r.stock_item_id && num(r.qty) > 0) m.set(r.stock_item_id, (m.get(r.stock_item_id) ?? 0) + num(r.qty))
+    return m
+  }, [resale, stockItemId, recipe])
+  const enabledSizes = sizeDrafts.filter((d) => d.enabled)
+  const effectiveDefault = enabledSizes.some((d) => d.size_id === defaultSize) ? defaultSize : (enabledSizes[0]?.size_id ?? null)
+  const sizesValid = !sized || (enabledSizes.length > 0 && enabledSizes.every((d) => d.price != null && d.price >= 0))
+
+  const valid = name.trim() && (sized || (price != null && price >= 0)) && (!resale || stockItemId) && sizesValid
 
   const submit = () => {
     if (!valid) return
@@ -137,7 +168,7 @@ export function ProductEditor({
       name: name.trim(),
       category_id: categoryId,
       description: description.trim() || null,
-      price_cents: price ?? 0,
+      price_cents: sized ? (enabledSizes.find((d) => d.size_id === effectiveDefault)?.price ?? 0) : (price ?? 0),
       color,
       active,
       show_in_pos: showInPos,
@@ -147,16 +178,20 @@ export function ProductEditor({
         .filter((r) => r.stock_item_id && num(r.qty) > 0)
         .map((r) => ({ stock_item_id: r.stock_item_id!, qty: num(r.qty) })),
       modifier_group_ids: groupIds,
+      long_description: longDescription.trim() || null,
+      tags,
+      featured,
+      sizes: sized ? toInput(sizeDrafts, effectiveDefault) : [],
     }
     save.mutate({ id: product?.id, data }, { onSuccess: () => onOpenChange(false) })
   }
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full gap-0 sm:max-w-2xl">
+      <SheetContent className="w-full gap-0 sm:max-w-2xl data-[side=right]:sm:max-w-2xl">
         <SheetHeader className="border-b">
           <SheetTitle className="font-heading text-xl">{product ? product.name : 'Nuevo producto'}</SheetTitle>
-          <SheetDescription>Precio, receta y modificadores. El costo y el margen se calculan en vivo.</SheetDescription>
+          <SheetDescription>Precio, receta, tamaños y modificadores. El costo y el margen se calculan en vivo.</SheetDescription>
         </SheetHeader>
 
         <ScrollArea className="min-h-0 flex-1">
@@ -185,14 +220,18 @@ export function ProductEditor({
                 </div>
                 <div className="grid gap-1.5">
                   <Label htmlFor="pe-price">Precio de venta</Label>
-                  <MoneyInput id="pe-price" value={price} onChange={setPrice} className="[&_input]:text-base [&_input]:font-semibold" />
+                  {sized ? (
+                    <p className="flex h-9 items-center rounded-md border border-dashed px-3 text-sm text-muted-foreground">Se define por tamaño</p>
+                  ) : (
+                    <MoneyInput id="pe-price" value={price} onChange={setPrice} className="[&_input]:text-base [&_input]:font-semibold" />
+                  )}
                 </div>
                 <div className="grid gap-1.5 sm:col-span-2">
                   <Label>Color en el POS</Label>
                   <ColorSwatches value={color} onChange={setColor} />
                 </div>
                 <div className="grid gap-1.5 sm:col-span-2">
-                  <Label htmlFor="pe-desc">Descripción (opcional)</Label>
+                  <Label htmlFor="pe-desc">Descripción corta (opcional)</Label>
                   <Textarea id="pe-desc" rows={2} value={description} onChange={(e) => setDescription(e.target.value)} />
                 </div>
                 <label className="flex items-center justify-between gap-3 rounded-xl border px-3 py-2.5">
@@ -208,7 +247,14 @@ export function ProductEditor({
 
             <Separator />
 
-            <Section title="Receta / escandallo" description="Insumos que se descuentan del stock por cada unidad vendida.">
+            <Section
+              title="Receta / escandallo"
+              description={
+                sized
+                  ? 'Receta base (factor ×1). Cada tamaño la escala y puede ajustar insumos.'
+                  : 'Insumos que se descuentan del stock por cada unidad vendida.'
+              }
+            >
               <label className="flex items-center justify-between gap-3 rounded-xl border px-3 py-2.5">
                 <span>
                   <span className="block text-sm font-medium">Producto de reventa</span>
@@ -258,6 +304,7 @@ export function ProductEditor({
                 </Button>
               </div>
 
+              {!sized && (
               <div className="grid grid-cols-3 gap-2 rounded-2xl bg-muted/60 p-4">
                 <div>
                   <p className="text-xs text-muted-foreground">Costo</p>
@@ -277,11 +324,50 @@ export function ProductEditor({
                   </p>
                 )}
               </div>
+              )}
             </Section>
 
             <Separator />
 
-            <Section title="Modificadores" description="Opciones que el cajero puede elegir al vender (tamaño, leche, extras…).">
+            <Section title="Tamaños" description="Vendé el producto en distintos tamaños, cada uno con su precio y su receta.">
+              <label className="flex items-center justify-between gap-3 rounded-xl border px-3 py-2.5">
+                <span>
+                  <span className="block text-sm font-medium">Se vende en distintos tamaños</span>
+                  <span className="block text-xs text-muted-foreground">En el POS se elige el tamaño al agregarlo (con uno predeterminado).</span>
+                </span>
+                <Switch checked={sized} onCheckedChange={setSized} aria-label="Se vende en distintos tamaños" />
+              </label>
+              {sized && (
+                <SizesEditor
+                  sizes={sizesQ.data ?? []}
+                  drafts={sizeDrafts}
+                  onChange={setSizeDrafts}
+                  defaultId={effectiveDefault}
+                  onDefault={setDefaultSize}
+                  base={baseRecipe}
+                  stock={stock.data}
+                />
+              )}
+              {sized && !sizesValid && <p className="text-xs text-destructive">Elegí al menos un tamaño y poné el precio de cada uno.</p>}
+            </Section>
+
+            <Separator />
+
+            <Section title="Menú para clientes" description="Lo que ven tus clientes al tocar el producto en el menú del QR.">
+              <MenuDetailsEditor
+                product={product}
+                longDescription={longDescription}
+                onLongDescription={setLongDescription}
+                tags={tags}
+                onTags={setTags}
+                featured={featured}
+                onFeatured={setFeatured}
+              />
+            </Section>
+
+            <Separator />
+
+            <Section title="Modificadores" description="Opciones que el cajero puede elegir al vender (leche, extras…).">
               {groups.data?.length ? (
                 <div className="grid gap-2 sm:grid-cols-2">
                   {groups.data.map((g) => {

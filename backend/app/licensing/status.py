@@ -7,7 +7,7 @@ import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-from app.config import DATA_DIR
+from app.config import DATA_DIR, DB_PATH
 from app.licensing import token as tok
 from app.licensing.machine import machine_id
 
@@ -35,6 +35,7 @@ class LicenseStatus:
     features: list[str] = field(default_factory=list)
     customer: str | None = None
     license_id: str | None = None
+    plan_key: str | None = None  # subscription plan (e.g. "pro_mensual"), for targeted announcements
     perpetual: bool = False
     expires_at: int | None = None  # paid/trial through
     grace_until: int | None = None
@@ -48,6 +49,38 @@ class LicenseStatus:
 
     def as_dict(self) -> dict:
         return asdict(self)
+
+
+_evidence: tuple[float, float] | None = None  # (checked at, latest timestamp in the DB)
+
+
+def db_clock_evidence() -> float:
+    """Latest moment the business data proves we've reached (newest audit entry / sale).
+
+    Deleting license_state.json resets `max_seen`, but the sales and audit log still prove the
+    real date: a clock set before them is a rollback.
+    """
+    global _evidence
+    now = time.monotonic()
+    if _evidence and now - _evidence[0] < 60:
+        return _evidence[1]
+    latest = 0.0
+    try:
+        import sqlite3
+        from datetime import UTC, datetime
+
+        with sqlite3.connect(f"file:{Path(DB_PATH).as_posix()}?mode=ro", uri=True, timeout=1) as con:
+            for table in ("audit_log", "sales"):
+                try:
+                    (value,) = con.execute(f"SELECT max(ts) FROM {table}").fetchone()  # noqa: S608 (fixed names)
+                except sqlite3.Error:
+                    continue
+                if value:
+                    latest = max(latest, datetime.fromisoformat(str(value)).replace(tzinfo=UTC).timestamp())
+    except Exception:
+        latest = 0.0
+    _evidence = (now, latest)
+    return latest
 
 
 def read_state() -> dict:
@@ -68,6 +101,7 @@ def write_state(**changes) -> None:
 
 def evaluate(token: str | None, now: float | None = None) -> LicenseStatus:
     """Pure evaluation of a token at `now` for this machine (no caching, no I/O but the clock state)."""
+    now_arg_missing = now is None
     now = time.time() if now is None else now
     status = LicenseStatus(machine_id=machine_id())
     if not token:
@@ -80,13 +114,17 @@ def evaluate(token: str | None, now: float | None = None) -> LicenseStatus:
 
     status.customer = p.get("cust")
     status.license_id = p.get("lid")
+    status.plan_key = p.get("pkey") if isinstance(p.get("pkey"), str) else None
     if p.get("mid") != status.machine_id:
         status.problem = "La licencia es de otra computadora. Activala de nuevo en esta."
         return status
 
-    # A clock moved backwards could stretch an expiring license forever.
-    max_seen = float(read_state().get("max_seen", 0))
-    if now < max_seen - CLOCK_SLACK_S:
+    # A clock moved backwards could stretch an expiring license forever. Evidence: the latest time
+    # this app saw, the latest data in the business DB, and when the license itself was issued.
+    real_clock = now_arg_missing
+    max_seen = max(float(read_state().get("max_seen", 0)), db_clock_evidence() if real_clock else 0.0)
+    issued = float(p.get("iat") or 0)
+    if now < max_seen - CLOCK_SLACK_S or now < issued - CLOCK_SLACK_S:
         status.problem = "La fecha de la computadora está atrasada. Corregila o conectate a internet para validar la licencia."
         return status
 

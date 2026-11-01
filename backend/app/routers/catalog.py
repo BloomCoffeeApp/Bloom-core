@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from app.auth import CurrentUser, Manager
 from app.db import get_db
@@ -18,9 +19,13 @@ from app.schemas.catalog import (
     ProductIn,
     ProductOut,
     ProductUpdate,
+    SizeIn,
+    SizeOut,
+    SizeUpdate,
 )
 from app.schemas.common import Ok
 from app.services import catalog as svc
+from app.services import product_images
 
 router = APIRouter(prefix="/api", tags=["catalog"])
 
@@ -94,6 +99,57 @@ def delete_product(product_id: int, db: Session = Depends(get_db), me: User = Ma
 @router.get("/products/{product_id}/price-history", response_model=list[PriceHistoryOut])
 def price_history(product_id: int, db: Session = Depends(get_db), _: User = Manager):
     return svc.price_history(db, product_id)
+
+
+@router.put("/products/{product_id}/photo", response_model=ProductOut)
+async def upload_photo(product_id: int, request: Request, db: Session = Depends(get_db), me: User = Manager) -> ProductOut:
+    """Raw image body (Content-Type image/jpeg|png|webp), capped while reading."""
+    declared = request.headers.get("content-length")
+    if declared and declared.isdigit() and int(declared) > product_images.MAX_UPLOAD_BYTES:
+        raise HTTPException(413, "La foto pesa demasiado (máximo 8 MB)")
+    body = bytearray()
+    async for chunk in request.stream():
+        body += chunk
+        if len(body) > product_images.MAX_UPLOAD_BYTES:
+            raise HTTPException(413, "La foto pesa demasiado (máximo 8 MB)")
+    ctype = request.headers.get("content-type")
+
+    def go() -> ProductOut:  # Pillow work off the event loop
+        return svc.product_out(db, product_images.save_photo(db, product_id, bytes(body), ctype, me))
+
+    return await run_in_threadpool(go)
+
+
+@router.delete("/products/{product_id}/photo", response_model=ProductOut)
+def delete_photo(product_id: int, db: Session = Depends(get_db), me: User = Manager) -> ProductOut:
+    return svc.product_out(db, product_images.delete_photo(db, product_id, me))
+
+
+@router.get("/product-tags")
+def product_tags(_: User = CurrentUser) -> list[dict[str, str]]:
+    return [{"code": k, "label": v} for k, v in svc.PRODUCT_TAGS.items()]
+
+
+# ---- Sizes
+@router.get("/sizes", response_model=list[SizeOut])
+def list_sizes(include_inactive: bool = True, db: Session = Depends(get_db), _: User = CurrentUser):
+    return svc.list_sizes(db, include_inactive)
+
+
+@router.post("/sizes", response_model=SizeOut)
+def create_size(data: SizeIn, db: Session = Depends(get_db), me: User = Manager) -> SizeOut:
+    return svc.create_size(db, data, me)
+
+
+@router.patch("/sizes/{size_id}", response_model=SizeOut)
+def update_size(size_id: int, data: SizeUpdate, db: Session = Depends(get_db), me: User = Manager) -> SizeOut:
+    return svc.update_size(db, size_id, data, me)
+
+
+@router.delete("/sizes/{size_id}", response_model=Ok)
+def delete_size(size_id: int, db: Session = Depends(get_db), me: User = Manager) -> Ok:
+    svc.update_size(db, size_id, SizeUpdate(active=False), me)
+    return Ok()
 
 
 # ---- Modifier groups

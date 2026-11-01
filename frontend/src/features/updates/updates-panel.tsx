@@ -1,4 +1,4 @@
-import { CircleArrowUp, CircleCheck, CircleAlert, Loader2, RefreshCw } from 'lucide-react'
+import { CircleArrowUp, CircleCheck, CircleAlert, ExternalLink, Loader2, RefreshCw, TriangleAlert } from 'lucide-react'
 import { useState } from 'react'
 
 import { ConfirmDialog } from '@/components/confirm-dialog'
@@ -68,6 +68,16 @@ export function UpdatesPanel() {
         )}
       </div>
 
+      {status.required && (
+        <p className="flex items-start gap-2 rounded-lg bg-destructive/10 p-3 text-sm" data-testid="update-required">
+          <TriangleAlert className="mt-0.5 size-4 shrink-0 text-destructive" />
+          <span>
+            <b>Actualización obligatoria:</b> la versión {status.current_version} ya no tiene soporte (mínima{' '}
+            {status.min_version}). Actualizá para seguir recibiendo correcciones; tus ventas y datos no se bloquean.
+          </span>
+        </p>
+      )}
+
       {status.error && !busy && (
         <p className="flex items-start gap-2 text-sm text-destructive">
           <CircleAlert className="mt-0.5 size-4 shrink-0" /> {status.error}
@@ -85,6 +95,9 @@ export function UpdatesPanel() {
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="flex items-center gap-2 font-medium">
               <CircleArrowUp className="size-4 text-primary" /> Nueva versión {latest.version} disponible
+              <span className="text-xs font-normal text-muted-foreground">
+                {status.required ? '· Actualización obligatoria' : '· Actualización recomendada'}
+              </span>
             </p>
             <p className="text-xs text-muted-foreground">
               {latest.published_at && `Publicada el ${fmtDate(latest.published_at)} · `}
@@ -92,6 +105,16 @@ export function UpdatesPanel() {
             </p>
           </div>
           {latest.notes && <p className="text-sm whitespace-pre-line text-muted-foreground">{latest.notes}</p>}
+          {status.release_notes_url && (
+            <a
+              href={status.release_notes_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+            >
+              <ExternalLink className="size-3.5" /> Ver todas las novedades
+            </a>
+          )}
           {busy ? (
             <Working status={status} />
           ) : status.state === 'ready' ? (

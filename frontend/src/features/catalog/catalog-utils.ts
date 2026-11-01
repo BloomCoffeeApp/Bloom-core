@@ -69,3 +69,9 @@ export const marginTextClass = (m: number | null | undefined) =>
   })[marginTone(m)]
 
 export const marginOf = (price: number, cost: number) => (price > 0 ? ((price - cost) / price) * 100 : null)
+
+/** "240 ml · 8 oz" (null without a volume). */
+export function volumeText(ml: number | null | undefined) {
+  if (!ml) return null
+  return `${ml} ml · ${Math.round(ml / 29.5735)} oz`
+}

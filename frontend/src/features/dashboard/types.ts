@@ -25,6 +25,8 @@ export interface TopProduct {
   name: string
   qty: number
   sales_cents: number
+  /** Per-size breakdown (only products sold by size). */
+  sizes: { size_id: number | null; name: string; qty: number; sales_cents: number }[]
 }
 
 export interface MixRow {

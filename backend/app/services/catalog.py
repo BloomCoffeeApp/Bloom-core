@@ -1,4 +1,4 @@
-"""Catalog business logic: products with recipes, modifiers, prices and the POS catalog."""
+"""Catalog business logic: products with recipes, sizes, modifiers, prices and the POS catalog."""
 
 from collections import defaultdict
 
@@ -14,7 +14,10 @@ from app.models import (
     Product,
     ProductCategory,
     ProductModifierGroup,
+    ProductSize,
+    ProductSizeRecipeItem,
     RecipeItem,
+    Size,
     StockItem,
     User,
 )
@@ -37,13 +40,31 @@ from app.schemas.catalog import (
     PosModifier,
     PosModifierGroup,
     PosProduct,
+    PosSize,
     PriceHistoryOut,
     ProductIn,
     ProductOut,
+    ProductSizeIn,
+    ProductSizeOut,
     ProductUpdate,
     RecipeItemOut,
+    SizeIn,
+    SizeOut,
+    SizeRecipeOverrideIn,
+    SizeUpdate,
 )
-from app.services import audit
+from app.services import audit, recipes
+
+# Fixed list of allergen/diet tags shown in the customer menu (code -> label).
+PRODUCT_TAGS: dict[str, str] = {
+    "sin_tacc": "Sin TACC",
+    "vegano": "Vegano",
+    "vegetariano": "Vegetariano",
+    "sin_lactosa": "Sin lactosa",
+    "sin_azucar": "Sin azúcar agregada",
+    "frutos_secos": "Contiene frutos secos",
+    "picante": "Picante",
+}
 
 
 # ---------------------------------------------------------------- helpers
@@ -118,6 +139,7 @@ def product_out(
         cat = categories.get(p.category_id) if p.category_id else None
     if stock is None:
         sids = [ri.stock_item_id for ri in p.recipe_items] + ([p.stock_item_id] if p.stock_item_id else [])
+        sids += [o.stock_item_id for ps in p.sizes for o in ps.recipe_items]
         stock = {s.id: s for s in db.scalars(select(StockItem).where(StockItem.id.in_(sids)))} if sids else {}
     if group_ids is None:
         group_ids = _product_group_ids(db, [p.id])
@@ -144,6 +166,9 @@ def product_out(
         )
     cost = round(total)
     direct = stock.get(p.stock_item_id) if p.stock_item_id else None
+    sizes = _sizes_out(p, stock)
+    if sizes:  # the headline cost/margin are the default size's
+        cost = next((x for x in sizes if x.is_default), sizes[0]).cost_cents
     return ProductOut(
         id=p.id,
         name=p.name,
@@ -152,18 +177,79 @@ def product_out(
         description=p.description,
         price_cents=p.price_cents,
         image_path=p.image_path,
+        image_url=image_url(p.image_path),
         color=p.color,
         active=p.active,
         show_in_pos=p.show_in_pos,
         stock_item_id=p.stock_item_id,
         stock_item_name=direct.name if direct else None,
         sort_order=p.sort_order,
+        long_description=p.long_description,
+        tags=list(p.tags or []),
+        featured=bool(p.featured),
         cost_cents=cost,
         margin_pct=margin_pct(p.price_cents, cost),
         recipe_items=lines,
         modifier_group_ids=sorted(group_ids.get(p.id, [])),
+        sizes=sizes,
         updated_at=p.updated_at,
     )
+
+
+def image_url(path: str | None) -> str | None:
+    return f"/uploads/{path}" if path else None
+
+
+def ordered_sizes(p: Product) -> list[ProductSize]:
+    return sorted(p.sizes, key=lambda ps: (ps.size.sort_order, ps.size.volume_ml or 0, ps.size_id))
+
+
+def _sizes_out(p: Product, stock: dict[int, StockItem]) -> list[ProductSizeOut]:
+    if not p.sizes:
+        return []
+    base: dict[int, float] = defaultdict(float)
+    if p.stock_item_id:
+        base[p.stock_item_id] += 1
+    for ri in p.recipe_items:
+        base[ri.stock_item_id] += ri.qty
+    default = recipes.default_size(p)
+    out = []
+    for ps in ordered_sizes(p):
+        overrides = {o.stock_item_id: o.qty for o in ps.recipe_items}
+        eff = recipes.size_recipe(dict(base), ps.recipe_scale or 1.0, overrides)
+        lines, total = [], 0.0
+        for sid, qty in eff.items():
+            si = stock.get(sid)
+            unit_cost = si.avg_cost_cents if si else 0.0
+            total += qty * unit_cost
+            lines.append(
+                RecipeItemOut(
+                    stock_item_id=sid,
+                    stock_item_name=si.name if si else "?",
+                    unit=si.unit if si else "u",
+                    qty=round(qty, 4),
+                    unit_cost_cents=unit_cost,
+                    line_cost_cents=round(qty * unit_cost, 2),
+                )
+            )
+        cost = round(total)
+        out.append(
+            ProductSizeOut(
+                size_id=ps.size_id,
+                name=ps.size.name,
+                short_label=ps.size.short_label,
+                volume_ml=ps.size.volume_ml,
+                active=ps.size.active,
+                price_cents=ps.price_cents,
+                recipe_scale=ps.recipe_scale,
+                is_default=ps is default,
+                recipe_overrides=[SizeRecipeOverrideIn(stock_item_id=k, qty=v) for k, v in overrides.items()],
+                recipe_items=lines,
+                cost_cents=cost,
+                margin_pct=margin_pct(ps.price_cents, cost),
+            )
+        )
+    return out
 
 
 # ---------------------------------------------------------------- categories
@@ -246,16 +332,73 @@ def _set_groups(db: Session, product_id: int, group_ids: list[int]) -> None:
         db.add(ProductModifierGroup(product_id=product_id, group_id=gid))
 
 
+def _clean_tags(tags: list[str]) -> list[str]:
+    bad = [t for t in tags if t not in PRODUCT_TAGS]
+    if bad:
+        raise HTTPException(400, f"Etiqueta desconocida: {', '.join(bad)}")
+    wanted = set(tags)
+    return [t for t in PRODUCT_TAGS if t in wanted]  # canonical order, no duplicates
+
+
+def _set_sizes(db: Session, p: Product, items: list[ProductSizeIn], user: User) -> None:
+    """Replaces the product's sizes. Records per-size price changes; syncs price_cents to the default."""
+    ids = [i.size_id for i in items]
+    if len(set(ids)) != len(ids):
+        raise HTTPException(400, "Hay un tamaño repetido")
+    found = {s.id: s for s in db.scalars(select(Size).where(Size.id.in_(ids)))} if ids else {}
+    if missing := set(ids) - set(found):
+        raise HTTPException(400, f"Tamaño inexistente: {sorted(missing)}")
+    if sum(1 for i in items if i.is_default) > 1:
+        raise HTTPException(400, "Solo un tamaño puede ser el predeterminado")
+    _check_stock_items(db, [o.stock_item_id for i in items for o in i.recipe_overrides])
+    old = {ps.size_id: ps for ps in p.sizes}
+    keep: set[int] = set()
+    for i in items:
+        ps = old.get(i.size_id)
+        if ps is None:
+            ps = ProductSize(size_id=i.size_id, size=found[i.size_id], price_cents=i.price_cents)
+            p.sizes.append(ps)
+        else:
+            keep.add(i.size_id)
+            if ps.price_cents != i.price_cents:
+                db.add(
+                    PriceHistory(
+                        product_id=p.id, size_id=i.size_id, old_cents=ps.price_cents, new_cents=i.price_cents, user_id=user.id
+                    )
+                )
+        ps.price_cents = i.price_cents
+        ps.recipe_scale = i.recipe_scale
+        ps.is_default = i.is_default
+        merged = {o.stock_item_id: o.qty for o in i.recipe_overrides}
+        ps.recipe_items.clear()
+        ps.recipe_items.extend(ProductSizeRecipeItem(stock_item_id=k, qty=v) for k, v in merged.items())
+    for sid, ps in old.items():
+        if sid not in keep:
+            p.sizes.remove(ps)
+    db.flush()
+    _sync_price(p)
+
+
+def _sync_price(p: Product) -> None:
+    """A sized product's price_cents mirrors its default size (lists, menus and old clients use it)."""
+    d = recipes.default_size(p)
+    if d is not None:
+        p.price_cents = d.price_cents
+
+
 def create_product(db: Session, data: ProductIn, user: User) -> ProductOut:
     _check_category(db, data.category_id)
     if data.stock_item_id:
         _check_stock_items(db, [data.stock_item_id])
-    fields = data.model_dump(exclude={"recipe_items", "modifier_group_ids"})
+    fields = data.model_dump(exclude={"recipe_items", "modifier_group_ids", "sizes"})
+    fields["tags"] = _clean_tags(data.tags) or None
     p = Product(**fields)
     db.add(p)
     db.flush()
     _set_recipe(db, p, data.recipe_items)
     _set_groups(db, p.id, data.modifier_group_ids)
+    if data.sizes:
+        _set_sizes(db, p, data.sizes, user)
     audit.log(db, user.id, "create", "product", p.id, {"name": p.name, "price_cents": p.price_cents})
     db.commit()
     db.refresh(p)
@@ -264,7 +407,12 @@ def create_product(db: Session, data: ProductIn, user: User) -> ProductOut:
 
 def update_product(db: Session, product_id: int, data: ProductUpdate, user: User) -> ProductOut:
     p = _get_product(db, product_id)
-    changes = data.model_dump(exclude_unset=True, exclude={"recipe_items", "modifier_group_ids"})
+    changes = data.model_dump(exclude_unset=True, exclude={"recipe_items", "modifier_group_ids", "sizes"})
+    if "tags" in changes:
+        changes["tags"] = _clean_tags(changes["tags"] or []) or None
+    sized = bool(data.sizes) if data.sizes is not None else bool(p.sizes)
+    if sized:
+        changes.pop("price_cents", None)  # the price of a sized product lives in its sizes
     if "category_id" in changes:
         _check_category(db, changes["category_id"])
     if changes.get("stock_item_id"):
@@ -281,6 +429,9 @@ def update_product(db: Session, product_id: int, data: ProductUpdate, user: User
     if data.modifier_group_ids is not None:
         _set_groups(db, p.id, data.modifier_group_ids)
         changes["modifier_group_ids"] = data.modifier_group_ids
+    if data.sizes is not None:
+        _set_sizes(db, p, data.sizes, user)
+        changes["sizes"] = [{"size_id": i.size_id, "price_cents": i.price_cents} for i in data.sizes]
     audit.log(db, user.id, "update", "product", p.id, changes)
     db.commit()
     db.refresh(p)
@@ -302,6 +453,23 @@ def bulk_price(db: Session, data: BulkPriceIn, user: User) -> BulkPriceOut:
     factor = 1 + data.percent / 100
     rows: list[BulkPriceRow] = []
     for p in db.scalars(q):
+        if p.sizes:  # one row per size; the product price follows its default size
+            for ps in ordered_sizes(p):
+                new = max(0, round_price(ps.price_cents * factor, data.round_to_cents))
+                rows.append(
+                    BulkPriceRow(
+                        product_id=p.id, name=p.name, size_id=ps.size_id, size_name=ps.size.name,
+                        category_id=p.category_id, old_cents=ps.price_cents, new_cents=new,
+                    )
+                )
+                if not data.dry_run and new != ps.price_cents:
+                    db.add(
+                        PriceHistory(product_id=p.id, size_id=ps.size_id, old_cents=ps.price_cents, new_cents=new, user_id=user.id)
+                    )
+                    ps.price_cents = new
+            if not data.dry_run:
+                _sync_price(p)
+            continue
         new = max(0, round_price(p.price_cents * factor, data.round_to_cents))
         rows.append(BulkPriceRow(product_id=p.id, name=p.name, category_id=p.category_id, old_cents=p.price_cents, new_cents=new))
         if not data.dry_run and new != p.price_cents:
@@ -328,8 +496,9 @@ def bulk_price(db: Session, data: BulkPriceIn, user: User) -> BulkPriceOut:
 def price_history(db: Session, product_id: int) -> list[PriceHistoryOut]:
     _get_product(db, product_id)
     rows = db.execute(
-        select(PriceHistory, User.name)
+        select(PriceHistory, User.name, Size.name)
         .outerjoin(User, User.id == PriceHistory.user_id)
+        .outerjoin(Size, Size.id == PriceHistory.size_id)
         .where(PriceHistory.product_id == product_id)
         .order_by(PriceHistory.ts.desc(), PriceHistory.id.desc())
     ).all()
@@ -339,12 +508,14 @@ def price_history(db: Session, product_id: int) -> list[PriceHistoryOut]:
             product_id=h.product_id,
             old_cents=h.old_cents,
             new_cents=h.new_cents,
+            size_id=h.size_id,
+            size_name=size_name,
             change_pct=round((h.new_cents - h.old_cents) / h.old_cents * 100, 1) if h.old_cents else None,
             user_id=h.user_id,
             user_name=name,
             ts=h.ts,
         )
-        for h, name in rows
+        for h, name, size_name in rows
     ]
 
 
@@ -498,8 +669,92 @@ def pos_catalog(db: Session) -> PosCatalogOut:
                 color=p.color,
                 image_path=p.image_path,
                 modifier_groups=[groups[gid] for gid in sorted(links.get(p.id, [])) if gid in groups],
+                sizes=pos_sizes(p),
             )
             for p in products
         ],
     )
 
+
+
+def pos_sizes(p: Product) -> list[PosSize]:
+    """Active sizes of a product, in display order, with exactly one flagged as default."""
+    active = [ps for ps in ordered_sizes(p) if ps.size.active]
+    if not active:
+        return []
+    d = recipes.default_size(p)
+    default_id = d.size_id if d is not None and d.size.active else active[0].size_id
+    return [
+        PosSize(
+            size_id=ps.size_id,
+            name=ps.size.name,
+            short_label=ps.size.short_label,
+            volume_ml=ps.size.volume_ml,
+            price_cents=ps.price_cents,
+            is_default=ps.size_id == default_id,
+        )
+        for ps in active
+    ]
+
+
+# ---------------------------------------------------------------- sizes
+def list_sizes(db: Session, include_inactive: bool = True) -> list[SizeOut]:
+    q = select(Size).order_by(Size.sort_order, Size.volume_ml, Size.name)
+    if not include_inactive:
+        q = q.where(Size.active.is_(True))
+    counts = dict(
+        db.execute(
+            select(ProductSize.size_id, func.count(ProductSize.id))
+            .join(Product, Product.id == ProductSize.product_id)
+            .where(Product.active.is_(True))
+            .group_by(ProductSize.size_id)
+        ).all()
+    )
+    out = []
+    for s in db.scalars(q):
+        o = SizeOut.model_validate(s)
+        o.product_count = counts.get(s.id, 0)
+        out.append(o)
+    return out
+
+
+def _clean_size(data: dict) -> dict:
+    for k in ("name", "short_label"):
+        if data.get(k) is not None:
+            data[k] = data[k].strip()
+            if not data[k]:
+                raise HTTPException(400, "El nombre del tamaño no puede quedar vacío")
+    return data
+
+
+def _check_size_name(db: Session, name: str, exclude_id: int | None = None) -> None:
+    q = select(Size.id).where(func.lower(Size.name) == name.lower(), Size.active.is_(True))
+    if exclude_id is not None:
+        q = q.where(Size.id != exclude_id)
+    if db.scalar(q):
+        raise HTTPException(409, f"Ya existe el tamaño «{name}»")
+
+
+def create_size(db: Session, data: SizeIn, user: User) -> SizeOut:
+    fields = _clean_size(data.model_dump())
+    _check_size_name(db, fields["name"])
+    s = Size(**fields)
+    db.add(s)
+    db.flush()
+    audit.log(db, user.id, "create", "size", s.id, {"name": s.name})
+    db.commit()
+    return SizeOut.model_validate(s)
+
+
+def update_size(db: Session, size_id: int, data: SizeUpdate, user: User) -> SizeOut:
+    s = db.get(Size, size_id)
+    if not s:
+        raise HTTPException(404, "Tamaño no encontrado")
+    changes = _clean_size(data.model_dump(exclude_unset=True))
+    if changes.get("name"):
+        _check_size_name(db, changes["name"], s.id)
+    for k, v in changes.items():
+        setattr(s, k, v)
+    audit.log(db, user.id, "update", "size", s.id, changes)
+    db.commit()
+    return next(o for o in list_sizes(db) if o.id == s.id)

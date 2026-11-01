@@ -82,6 +82,9 @@ class SaleItem(IdMixin, Base):
     sale_id: Mapped[int] = mapped_column(ForeignKey("sales.id", ondelete="CASCADE"), index=True)
     product_id: Mapped[int | None] = mapped_column(ForeignKey("products.id"), index=True)
     name_snapshot: Mapped[str] = mapped_column(String(160))
+    # Size sold (snapshot): the id groups reports, the name survives renames/deletions.
+    size_id: Mapped[int | None]
+    size_name: Mapped[str | None] = mapped_column(String(60))
     qty: Mapped[float] = mapped_column(Float, default=1)
     unit_price_cents: Mapped[int]
     discount_cents: Mapped[int] = mapped_column(default=0)

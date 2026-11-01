@@ -19,4 +19,9 @@ export interface UpdateStatus {
   message: string | null
   progress: { downloaded: number; total: number }
   can_install: boolean
+  /** Minimum supported version from the vendor's remote config. */
+  min_version: string | null
+  /** This version is older than `min_version`: updating is mandatory. */
+  required: boolean
+  release_notes_url: string | null
 }

@@ -74,7 +74,10 @@ function LineForm({
   return (
     <>
       <DialogHeader>
-        <DialogTitle>{line.name}</DialogTitle>
+        <DialogTitle>
+          {line.name}
+          {line.size && <span className="ml-2 text-base font-normal text-muted-foreground">{line.size.name}</span>}
+        </DialogTitle>
         <DialogDescription>
           {fmtMoney(line.unit_cents)} c/u{line.modifiers.length ? ` · ${line.modifiers.map((m) => m.name).join(', ')}` : ''}
         </DialogDescription>
@@ -303,7 +306,14 @@ export function CartPanel({
             {cart.lines.map((l) => (
               <li key={l.key} className="flex items-start gap-2 px-3 py-2.5">
                 <button className="min-w-0 flex-1 text-left" onClick={() => setEditing(l)}>
-                  <p className="leading-tight font-medium">{l.name}</p>
+                  <p className="leading-tight font-medium">
+                    <span>{l.name}</span>
+                    {l.size && (
+                      <span className="ml-1.5 inline-flex rounded-md bg-primary/10 px-1.5 py-0.5 align-middle text-xs font-semibold text-primary" title={l.size.name}>
+                        {l.size.short_label}
+                      </span>
+                    )}
+                  </p>
                   {l.modifiers.length > 0 && <p className="text-xs text-muted-foreground">{l.modifiers.map((m) => m.name).join(' · ')}</p>}
                   {l.notes && (
                     <p className="flex items-center gap-1 text-xs text-muted-foreground italic">

@@ -39,7 +39,8 @@ export default defineConfig({
     port: 5173,
     // Dev server stays on localhost; set VITE_LAN=1 to test from a tablet on the LAN.
     host: process.env.VITE_LAN === '1',
-    proxy: { '/api': `http://127.0.0.1:${apiPort}` },
+    // /uploads: product photos are served by the backend too.
+    proxy: { '/api': `http://127.0.0.1:${apiPort}`, '/uploads': `http://127.0.0.1:${apiPort}` },
   },
   build: { chunkSizeWarningLimit: 1500 },
 })

@@ -1,7 +1,9 @@
 """In-app updates: check a signed manifest, download the installer, verify it and run it.
 
-Provider-agnostic: the app only knows the manifest URL (brand.json `updateManifest`), e.g. a
-GitHub "latest release" asset or a proxy on the license server. Manifest (latest.json):
+Provider-agnostic: the app only knows the manifest URL, which comes from the vendor's signed
+remote config (app/remote_config.py) and falls back to brand.json `updateManifest` (builds without
+a license server, or before the first config arrives). The remote config may also set a minimum
+supported version: older installations see "Actualización obligatoria". Manifest (latest.json):
 
     {"version": "1.2.0", "url": "https://.../Bloom-Setup-1.2.0.exe", "sha256": "<hex>",
      "size": 123456, "notes": "...", "published_at": "2026-01-31T12:00:00Z", "signature": "<b64url>"}
@@ -78,11 +80,28 @@ def is_newer(candidate: str, current: str) -> bool:
 # ---------- URLs ----------
 
 def manifest_url() -> str | None:
-    """brand.json `updateManifest`; BLOOM_UPDATE_MANIFEST overrides it only in development."""
+    """Remote config > brand.json `updateManifest`; BLOOM_UPDATE_MANIFEST overrides both only in development."""
     if not config.FROZEN and "BLOOM_UPDATE_MANIFEST" in os.environ:
         return os.environ["BLOOM_UPDATE_MANIFEST"].strip() or None
+    from app import remote_config
+
+    remote = remote_config.manifest_url()
+    if remote:
+        return remote
     url = config.BRAND.get("updateManifest")
     return url.strip() if isinstance(url, str) and url.strip() else None
+
+
+def support_status() -> dict:
+    """Minimum supported version (remote config): `required` = this version is older than it."""
+    from app import remote_config
+
+    minimum = remote_config.min_version()
+    try:
+        required = bool(minimum) and is_newer(minimum, config.APP_VERSION)
+    except UpdateError:
+        minimum, required = None, False
+    return {"min_version": minimum, "required": required, "release_notes_url": remote_config.release_notes_url()}
 
 
 def check_url(url: object) -> str:
@@ -209,6 +228,7 @@ def _describe(s: dict) -> dict:
         "message": s["message"],
         "progress": {"downloaded": s["downloaded"], "total": s["total"]},
         "can_install": bool(config.FROZEN),
+        **support_status(),
     }
 
 

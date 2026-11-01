@@ -17,13 +17,27 @@ class PublicModifierGroup(BaseModel):
     modifiers: list[PublicModifier]
 
 
+class PublicSize(BaseModel):
+    id: int  # size id
+    name: str
+    short_label: str
+    volume_ml: int | None = None
+    price_cents: int | None = None
+    is_default: bool = False
+
+
 class PublicProduct(BaseModel):
     id: int
     name: str
     description: str | None = None
-    price_cents: int | None = None
+    price_cents: int | None = None  # sized products: the default size's price
     color: str | None = None
     modifier_groups: list[PublicModifierGroup] = []
+    long_description: str | None = None
+    tags: list[str] = []  # codes; labels in `PublicMenuOut.tag_labels`
+    featured: bool = False
+    photo_url: str | None = None  # local menu only (/uploads/...)
+    sizes: list[PublicSize] = []
 
 
 class PublicCategory(BaseModel):
@@ -39,3 +53,4 @@ class PublicMenuOut(BaseModel):
     show_prices: bool
     message: str
     categories: list[PublicCategory]
+    tag_labels: dict[str, str] = {}

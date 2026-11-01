@@ -55,19 +55,77 @@ class RecipeItemOut(BaseModel):
     line_cost_cents: float
 
 
+# ---------- Sizes ----------
+class SizeIn(BaseModel):
+    name: str = Field(min_length=1, max_length=60)
+    short_label: str = Field(min_length=1, max_length=12)
+    volume_ml: int | None = Field(default=None, ge=1, le=10000)
+    sort_order: int = 0
+    active: bool = True
+
+
+class SizeUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=60)
+    short_label: str | None = Field(default=None, min_length=1, max_length=12)
+    volume_ml: int | None = Field(default=None, ge=1, le=10000)
+    sort_order: int | None = None
+    active: bool | None = None
+
+
+class SizeOut(ORM):
+    id: int
+    name: str
+    short_label: str
+    volume_ml: int | None
+    sort_order: int
+    active: bool
+    product_count: int = 0
+
+
+class SizeRecipeOverrideIn(BaseModel):
+    stock_item_id: int
+    qty: float = Field(ge=0)  # replaces the scaled base qty of this item; 0 = not used in this size
+
+
+class ProductSizeIn(BaseModel):
+    size_id: int
+    price_cents: int = Field(ge=0)
+    recipe_scale: float = Field(default=1.0, gt=0, le=20)
+    is_default: bool = False
+    recipe_overrides: list[SizeRecipeOverrideIn] = []
+
+
+class ProductSizeOut(BaseModel):
+    size_id: int
+    name: str
+    short_label: str
+    volume_ml: int | None
+    active: bool
+    price_cents: int
+    recipe_scale: float
+    is_default: bool
+    recipe_overrides: list[SizeRecipeOverrideIn]
+    recipe_items: list[RecipeItemOut]  # effective recipe of this size
+    cost_cents: int
+    margin_pct: float | None
+
+
 class ProductIn(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     category_id: int | None = None
     description: str | None = None
     price_cents: int = Field(ge=0)
-    image_path: str | None = None
     color: str | None = None
     active: bool = True
     show_in_pos: bool = True
     stock_item_id: int | None = None
     sort_order: int = 0
+    long_description: str | None = Field(default=None, max_length=2000)
+    tags: list[str] = []
+    featured: bool = False
     recipe_items: list[RecipeItemIn] = []
     modifier_group_ids: list[int] = []
+    sizes: list[ProductSizeIn] = []
 
 
 class ProductUpdate(BaseModel):
@@ -75,14 +133,17 @@ class ProductUpdate(BaseModel):
     category_id: int | None = None
     description: str | None = None
     price_cents: int | None = Field(default=None, ge=0)
-    image_path: str | None = None
     color: str | None = None
     active: bool | None = None
     show_in_pos: bool | None = None
     stock_item_id: int | None = None
     sort_order: int | None = None
+    long_description: str | None = Field(default=None, max_length=2000)
+    tags: list[str] | None = None
+    featured: bool | None = None
     recipe_items: list[RecipeItemIn] | None = None
     modifier_group_ids: list[int] | None = None
+    sizes: list[ProductSizeIn] | None = None  # [] removes every size (back to a single price)
 
 
 class ProductOut(BaseModel):
@@ -93,16 +154,21 @@ class ProductOut(BaseModel):
     description: str | None
     price_cents: int
     image_path: str | None
+    image_url: str | None = None
     color: str | None
     active: bool
     show_in_pos: bool
     stock_item_id: int | None
     stock_item_name: str | None = None
     sort_order: int
+    long_description: str | None = None
+    tags: list[str] = []
+    featured: bool = False
     cost_cents: int
     margin_pct: float | None
     recipe_items: list[RecipeItemOut]
     modifier_group_ids: list[int]
+    sizes: list[ProductSizeOut] = []
     updated_at: datetime | None = None
 
 
@@ -116,6 +182,8 @@ class BulkPriceIn(BaseModel):
 class BulkPriceRow(BaseModel):
     product_id: int
     name: str
+    size_id: int | None = None
+    size_name: str | None = None
     category_id: int | None
     old_cents: int
     new_cents: int
@@ -132,6 +200,8 @@ class PriceHistoryOut(BaseModel):
     product_id: int
     old_cents: int
     new_cents: int
+    size_id: int | None = None
+    size_name: str | None = None
     change_pct: float | None
     user_id: int | None
     user_name: str | None
@@ -213,6 +283,15 @@ class PosCategory(BaseModel):
     icon: str
 
 
+class PosSize(BaseModel):
+    size_id: int
+    name: str
+    short_label: str
+    volume_ml: int | None
+    price_cents: int
+    is_default: bool
+
+
 class PosProduct(BaseModel):
     id: int
     name: str
@@ -221,6 +300,7 @@ class PosProduct(BaseModel):
     color: str | None
     image_path: str | None
     modifier_groups: list[PosModifierGroup]
+    sizes: list[PosSize] = []  # empty = no size choice
 
 
 class PosCatalogOut(BaseModel):

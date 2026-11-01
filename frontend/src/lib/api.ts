@@ -62,7 +62,11 @@ async function request<T>(method: string, path: string, body?: unknown, query?: 
   if (token) headers.Authorization = `Bearer ${token}`
   let payload: BodyInit | undefined
   if (body instanceof FormData) payload = body
-  else if (body !== undefined) {
+  else if (body instanceof Blob) {
+    // Raw file upload (e.g. a product photo): the server reads the body as-is.
+    headers['Content-Type'] = body.type || 'application/octet-stream'
+    payload = body
+  } else if (body !== undefined) {
     headers['Content-Type'] = 'application/json'
     payload = JSON.stringify(body)
   }

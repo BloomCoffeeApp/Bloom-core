@@ -1,4 +1,4 @@
-"""Background periodic jobs (alerts evaluation, daily backup, update check) in daemon threads."""
+"""Background periodic jobs (alerts, daily backup, license, remote config, update check) in daemon threads."""
 
 import logging
 import threading
@@ -69,9 +69,25 @@ def _updates_loop() -> None:
         _stop.wait(INTERVAL_S)
 
 
+def _remote_config_loop() -> None:
+    """Signed vendor config (update URL, min version, support, announcements): shortly after
+    startup and then every 6 h (remote_config decides when it's due). Offline is fine."""
+    from app import remote_config
+
+    if _stop.wait(remote_config.STARTUP_DELAY_S):
+        return
+    while not _stop.is_set():
+        try:
+            remote_config.refresh_if_due()
+        except Exception:
+            log.exception("remote config refresh failed")
+        _stop.wait(INTERVAL_S)
+
+
 def start_jobs() -> None:
     _stop.clear()
     threading.Thread(target=_loop, name="cafe-jobs", daemon=True).start()
+    threading.Thread(target=_remote_config_loop, name="cafe-remote-config", daemon=True).start()
     threading.Thread(target=_updates_loop, name="cafe-updates", daemon=True).start()
 
 

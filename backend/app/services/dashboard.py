@@ -208,9 +208,22 @@ def dashboard(db: Session, start: date, end: date, show_costs: bool) -> dict[str
         .group_by(SaleItem.product_id).order_by(func.sum(_item_total()).desc()).limit(10)
     ).all()
     top_products = [
-        {"product_id": pid, "name": names.get(pid) or snap, "qty": round(float(q or 0), 2), "sales_cents": int(s or 0)}
+        {"product_id": pid, "name": names.get(pid) or snap, "qty": round(float(q or 0), 2), "sales_cents": int(s or 0),
+         "sizes": []}
         for pid, snap, q, s in top_rows
     ]
+    by_pid = {t["product_id"]: t for t in top_products if t["product_id"] is not None}
+    if by_pid:
+        for pid, size_id, sname, q, s in db.execute(
+            select(SaleItem.product_id, SaleItem.size_id, func.max(SaleItem.size_name), func.sum(SaleItem.qty),
+                   func.sum(_item_total()))
+            .join(Sale, Sale.id == SaleItem.sale_id)
+            .where(*_completed(a, b), SaleItem.product_id.in_(by_pid), SaleItem.size_id.is_not(None))
+            .group_by(SaleItem.product_id, SaleItem.size_id).order_by(func.sum(_item_total()).desc())
+        ).all():
+            by_pid[pid]["sizes"].append(
+                {"size_id": size_id, "name": sname or "", "qty": round(float(q or 0), 2), "sales_cents": int(s or 0)}
+            )
 
     pm_names = dict(db.execute(select(PaymentMethod.code, PaymentMethod.name)).all())
     pay = db.execute(

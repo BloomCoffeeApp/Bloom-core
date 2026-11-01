@@ -40,6 +40,7 @@ import { LanHelp } from './lan-help'
 import type { BackupRow, BackupSettings, PaymentMethod, RestoreResult } from './types'
 import { Logo } from '@/components/logo'
 import { useHasFeature } from '@/features/license/api'
+import { SupportCard } from '@/features/remote-config/support-card'
 import { UpdatesPanel } from '@/features/updates/updates-panel'
 import { BRAND } from '@/lib/brand'
 
@@ -349,6 +350,7 @@ export function AboutSection({ isAdmin }: { isAdmin: boolean }) {
         {info.data && <Badge variant="secondary">Versión {info.data.version}</Badge>}
       </div>
       {isAdmin && <UpdatesPanel />}
+      <SupportCard />
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="flex items-start gap-3 rounded-xl border p-4">
           <Scale className="mt-0.5 size-5 text-muted-foreground" />

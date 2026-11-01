@@ -110,8 +110,9 @@ Desinstalar la app **no** borra los datos. Al actualizar, la base se migra sola 
 
 ### Actualizaciones automáticas
 
-La app busca versiones nuevas un rato después de abrirse y cada 6 horas, en la dirección de
-`updateManifest` de `brand.json` (vacío = desactivado). Si hay una, el administrador la ve en
+La app busca versiones nuevas un rato después de abrirse y cada 6 horas, en la dirección que indica la
+configuración remota del distribuidor (ver abajo) o, si no hay, en `updateManifest` de `brand.json`
+(vacío = desactivado). Si hay una, el administrador la ve en
 *Configuración → Acerca de* (y un aviso en la barra superior); con *Actualizar ahora* la app descarga el
 instalador, lo verifica, hace un respaldo y se cierra; el instalador corre en silencio y la vuelve a abrir.
 
@@ -120,6 +121,24 @@ El manifiesto (`latest.json`) tiene `version`, `url`, `sha256`, `size`, `notes`,
 firma las licencias; la app trae solo la clave pública). La app **ignora** manifiestos sin firma o con firma
 inválida, versiones iguales o anteriores a la instalada, direcciones que no sean `https` y descargas cuyo
 tamaño o `sha256` no coincidan. Sin internet no pasa nada: solo se muestra un aviso.
+
+### Configuración remota
+
+Si `brand.json` tiene `licenseServer`, la app descarga cada 6 horas (y unos segundos después de abrirse)
+una configuración **firmada** del servidor del distribuidor (`GET <licenseServer>/v1/config`): dirección
+del manifiesto de actualizaciones, versión mínima soportada (las anteriores ven *Actualización obligatoria*,
+sin bloquear nada), link de novedades, contactos de soporte y links legales (en *Configuración → Acerca de*)
+y avisos que se muestran arriba en la app (cada uno se puede cerrar y no vuelve a aparecer).
+
+La firma es Ed25519 con la misma clave que las licencias, sobre `BLOOM-CONFIG1\n` + el JSON canónico del
+contenido; se verifica con la clave pública que trae la app (nunca con algo que mande el servidor). Se
+rechazan configuraciones sin firma, vencidas o más viejas que la guardada. La última válida queda en la
+carpeta de datos (`remote_config.json`) y se usa sin internet. Lo único fijo en la app es la dirección del
+servidor y la clave pública; `updateManifest` queda como respaldo para distribuciones sin servidor.
+
+Las suscripciones también pueden recibir un **cambio de precio** anunciado con anticipación: el
+administrador lo ve en *Configuración → Licencia → Tu suscripción* (y un aviso arriba) y elige **Aceptar
+nuevo precio** o **Cancelar suscripción**; sin aceptación no se cobra el precio nuevo.
 
 ### Publicar una versión
 
@@ -149,7 +168,8 @@ Todo sale de [`brand.json`](brand.json) en la raíz:
 | `port` | Puerto local del servidor (si está ocupado por otra app, el `.exe` usa el siguiente libre) |
 | `colors` | Colores del logo e ícono |
 | `version` | Versión de la app (instalador, *Acerca de*, actualizaciones) |
-| `updateManifest` | Dirección `https` del `latest.json` de actualizaciones (vacío = sin actualizaciones automáticas) |
+| `updateManifest` | Respaldo: dirección `https` del `latest.json` cuando no hay configuración remota (vacío = sin actualizaciones automáticas) |
+| `licenseServer` | (opcional) Servidor de licencias del distribuidor: licencias, suscripciones y configuración remota firmada |
 
 El ícono del `.exe` se regenera solo en `build/build.ps1` (`build/make_icon.py`); el logo de la app es `frontend/public/logo.svg` y `src/components/logo.tsx`.
 

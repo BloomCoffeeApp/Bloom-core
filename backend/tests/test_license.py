@@ -102,6 +102,24 @@ def test_clock_rollback_detected(signer):
     assert not s.valid and "fecha" in s.problem
 
 
+def test_clock_set_before_the_license_was_issued(signer):
+    token = signer(iat=int(time.time()))
+    assert not lic_status.evaluate(token, time.time() - 2 * DAY).valid
+
+
+def test_deleting_the_state_file_does_not_hide_a_rollback(seeded, signer, monkeypatch):
+    """The business data (audit log / sales) proves the real date even without license_state.json."""
+    token = signer(iat=int(time.time()) - 30 * DAY, exp=int(time.time()) + DAY)
+    lic_status.state_path().unlink(missing_ok=True)
+    monkeypatch.setattr(lic_status, "_evidence", None)
+    real = time.time()
+    assert lic_status.evaluate(token).valid
+    monkeypatch.setattr(lic_status, "_evidence", None)
+    monkeypatch.setattr(lic_status.time, "time", lambda: real - 3 * DAY)  # clock moved back 3 days
+    s = lic_status.evaluate(token)
+    assert not s.valid and "fecha" in s.problem
+
+
 def test_api_status_import_and_gating(seeded, signer):
     client, h = seeded
     r = client.get("/api/license", headers=h).json()
