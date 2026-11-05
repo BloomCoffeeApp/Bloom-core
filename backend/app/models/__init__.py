@@ -15,6 +15,7 @@ from app.models.catalog import (
     Size,
 )
 from app.models.customers import Customer, CustomerAccountMovement, LoyaltyTransaction
+from app.models.promos import LoyaltyProgram, LoyaltyStamp, Promo
 from app.models.orders import DiningTable, Order, OrderItem, OrderStation, TableTab, WaiterCall
 from app.models.purchases import (
     Purchase,

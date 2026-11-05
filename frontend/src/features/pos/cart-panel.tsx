@@ -8,13 +8,14 @@ import {
   ShoppingBag,
   Star,
   StickyNote,
+  Tag,
   Trash2,
   UserRound,
   UtensilsCrossed,
   LayoutGrid,
   X,
 } from 'lucide-react'
-import { useState } from 'react'
+import { type ReactNode, useState } from 'react'
 
 import { EmptyState } from '@/components/empty-state'
 import { MoneyInput } from '@/components/money-input'
@@ -28,8 +29,8 @@ import { cn } from '@/lib/utils'
 
 import type { Channel } from '../sales/types'
 import { CustomerPicker } from './customer-picker'
-import type { CartLine, PosConfig } from './types'
-import type { CartApi, CartTotals } from './use-cart'
+import type { CartLine, PosConfig, QuoteLine } from './types'
+import { type CartApi, type CartTotals, lineNet } from './use-cart'
 
 const CHANNELS: { id: Channel; label: string; icon: typeof Coffee }[] = [
   { id: 'salon', label: 'Salón', icon: UtensilsCrossed },
@@ -212,6 +213,9 @@ export function CartPanel({
   onCheckout,
   openTabs = 0,
   onOpenTabs,
+  quote,
+  pricing = false,
+  customerExtras,
 }: {
   cartApi: CartApi
   totals: CartTotals
@@ -221,6 +225,12 @@ export function CartPanel({
   /** Open tables waiting to be charged (0 hides the button). */
   openTabs?: number
   onOpenTabs?: () => void
+  /** Automatic promotion of each line (backend quote). */
+  quote?: QuoteLine[]
+  /** The quote is being recalculated: charging waits so the total matches the backend. */
+  pricing?: boolean
+  /** Below the customer (Pro: stamp cards). */
+  customerExtras?: ReactNode
 }) {
   const { cart } = cartApi
   const [editing, setEditing] = useState<CartLine | null>(null)
@@ -298,6 +308,7 @@ export function CartPanel({
             </Button>
           )}
         </div>
+        {cart.customer && customerExtras}
         {cart.customer && maxRedeem > 0 && loyalty && (
           <div className="flex items-center gap-2 rounded-xl bg-warning/15 px-3 py-2 text-sm">
             <Gift className="size-4 shrink-0" />
@@ -328,9 +339,11 @@ export function CartPanel({
           </div>
         ) : (
           <ul className="divide-y">
-            {cart.lines.map((l) => (
-              <li key={l.key} className="flex items-start gap-2 px-3 py-2.5">
-                <button className="min-w-0 flex-1 text-left" onClick={() => setEditing(l)}>
+            {cart.lines.map((l, i) => {
+              const promo = quote?.find((q) => q.index === i && q.discount_cents > 0 && q.promo_name)
+              return (
+              <li key={l.key} className="flex items-start gap-2 px-3 py-2.5" data-testid="cart-line">
+                <button className="min-w-0 flex-1 text-left" onClick={() => !l.reward && setEditing(l)}>
                   <p className="leading-tight font-medium">
                     <span>{l.name}</span>
                     {l.size && (
@@ -349,9 +362,26 @@ export function CartPanel({
                     {fmtMoney(l.unit_cents)} c/u
                     {l.discount_cents > 0 && <span className="text-success"> · −{fmtMoney(l.discount_cents)}</span>}
                   </p>
+                  {promo && !l.reward && (
+                    <p className="mt-1 flex w-fit max-w-full items-start gap-1 rounded-md bg-success/15 px-1.5 py-0.5 text-xs font-medium break-words text-success" data-testid="line-promo">
+                      <Tag className="mt-0.5 size-3 shrink-0" />
+                      <span className="min-w-0">Promo: {promo.promo_name} · −{fmtMoney(promo.discount_cents)}</span>
+                    </p>
+                  )}
+                  {l.reward && (
+                    <p className="mt-1 flex w-fit max-w-full items-start gap-1 rounded-md bg-warning/20 px-1.5 py-0.5 text-xs font-medium break-words text-warning-foreground dark:text-warning" data-testid="line-reward">
+                      <Gift className="mt-0.5 size-3 shrink-0" />
+                      <span className="min-w-0">Premio fidelidad · {l.reward.label}</span>
+                    </p>
+                  )}
                 </button>
                 <div className="flex shrink-0 flex-col items-end gap-1.5">
-                  <span className="tabular font-semibold">{fmtMoney(l.unit_cents * l.qty - l.discount_cents)}</span>
+                  <span className="tabular flex flex-col items-end font-semibold leading-tight">
+                    {(promo || l.reward) && (
+                      <span className="text-xs font-normal text-muted-foreground line-through">{fmtMoney(l.unit_cents * l.qty - l.discount_cents)}</span>
+                    )}
+                    {fmtMoney(lineNet(l, promo))}
+                  </span>
                   <div className="flex items-center gap-1">
                     <Button
                       variant="outline"
@@ -363,13 +393,21 @@ export function CartPanel({
                       {l.qty === 1 ? <Trash2 className="text-destructive" /> : <Minus />}
                     </Button>
                     <span className="tabular w-7 text-center font-semibold">{l.qty}</span>
-                    <Button variant="outline" size="icon-lg" className="size-10" onClick={() => cartApi.setQty(l.key, l.qty + 1)} aria-label="Sumar">
+                    <Button
+                      variant="outline"
+                      size="icon-lg"
+                      className="size-10"
+                      disabled={!!l.reward}
+                      onClick={() => cartApi.setQty(l.key, l.qty + 1)}
+                      aria-label="Sumar"
+                    >
                       <Plus />
                     </Button>
                   </div>
                 </div>
               </li>
-            ))}
+              )
+            })}
           </ul>
         )}
       </div>
@@ -395,6 +433,23 @@ export function CartPanel({
               <span className="tabular">−{fmtMoney(totals.pointsDiscount)}</span>
             </div>
           )}
+          {totals.rewardDiscount > 0 && cart.reward && (
+            <div className="flex items-center justify-between text-success" data-testid="reward-discount">
+              <span className="flex items-center gap-1">
+                <Gift className="size-3.5" /> Premio fidelidad · {cart.reward.label}
+                <button className="text-muted-foreground hover:text-foreground" onClick={() => cartApi.setReward(null)} aria-label="Quitar premio">
+                  <X className="size-3.5" />
+                </button>
+              </span>
+              <span className="tabular">−{fmtMoney(totals.rewardDiscount)}</span>
+            </div>
+          )}
+          {totals.promoDiscount > 0 && (
+            <div className="flex justify-between text-xs text-success" data-testid="promo-savings">
+              <span>Ahorro por promos (ya aplicado)</span>
+              <span className="tabular">−{fmtMoney(totals.promoDiscount)}</span>
+            </div>
+          )}
         </div>
         <div className="flex items-end justify-between">
           <div className="flex gap-1">
@@ -417,7 +472,7 @@ export function CartPanel({
         {totals.pointsEarned > 0 && <p className="text-right text-xs text-muted-foreground">Suma {totals.pointsEarned} puntos</p>}
         <Button
           className="h-16 w-full rounded-2xl text-xl font-bold tracking-wide shadow-md"
-          disabled={!cart.lines.length || !cashOpen}
+          disabled={!cart.lines.length || !cashOpen || pricing}
           onClick={onCheckout}
         >
           COBRAR <span className="ml-2 text-sm font-normal opacity-70">F9</span>

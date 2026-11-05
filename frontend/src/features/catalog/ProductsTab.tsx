@@ -3,6 +3,8 @@ import { useMemo, useState } from 'react'
 
 import { type ColumnDef, DataTable } from '@/components/data-table'
 import { EmptyState } from '@/components/empty-state'
+import { LockBadge } from '@/components/lock-badge'
+import { FreeLocksBanner } from '@/features/license/free-locks-banner'
 import { StatCard } from '@/components/stat-card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -62,7 +64,10 @@ export function ProductsTab() {
           <div className="flex items-center gap-3">
             <span className={cn('size-2.5 shrink-0 rounded-full', palette(row.original.color ?? row.original.category?.color).dot)} />
             <div className="min-w-0">
-              <p className={cn('truncate font-medium', !row.original.active && 'text-muted-foreground line-through')}>{row.original.name}</p>
+              <p className={cn('flex items-center gap-2 truncate font-medium', !row.original.active && 'text-muted-foreground line-through')}>
+                <span className="truncate">{row.original.name}</span>
+                {row.original.locked && <LockBadge />}
+              </p>
               <p className="truncate text-xs text-muted-foreground">
                 {row.original.stock_item_id
                   ? `Reventa · ${row.original.stock_item_name}`
@@ -134,6 +139,7 @@ export function ProductsTab() {
 
   return (
     <div className="space-y-4">
+      <FreeLocksBanner kinds={['products']} />
       <div className="grid gap-4 sm:grid-cols-3">
         <StatCard label="Productos activos" value={stats.count} icon={Package} loading={products.isLoading} />
         <StatCard
@@ -230,7 +236,10 @@ export function ProductsTab() {
                       <MarginBadge margin={p.margin_pct} />
                     </div>
                     <div className="min-w-0">
-                      <p className="truncate font-medium">{p.name}</p>
+                      <p className="flex items-center gap-2 font-medium">
+                        <span className="truncate">{p.name}</span>
+                        {p.locked && <LockBadge />}
+                      </p>
                       <p className="truncate text-xs text-muted-foreground">{p.category?.name ?? 'Sin categoría'}</p>
                     </div>
                     <div className="flex items-end justify-between">

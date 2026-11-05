@@ -18,6 +18,8 @@ from app.schemas.sales import (
     CashSessionOut,
     PaymentMethodOut,
     PaymentMethodUpdate,
+    QuoteIn,
+    QuoteOut,
     SaleDetail,
     SaleIn,
     SaleListOut,
@@ -53,6 +55,12 @@ def update_payment_method(
 def pos_config(db: Session = Depends(get_db), user: User = CurrentUser) -> dict:
     """Settings the POS needs to preview totals (the backend always recalculates)."""
     return {"loyalty": sales_svc.loyalty_cfg(db), "can_discount": sales_svc.can_discount(user)}
+
+
+@router.post("/pos/quote", response_model=QuoteOut)
+def pos_quote(data: QuoteIn, db: Session = Depends(get_db), _: User = Seller) -> dict:
+    """Automatic promotions of a cart (Pro `promos`; none in the free edition)."""
+    return {"lines": sales_svc.quote(db, data.items)}
 
 
 # ---------- Cash ----------

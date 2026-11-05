@@ -7,7 +7,7 @@ from app.db import get_db
 from app.models import User, UserSession
 from app.schemas.common import Ok
 from app.schemas.users import LoginIn, LoginOut, SetupIn, UserPublic
-from app.services import audit, settings
+from app.services import audit, free_plan, settings
 
 router = APIRouter(prefix="/api", tags=["auth"])
 
@@ -39,8 +39,11 @@ def setup(data: SetupIn, db: Session = Depends(get_db)) -> LoginOut:
 
 
 @router.get("/auth/users", response_model=list[UserPublic])
-def login_users(db: Session = Depends(get_db)) -> list[User]:
-    return list(db.scalars(select(User).where(User.active.is_(True)).order_by(User.name)))
+def login_users(db: Session = Depends(get_db)) -> list[dict]:
+    return [
+        {**UserPublic.model_validate(u).model_dump(), "locked": free_plan.is_locked(db, "users", u.id)}
+        for u in db.scalars(select(User).where(User.active.is_(True)).order_by(User.name))
+    ]
 
 
 @router.post("/auth/login", response_model=LoginOut)
@@ -54,6 +57,7 @@ def login(data: LoginIn, request: Request, db: Session = Depends(get_db)) -> Log
         audit.log(db, user.id if user else None, "login_failed", "user", data.user_id)
         db.commit()
         raise HTTPException(401, "PIN incorrecto")
+    free_plan.ensure_usable(db, "users", user.id, user.name)
     login_throttle.success(*keys)
     audit.log(db, user.id, "login", "user", user.id)
     return LoginOut(token=create_session(db, user), user=UserPublic.model_validate(user))

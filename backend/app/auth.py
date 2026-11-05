@@ -43,16 +43,24 @@ class LoginThrottle:
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self._state: dict[str, tuple[int, float]] = {}  # key -> (fails, locked_until)
+        # Online demo: prefixes keys with the visitor's sandbox (user ids repeat in every sandbox).
+        self.namespace: Callable[[], str] | None = None
+
+    def _keys(self, keys: tuple[str, ...]) -> tuple[str, ...]:
+        ns = self.namespace() if self.namespace else ""
+        return tuple(f"{ns}:{k}" for k in keys) if ns else keys
 
     def wait_seconds(self, *keys: str) -> int:
         """Seconds the caller must still wait (0 = allowed)."""
         now = time.monotonic()
+        keys = self._keys(keys)
         with self._lock:
             until = max((self._state.get(k, (0, 0.0))[1] for k in keys), default=0.0)
         return int(until - now) + 1 if until > now else 0
 
     def fail(self, *keys: str) -> None:
         now = time.monotonic()
+        keys = self._keys(keys)
         with self._lock:
             for k in keys:
                 fails = self._state.get(k, (0, 0.0))[0] + 1
@@ -62,6 +70,7 @@ class LoginThrottle:
                 self._state[k] = (fails, until)
 
     def success(self, *keys: str) -> None:
+        keys = self._keys(keys)
         with self._lock:
             for k in keys:
                 self._state.pop(k, None)
@@ -102,6 +111,10 @@ def get_current_user(
     user = db.get(User, sess.user_id)
     if not user or not user.active:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Usuario inactivo")
+    from app.services import free_plan
+
+    if free_plan.is_locked(db, "users", user.id):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, free_plan.locked_message("users", user.name))
     return user
 
 

@@ -17,11 +17,19 @@ PRO_FEATURES: dict[str, str] = {
     "users": "Usuarios ilimitados",
     "backup_export": "Descargar y restaurar respaldos",
     "orders_pro": "Pedidos avanzados (estaciones, tiempos por producto, pantalla de retiro)",
+    "loyalty_pro": "Fidelidad por compras (tarjeta de sellos)",
+    "promos": "Promociones: combos y descuentos programados",
 }
 
 # Free plan caps. The vendor can change them without a new .exe through the signed remote config
 # ("free_limits"); these built-in values apply offline or before the first config arrives.
-FREE_LIMITS_DEFAULT: dict[str, int] = {"products": 5, "users": 1, "customers": 20, "stock_items": 15, "sales_history_days": 30}
+FREE_LIMITS_DEFAULT: dict[str, int] = {
+    "products": 5, "users": 1, "customers": 20, "stock_items": 15, "sales_history_days": 30,
+    # Days between two swaps in "Elegí tus activos" (services/free_plan.py); 0 = no wait.
+    "swap_cooldown_days": 7,
+}
+# Keys that may be 0 (the rest must be >= 1).
+FREE_LIMITS_ZERO_OK = {"swap_cooldown_days"}
 FREE_LIMIT_LABELS = {"products": "productos", "users": "usuarios activos", "customers": "clientes", "stock_items": "insumos"}
 FREE_LIMIT_LABELS_ONE = {"products": "producto", "users": "usuario activo", "customers": "cliente", "stock_items": "insumo"}
 
@@ -31,7 +39,7 @@ def free_limits() -> dict[str, int]:
 
     limits = dict(FREE_LIMITS_DEFAULT)
     for key, value in remote_config.free_limits().items():
-        if key in limits and isinstance(value, int) and not isinstance(value, bool) and value >= 1:
+        if key in limits and isinstance(value, int) and not isinstance(value, bool) and value >= (0 if key in FREE_LIMITS_ZERO_OK else 1):
             limits[key] = value
     return limits
 

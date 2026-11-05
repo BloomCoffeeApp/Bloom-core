@@ -5,6 +5,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 
 import App from '@/App'
+import { DemoBanner } from '@/components/demo-banner'
 import { Toaster } from '@/components/ui/sonner'
 import { DesktopProvider } from '@/components/window-controls'
 import { TooltipProvider } from '@/components/ui/tooltip'
@@ -25,6 +26,7 @@ createRoot(document.getElementById('root')!).render(
           <TooltipProvider delayDuration={300}>
             <DesktopProvider>
               <App />
+              <DemoBanner />
               <Toaster richColors position="top-right" />
             </DesktopProvider>
           </TooltipProvider>

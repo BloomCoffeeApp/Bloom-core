@@ -82,6 +82,9 @@ def save_photo(db: Session, product_id: int, raw: bytes, content_type: str | Non
     p = db.get(Product, product_id)
     if not p:
         raise HTTPException(404, "Producto no encontrado")
+    from app.services import free_plan
+
+    free_plan.ensure_usable(db, "products", p.id, p.name)
     ctype = (content_type or "").split(";")[0].strip().lower()
     if ctype not in ALLOWED_TYPES:
         raise HTTPException(415, "Formato no soportado: subí una foto JPG, PNG o WebP")

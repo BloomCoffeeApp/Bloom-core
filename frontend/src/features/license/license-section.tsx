@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 
+import { FreeLocksBanner } from './free-locks-banner'
 import { SettingsCard } from '../settings/form'
 import {
   hasFeature,
@@ -107,6 +108,7 @@ export function LicenseSection() {
             {info.free_limits.sales_history_days} días.
           </p>
         )}
+        {!info.valid && <FreeLocksBanner kinds={['products', 'customers', 'stock_items', 'users']} />}
       </SettingsCard>
 
       {info.server_configured && (!info.valid || info.plan === 'trial') && <SubscribeCard proLabel={info.pro_label} onStarted={setCheckout} />}

@@ -10,7 +10,7 @@ from app.licensing import client as license_client
 from app.licensing.features import PRO_LABEL
 from app.licensing.status import store_token
 from app.models import User
-from app.services import audit
+from app.services import audit, free_plan
 from app.services import settings as settings_svc
 
 router = APIRouter(prefix="/api/license", tags=["license"])
@@ -27,6 +27,10 @@ class CheckoutIn(BaseModel):
 
 class TokenIn(BaseModel):
     token: str = Field(min_length=20, max_length=4096)
+
+
+class FreeActivesIn(BaseModel):
+    ids: list[int] = Field(max_length=100_000)
 
 
 def _out(status=None) -> dict:
@@ -144,3 +148,24 @@ def cancel_subscription(me: User = AdminOnly, db: Session = Depends(get_db)) -> 
     audit.log(db, me.id, "cancel", "subscription", None, {"code": result.get("cancellation_code")})
     db.commit()
     return result
+
+
+# ---- Free plan "option C": which items stay active for use ("Elegí tus activos")
+
+
+@router.get("/free-plan")
+def free_plan_overview(db: Session = Depends(get_db), _: User = CurrentUser) -> dict:
+    return free_plan.overview(db)
+
+
+@router.get("/free-plan/{kind}")
+def free_plan_items(kind: str, db: Session = Depends(get_db), _: User = AdminOnly) -> dict:
+    if kind not in free_plan.KINDS:
+        raise HTTPException(404, "Tipo inexistente")
+    return {"status": free_plan.kind_status(db, kind), "items": free_plan.items(db, kind)}
+
+
+@router.put("/free-plan/{kind}")
+def free_plan_choose(kind: str, data: FreeActivesIn, db: Session = Depends(get_db), me: User = AdminOnly) -> dict:
+    status = free_plan.choose(db, kind, data.ids, me)
+    return {"status": status, "items": free_plan.items(db, kind)}

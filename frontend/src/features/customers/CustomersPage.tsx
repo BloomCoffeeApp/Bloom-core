@@ -5,6 +5,8 @@ import { useNavigate, useSearchParams } from 'react-router'
 import { type ColumnDef, DataTable } from '@/components/data-table'
 import { PageHeader } from '@/components/page-header'
 import { StatCard } from '@/components/stat-card'
+import { LockBadge } from '@/components/lock-badge'
+import { FreeLocksBanner } from '@/features/license/free-locks-banner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -86,7 +88,10 @@ export function CustomersPage() {
             <div className="flex min-w-0 items-center gap-3">
               <CustomerAvatar id={c.id} name={c.name} />
               <div className="min-w-0">
-                <p className="truncate font-medium">{c.name}</p>
+                <p className="flex items-center gap-2 font-medium">
+                  <span className="truncate">{c.name}</span>
+                  {c.locked && <LockBadge />}
+                </p>
                 <p className="truncate text-xs text-muted-foreground">
                   {c.notes || c.email || (c.visits ? `${c.visits} visitas` : 'Sin compras todavía')}
                 </p>
@@ -212,6 +217,7 @@ export function CustomersPage() {
         />
       </div>
 
+      <FreeLocksBanner kinds={['customers']} className="mb-3" />
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <Tabs value={segment} onValueChange={setSegment}>
           <TabsList className="h-auto flex-wrap">

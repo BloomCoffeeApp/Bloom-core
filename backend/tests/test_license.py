@@ -134,10 +134,13 @@ def test_api_status_import_and_gating(seeded, signer):
     assert client.put("/api/settings/network", json={"lan_enabled": True}, headers=h).status_code == 200
 
 
-def test_only_admin_manages_license(seeded, signer):
+def test_only_admin_manages_license(seeded, signer, monkeypatch):
+    from app import remote_config
     from tests.conftest import login
 
     client, _ = seeded
+    # Free plan: room for every demo user (otherwise only the admin can log in)
+    monkeypatch.setattr(remote_config, "free_limits", lambda: {"users": 10})
     hc = login(client, "Caja Demo", "1111")
     assert client.get("/api/license", headers=hc).status_code == 200
     assert client.post("/api/license/import", json={"token": signer()}, headers=hc).status_code == 403

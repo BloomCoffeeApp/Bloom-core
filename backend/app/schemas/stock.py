@@ -56,6 +56,8 @@ class StockItemOut(BaseModel):
     status: str  # ok|low|out
     value_cents: int
     next_expiry: str | None = None
+    # Free plan: visible but not usable in recipes or stock movements (services/free_plan.py).
+    locked: bool = False
 
 
 class MovementOut(BaseModel):

@@ -41,6 +41,8 @@ class CustomerOut(ORM):
     credit_limit_cents: int
     active: bool
     created_at: datetime
+    # Free plan: visible (and its balance collectable) but not usable in sales (services/free_plan.py).
+    locked: bool = False
 
 
 class CustomerListItem(CustomerOut):

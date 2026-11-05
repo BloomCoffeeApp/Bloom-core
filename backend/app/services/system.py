@@ -91,6 +91,9 @@ def restore_backup(path: Path) -> str:
     finally:
         src.close()
     engine.dispose()
+    from app.services import free_plan
+
+    free_plan.invalidate()  # the restored DB may have another catalog / selection
     return safety.name
 
 

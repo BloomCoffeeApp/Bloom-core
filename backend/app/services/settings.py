@@ -28,6 +28,8 @@ DEFAULTS: dict[str, Any] = {
         "max_pending": 3,
         "call_minutes": 10,
     },
+    # Free plan "Elegí tus activos" (services/free_plan.py); only changed through /api/free-plan.
+    "free_actives": {},
     "setup_done": False,
 }
 

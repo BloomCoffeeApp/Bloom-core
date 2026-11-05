@@ -32,6 +32,10 @@ class LicenseServerError(Exception):
 
 
 def server_url() -> str | None:
+    from app import demo
+
+    if demo.is_enabled():  # the online demo never talks to the license server
+        return None
     url = os.environ.get("BLOOM_LICENSE_SERVER") or BRAND.get("licenseServer")
     return url.rstrip("/") if url else None
 

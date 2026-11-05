@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { ArrowLeft, Delete } from 'lucide-react'
+import { ArrowLeft, Delete, Lock } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 
 import { AVATAR_COLORS, initials } from '@/components/avatar-utils'
@@ -33,7 +33,7 @@ export function LoginPage({ businessName }: { businessName?: string }) {
       try {
         await login(selected.id, value)
       } catch (e) {
-        setError(e instanceof ApiError && e.status === 429 ? e.message : 'PIN incorrecto')
+        setError(e instanceof ApiError && (e.status === 429 || e.status === 402) ? e.message : 'PIN incorrecto')
         setPin('')
       } finally {
         setBusy(false)
@@ -87,12 +87,18 @@ export function LoginPage({ businessName }: { businessName?: string }) {
               {users?.map((u) => (
                 <button
                   key={u.id}
+                  disabled={u.locked}
+                  title={u.locked ? 'Bloqueado en el plan gratuito: el administrador puede activarlo en «Elegí tus activos».' : undefined}
                   onClick={() => {
                     setSelected(u)
                     setPin('')
                   }}
-                  className="flex flex-col items-center gap-2 rounded-2xl border bg-background p-4 transition hover:-translate-y-0.5 hover:border-primary hover:shadow-md"
+                  className={cn(
+                    'relative flex flex-col items-center gap-2 rounded-2xl border bg-background p-4 transition hover:-translate-y-0.5 hover:border-primary hover:shadow-md',
+                    u.locked && 'cursor-not-allowed opacity-60 hover:translate-y-0 hover:border-border hover:shadow-none',
+                  )}
                 >
+                  {u.locked && <Lock className="absolute top-2 right-2 size-4 text-warning" aria-label="Bloqueado" />}
                   <Avatar className="size-12">
                     <AvatarFallback className={cn('font-semibold', AVATAR_COLORS[u.color])}>
                       {initials(u.name)}

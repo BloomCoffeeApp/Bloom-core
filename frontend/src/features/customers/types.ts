@@ -12,6 +12,8 @@ export interface Customer {
   credit_limit_cents: number
   active: boolean
   created_at: string
+  /** Free plan: visible (balance still collectable) but can't be used in sales. */
+  locked?: boolean
 }
 
 export interface CustomerListItem extends Customer {

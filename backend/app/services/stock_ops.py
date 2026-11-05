@@ -39,7 +39,7 @@ from app.schemas.stock import (
     SuggestionItem,
     WasteIn,
 )
-from app.services import audit
+from app.services import audit, free_plan
 from app.services.stock import apply_movement
 
 CONSUMPTION_TYPES = ("sale", "internal", "waste")
@@ -82,7 +82,8 @@ def _next_expiry(db: Session) -> dict[int, str]:
 
 
 def item_out(
-    item: StockItem, cats: dict[int, str], sups: dict[int, str], expiries: dict[int, str] | None = None
+    item: StockItem, cats: dict[int, str], sups: dict[int, str], expiries: dict[int, str] | None = None,
+    usable: frozenset[int] | None = None,
 ) -> StockItemOut:
     return StockItemOut(
         id=item.id,
@@ -100,6 +101,7 @@ def item_out(
         status=item_status(item),
         value_cents=item_value_cents(item),
         next_expiry=(expiries or {}).get(item.id),
+        locked=bool(item.active and usable is not None and item.id not in usable),
     )
 
 
@@ -171,7 +173,8 @@ def list_items(
         query = query.where(StockItem.name.ilike(f"%{q}%"))
     cats, sups = _lookups(db)
     exp = _next_expiry(db)
-    out = [item_out(i, cats, sups, exp) for i in db.scalars(query)]
+    usable = free_plan.active_ids(db, "stock_items")
+    out = [item_out(i, cats, sups, exp, usable) for i in db.scalars(query)]
     if status:
         out = [o for o in out if o.status == status]
     return out
@@ -179,7 +182,14 @@ def list_items(
 
 def get_item(db: Session, item_id: int) -> StockItemOut:
     cats, sups = _lookups(db)
-    return item_out(_get_item(db, item_id), cats, sups, _next_expiry(db))
+    return item_out(_get_item(db, item_id), cats, sups, _next_expiry(db), free_plan.active_ids(db, "stock_items"))
+
+
+def _usable_item(db: Session, item_id: int) -> StockItem:
+    """The stock item, or 402 when the free plan locks it (movements need an active one)."""
+    item = _get_item(db, item_id)
+    free_plan.ensure_usable(db, "stock_items", item.id, item.name)
+    return item
 
 
 def _check_refs(db: Session, category_id: int | None, supplier_id: int | None) -> None:
@@ -195,6 +205,7 @@ def create_item(db: Session, data: StockItemIn, user: User) -> StockItemOut:
     item = StockItem(**fields, current_qty=0)
     db.add(item)
     db.flush()
+    free_plan.on_created(db, "stock_items", item.id)
     if data.initial_qty:
         apply_movement(
             db, item.id, data.initial_qty, "adjustment",
@@ -208,6 +219,12 @@ def create_item(db: Session, data: StockItemIn, user: User) -> StockItemOut:
 def update_item(db: Session, item_id: int, data: StockItemUpdate, user: User) -> StockItemOut:
     item = _get_item(db, item_id)
     changes = data.model_dump(exclude_unset=True)
+    if item.active and set(changes) - {"active"}:
+        free_plan.ensure_usable(db, "stock_items", item.id, item.name)  # locked: only archiving
+    if changes.get("active") is False and item.active:
+        free_plan.on_archived(db, "stock_items", item.id)
+    elif changes.get("active") is True and not item.active:
+        free_plan.on_reactivated(db, "stock_items", item.id)
     _check_refs(db, changes.get("category_id"), changes.get("default_supplier_id"))
     for k, v in changes.items():
         setattr(item, k, v)
@@ -218,6 +235,8 @@ def update_item(db: Session, item_id: int, data: StockItemUpdate, user: User) ->
 
 def deactivate_item(db: Session, item_id: int, user: User) -> None:
     item = _get_item(db, item_id)
+    if item.active:
+        free_plan.on_archived(db, "stock_items", item.id)
     item.active = False
     audit.log(db, user.id, "deactivate", "stock_item", item.id, {"name": item.name})
     db.commit()
@@ -246,7 +265,7 @@ def movements(db: Session, item_id: int, limit: int = 200, type: str | None = No
 
 # ---------------------------------------------------------------- adjust / waste
 def adjust(db: Session, data: AdjustIn, user: User) -> StockItemOut:
-    item = _get_item(db, data.stock_item_id)
+    item = _usable_item(db, data.stock_item_id)
     delta = data.delta if data.delta is not None else (data.new_qty or 0) - item.current_qty
     delta = round(delta, 4)
     if abs(delta) < 1e-9:
@@ -279,7 +298,7 @@ def _consume_lots(db: Session, item_id: int, qty: float) -> None:
 
 
 def waste(db: Session, data: WasteIn, user: User) -> StockItemOut:
-    item = _get_item(db, data.stock_item_id)
+    item = _usable_item(db, data.stock_item_id)
     mv = apply_movement(db, item.id, -data.qty, "waste", reason=data.reason, user_id=user.id)
     if item.track_expiry:
         _consume_lots(db, item.id, data.qty)
@@ -353,7 +372,8 @@ def create_count(db: Session, data: CountCreate, user: User) -> CountOut:
     q = select(StockItem).where(StockItem.active.is_(True)).order_by(StockItem.name)
     if data.category_id is not None:
         q = q.where(StockItem.category_id == data.category_id)
-    items = list(db.scalars(q))
+    usable = free_plan.active_ids(db, "stock_items")
+    items = [i for i in db.scalars(q) if usable is None or i.id in usable]  # locked ones aren't counted
     if not items:
         raise HTTPException(400, "No hay insumos para contar")
     c = InventoryCount(status="open", notes=data.notes, user_id=user.id)
@@ -377,6 +397,7 @@ def set_counted(db: Session, count_id: int, item_id: int, counted_qty: float | N
     ci = next((i for i in c.items if i.id == item_id), None)
     if ci is None:
         raise HTTPException(404, "Ítem de conteo no encontrado")
+    free_plan.ensure_all_usable(db, "stock_items", [ci.stock_item_id])
     ci.counted_qty = counted_qty
     c.updated_at = utcnow()
     db.commit()
@@ -390,6 +411,8 @@ def set_counted_bulk(db: Session, count_id: int, rows: list[CountItemRow]) -> Co
         ci = by_id.get(r.id)
         if ci is None:
             raise HTTPException(404, "Ítem de conteo no encontrado")
+        if r.counted_qty is not None:
+            free_plan.ensure_all_usable(db, "stock_items", [ci.stock_item_id])
         ci.counted_qty = r.counted_qty
     c.updated_at = utcnow()
     db.commit()
@@ -402,9 +425,10 @@ def apply_count(db: Session, count_id: int, user: User) -> CountOut:
     if not any(ci.counted_qty is not None for ci in c.items):
         raise HTTPException(400, "No cargaste ninguna cantidad contada")
     applied = []
+    usable = free_plan.active_ids(db, "stock_items")
     for ci in c.items:
-        if ci.counted_qty is None:
-            continue
+        if ci.counted_qty is None or (usable is not None and ci.stock_item_id not in usable):
+            continue  # not counted, or locked by the free plan since the count started
         item = db.get(StockItem, ci.stock_item_id)
         if item is None:
             continue

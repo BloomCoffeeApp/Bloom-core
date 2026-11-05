@@ -1,11 +1,14 @@
 import { CircleCheckBig, Gift, Lock, Printer, Plus, Unlock } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Route, Routes } from 'react-router'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { fmtMoney } from '@/lib/format'
+import { useHasFeature } from '@/features/license/api'
+import type { StampReward } from '@/pro-modules'
+import { proModules } from '@pro'
 
 import { useCurrentCash } from '../cash/api'
 import { OpenCashDialog } from '../cash/dialogs'
@@ -13,7 +16,7 @@ import { useCreateSale, usePaymentMethods } from '../sales/api'
 import { printTicket } from '../sales/print'
 import type { SaleDetail } from '../sales/types'
 import { useOpenTabs } from '../orders/api'
-import { usePosCatalog, usePosConfig } from './api'
+import { usePosCatalog, usePosConfig, usePosQuote } from './api'
 import { TabsDialog } from './tabs-dialog'
 import { CartPanel } from './cart-panel'
 import { CheckoutDialog, type CheckoutConfirm } from './checkout-dialog'
@@ -80,7 +83,41 @@ function PosPage() {
   const [tabsOpen, setTabsOpen] = useState(false)
   const tabs = useOpenTabs()
 
-  const totals = useMemo(() => computeTotals(cartApi.cart, config.data), [cartApi.cart, config.data])
+  // Automatic promotions (Pro): the backend prices the cart; checkout waits for a fresh quote.
+  const promosOn = useHasFeature('promos') === true && proModules.edition === 'pro'
+  const quote = usePosQuote(promosOn ? cartApi.cart.lines : [])
+  const quoteLines = promosOn && cartApi.cart.lines.length ? quote.data?.lines : undefined
+  const pricing = promosOn && cartApi.cart.lines.length > 0 && (quote.isFetching || quote.isPlaceholderData)
+  const totals = useMemo(
+    () => computeTotals(cartApi.cart, config.data, quoteLines),
+    [cartApi.cart, config.data, quoteLines],
+  )
+  const stampsOn = useHasFeature('loyalty_pro') === true && !!proModules.PosStampCards
+
+  const redeem = useCallback(
+    (r: StampReward) => {
+      if (r.kind === 'product') {
+        const p = catalog.data?.products.find((x) => x.id === r.product_id)
+        if (!p) return toast.error('El producto del premio no está en el catálogo del POS')
+        const size = r.size_id != null ? (p.sizes.find((s) => s.size_id === r.size_id) ?? null) : null
+        cartApi.addReward(p, size ?? p.sizes.find((s) => s.is_default) ?? p.sizes[0] ?? null, {
+          program_id: r.program_id,
+          label: r.label,
+        })
+      } else {
+        cartApi.setReward({ program_id: r.program_id, label: r.label, kind: r.kind, value: r.value })
+      }
+      toast.success(`Premio agregado: ${r.label}`)
+    },
+    [catalog.data, cartApi],
+  )
+  const redeemed = useMemo(
+    () => [
+      ...cartApi.cart.lines.flatMap((l) => (l.reward ? [l.reward.program_id] : [])),
+      ...(cartApi.cart.reward ? [cartApi.cart.reward.program_id] : []),
+    ],
+    [cartApi.cart],
+  )
   const cashOpen = !!cash.data
   const cashKnownClosed = !cash.isLoading && !cash.isError && !cash.data
 
@@ -131,6 +168,7 @@ function PosPage() {
           // A courtesy gives the whole cart away: no discounts, points or payments.
           discount_cents: courtesy ? 0 : l.discount_cents,
           to_bar: l.to_bar !== false,
+          reward_program_id: courtesy ? null : (l.reward?.program_id ?? null),
         })),
         customer_id: cart.customer?.id ?? null,
         channel: cart.channel,
@@ -141,6 +179,7 @@ function PosPage() {
         is_courtesy: !!courtesy,
         courtesy_reason: courtesy?.reason || null,
         tab_id: cart.tab?.id ?? null,
+        reward_program_id: courtesy ? null : (cart.reward?.program_id ?? null),
       },
       {
         onSuccess: (sale) => {
@@ -154,7 +193,7 @@ function PosPage() {
   }
 
   return (
-    <div className="grid h-[calc(100svh-3.5rem)] grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)_minmax(0,50%)] overflow-hidden md:grid-cols-[1fr_340px] md:grid-rows-1 lg:grid-cols-[1fr_400px] xl:grid-cols-[1fr_440px]">
+    <div className="grid h-[calc(100svh-3.5rem)] grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)_minmax(0,50%)] overflow-hidden md:grid-cols-[minmax(0,1fr)_340px] md:grid-rows-1 lg:grid-cols-[minmax(0,1fr)_400px] xl:grid-cols-[minmax(0,1fr)_440px]">
       <ProductGrid
         catalog={catalog.data}
         loading={catalog.isLoading}
@@ -171,6 +210,15 @@ function PosPage() {
           onCheckout={startCheckout}
           openTabs={tabs.data?.length ?? 0}
           onOpenTabs={() => setTabsOpen(true)}
+          quote={quoteLines}
+          pricing={pricing}
+          customerExtras={
+            stampsOn && cartApi.cart.customer && proModules.PosStampCards ? (
+              <Suspense fallback={null}>
+                <proModules.PosStampCards customerId={cartApi.cart.customer.id} redeemed={redeemed} onRedeem={redeem} />
+              </Suspense>
+            ) : null
+          }
         />
         {cashKnownClosed && (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/80 p-6 backdrop-blur-sm">

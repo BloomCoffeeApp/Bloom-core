@@ -98,6 +98,8 @@ export interface Product {
   modifier_group_ids: number[]
   sizes: ProductSize[]
   updated_at: string | null
+  /** Free plan: visible but not usable (backend services/free_plan.py). */
+  locked: boolean
 }
 
 export interface ProductInput {

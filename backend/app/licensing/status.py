@@ -153,6 +153,10 @@ def evaluate(token: str | None, now: float | None = None) -> LicenseStatus:
 
 def current_status(force: bool = False) -> LicenseStatus:
     global _cache
+    from app import demo
+
+    if demo.is_enabled():  # online demo (never the desktop build): every Pro feature, no license file
+        return demo.demo_license_status()
     now = time.time()
     with _lock:
         if not force and _cache and now - _cache[0] < _CACHE_S:

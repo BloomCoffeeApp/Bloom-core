@@ -130,6 +130,8 @@ class SaleItemIn(BaseModel):
     discount_cents: int = Field(default=0, ge=0)
     # False for lines that already reached the bar (e.g. charged from a table's tab).
     to_bar: bool = True
+    # Pro `loyalty_pro`: this line is the free product of a stamp card ($0, stock moves).
+    reward_program_id: int | None = None
 
 
 class PaymentIn(BaseModel):
@@ -153,6 +155,23 @@ class SaleIn(BaseModel):
     courtesy_reason: str | None = Field(default=None, max_length=200)
     # Charging a table's open tab ("mesa abierta"): the tab closes with this sale.
     tab_id: int | None = None
+    # Pro `loyalty_pro`: redeem a stamp card whose reward is a discount on this sale.
+    reward_program_id: int | None = None
+
+
+class QuoteIn(BaseModel):
+    items: list[SaleItemIn] = Field(min_length=1, max_length=200)
+
+
+class QuoteLineOut(BaseModel):
+    index: int
+    promo_id: int | None
+    promo_name: str | None
+    discount_cents: int
+
+
+class QuoteOut(BaseModel):
+    lines: list[QuoteLineOut]
 
 
 class SaleVoidIn(BaseModel):
@@ -172,6 +191,11 @@ class SaleItemOut(ORM):
     cost_cents: int
     modifiers: list[dict[str, Any]] | None
     notes: str | None
+    promo_id: int | None = None
+    promo_name: str | None = None
+    promo_discount_cents: int = 0
+    reward_program_id: int | None = None
+    courtesy_reason: str | None = None
 
 
 class SalePaymentOut(ORM):
@@ -212,6 +236,7 @@ class SaleOut(BaseModel):
     cost_cents: int
     points_earned: int
     points_redeemed: int
+    reward_discount_cents: int = 0
     notes: str | None
     void_reason: str | None
     voided_by: int | None

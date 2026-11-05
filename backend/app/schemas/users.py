@@ -12,6 +12,8 @@ class UserPublic(ORM):
     name: str
     role: str
     color: str
+    # Free plan: this user can't log in (services/free_plan.py).
+    locked: bool = False
 
 
 class UserOut(UserPublic):

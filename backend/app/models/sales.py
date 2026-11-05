@@ -62,6 +62,9 @@ class Sale(IdMixin, Base):
     cost_cents: Mapped[int] = mapped_column(default=0)
     points_earned: Mapped[int] = mapped_column(default=0)
     points_redeemed: Mapped[int] = mapped_column(default=0)
+    # Pro `loyalty_pro`: a stamp-card discount reward applied to this sale (included in discount_cents).
+    reward_program_id: Mapped[int | None]
+    reward_discount_cents: Mapped[int] = mapped_column(default=0, server_default="0")
     status: Mapped[str] = mapped_column(String(12), default="completed")  # completed|voided
     # Courtesy ("invita la casa"): stock moves as a normal sale but nothing is charged. Totals are 0 and
     # the menu value given away is kept in courtesy_cents; revenue/ticket aggregates exclude these sales.
@@ -92,6 +95,13 @@ class SaleItem(IdMixin, Base):
     cost_cents: Mapped[int] = mapped_column(default=0)
     modifiers: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON)
     notes: Mapped[str | None] = mapped_column(String(200))
+    # Pro `promos` (snapshot): the promotion applied and its part of discount_cents.
+    promo_id: Mapped[int | None]
+    promo_name: Mapped[str | None] = mapped_column(String(120))
+    promo_discount_cents: Mapped[int] = mapped_column(default=0, server_default="0")
+    # Pro `loyalty_pro`: free product given as a stamp-card reward ($0 line, stock moves).
+    reward_program_id: Mapped[int | None]
+    courtesy_reason: Mapped[str | None] = mapped_column(String(60))
 
 
 class SalePayment(IdMixin, Base):

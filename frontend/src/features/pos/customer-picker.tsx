@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 
 import { EmptyState } from '@/components/empty-state'
+import { LockBadge } from '@/components/lock-badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -107,7 +108,10 @@ export function CustomerPicker({
                 onChange={(e) => setQ(e.target.value)}
                 placeholder="Nombre o teléfono…"
                 className="h-12 pl-9 text-base"
-                onKeyDown={(e) => e.key === 'Enter' && data?.[0] && pick(data[0])}
+                onKeyDown={(e) => {
+                  const first = data?.find((c) => !c.locked)
+                  if (e.key === 'Enter' && first) pick(first)
+                }}
               />
             </div>
             <div className="max-h-80 space-y-1 overflow-y-auto">
@@ -121,14 +125,19 @@ export function CustomerPicker({
                 data.map((c) => (
                   <button
                     key={c.id}
+                    disabled={c.locked}
+                    title={c.locked ? 'Bloqueado en el plan gratuito: no se puede asociar a una venta.' : undefined}
                     onClick={() => pick(c)}
-                    className="flex min-h-14 w-full items-center gap-3 rounded-xl px-3 py-2 text-left hover:bg-muted"
+                    className="flex min-h-14 w-full items-center gap-3 rounded-xl px-3 py-2 text-left hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent"
                   >
                     <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 font-semibold text-primary">
                       {c.name.slice(0, 1).toUpperCase()}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium">{c.name}</p>
+                      <p className="flex items-center gap-2 font-medium">
+                        <span className="truncate">{c.name}</span>
+                        {c.locked && <LockBadge />}
+                      </p>
                       <p className="truncate text-xs text-muted-foreground">{c.phone ?? 'Sin teléfono'}</p>
                     </div>
                     <div className="text-right text-xs">

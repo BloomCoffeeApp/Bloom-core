@@ -56,6 +56,8 @@ export interface UserRow {
   color: string
   active: boolean
   last_login_at: string | null
+  /** Free plan: this user can't log in. */
+  locked?: boolean
 }
 
 export interface UserCreate {

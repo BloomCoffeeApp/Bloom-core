@@ -1,12 +1,10 @@
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.auth import Manager, require_role
 from app.db import get_db
-from app.licensing import check_free_limit
 from app.models import Customer, CustomerAccountMovement, LoyaltyTransaction, User
 from app.schemas.common import Ok
 from app.schemas.customers import (
@@ -23,6 +21,7 @@ from app.schemas.customers import (
     PointsIn,
 )
 from app.services import customers as svc
+from app.services import free_plan
 
 router = APIRouter(prefix="/api", tags=["customers"])
 
@@ -49,7 +48,7 @@ def customer_stats(db: Session = Depends(get_db), _: User = Staff) -> dict[str, 
 
 @router.post("/customers", response_model=CustomerOut)
 def create_customer(data: CustomerCreate, db: Session = Depends(get_db), user: User = Staff) -> Customer:
-    check_free_limit("customers", db.scalar(select(func.count(Customer.id)).where(Customer.active.is_(True))) or 0)
+    free_plan.check_can_create(db, "customers")
     return svc.create(db, data.model_dump(), user)
 
 

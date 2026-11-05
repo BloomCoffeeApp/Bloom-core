@@ -1,12 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
-from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
 from app.auth import CurrentUser, Manager
 from app.db import get_db
-from app.licensing import check_free_limit
-from app.models import Product, User
+from app.models import User
 from app.schemas.catalog import (
     BulkPriceIn,
     BulkPriceOut,
@@ -27,7 +25,7 @@ from app.schemas.catalog import (
 )
 from app.schemas.common import Ok
 from app.services import catalog as svc
-from app.services import product_images
+from app.services import free_plan, product_images
 
 router = APIRouter(prefix="/api", tags=["catalog"])
 
@@ -84,7 +82,7 @@ def get_product(product_id: int, db: Session = Depends(get_db), _: User = Curren
 
 @router.post("/products", response_model=ProductOut)
 def create_product(data: ProductIn, db: Session = Depends(get_db), me: User = Manager) -> ProductOut:
-    check_free_limit("products", db.scalar(select(func.count(Product.id)).where(Product.active.is_(True))) or 0)
+    free_plan.check_can_create(db, "products")
     return svc.create_product(db, data, me)
 
 

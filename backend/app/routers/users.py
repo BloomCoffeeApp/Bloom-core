@@ -7,40 +7,49 @@ from sqlalchemy.orm import Session
 from app import lan
 from app.auth import AdminOnly, CurrentUser, hash_pin, revoke_sessions
 from app.db import get_db
-from app.licensing import check_free_limit, has_feature
+from app.licensing import has_feature
 from app.licensing.features import PRO_LABEL
 from app.models import User
 from app.schemas.users import UserCreate, UserOut, UserUpdate
-from app.services import audit
+from app.services import audit, free_plan
 from app.services import settings as settings_svc
 
 router = APIRouter(prefix="/api", tags=["users"])
 
 
+def user_out(db: Session, u: User) -> dict[str, Any]:
+    return {**UserOut.model_validate(u).model_dump(), "locked": u.active and free_plan.is_locked(db, "users", u.id)}
+
+
 @router.get("/users", response_model=list[UserOut])
-def list_users(db: Session = Depends(get_db), _: User = AdminOnly) -> list[User]:
-    return list(db.scalars(select(User).order_by(User.name)))
+def list_users(db: Session = Depends(get_db), _: User = AdminOnly) -> list[dict[str, Any]]:
+    return [user_out(db, u) for u in db.scalars(select(User).order_by(User.name))]
 
 
 @router.post("/users", response_model=UserOut)
-def create_user(data: UserCreate, db: Session = Depends(get_db), me: User = AdminOnly) -> User:
-    active = db.scalar(select(func.count(User.id)).where(User.active.is_(True))) or 0
-    if not has_feature("users"):
-        check_free_limit("users", active)
+def create_user(data: UserCreate, db: Session = Depends(get_db), me: User = AdminOnly) -> dict[str, Any]:
+    free_plan.check_can_create(db, "users")
     user = User(name=data.name, pin_hash=hash_pin(data.pin), role=data.role, color=data.color)
     db.add(user)
     db.flush()
+    free_plan.on_created(db, "users", user.id)
     audit.log(db, me.id, "create", "user", user.id, {"name": user.name, "role": user.role})
     db.commit()
-    return user
+    return user_out(db, user)
 
 
 @router.patch("/users/{user_id}", response_model=UserOut)
-def update_user(user_id: int, data: UserUpdate, db: Session = Depends(get_db), me: User = AdminOnly) -> User:
+def update_user(user_id: int, data: UserUpdate, db: Session = Depends(get_db), me: User = AdminOnly) -> dict[str, Any]:
     user = db.get(User, user_id)
     if not user:
         raise HTTPException(404, "Usuario no encontrado")
     changes = data.model_dump(exclude_unset=True)
+    if changes.get("active") is False and user.active:
+        free_plan.on_archived(db, "users", user.id)
+    elif changes.get("active") is True and not user.active:
+        free_plan.on_reactivated(db, "users", user.id)
+    elif user.active and set(changes) - {"active"}:
+        free_plan.ensure_usable(db, "users", user.id, user.name)
     demoting = changes.get("active") is False or changes.get("role", "admin") != "admin"
     if demoting and user.role == "admin":
         admins = db.scalar(select(func.count(User.id)).where(User.role == "admin", User.active.is_(True)))
@@ -58,7 +67,8 @@ def update_user(user_id: int, data: UserUpdate, db: Session = Depends(get_db), m
         revoke_sessions(db, user.id)
     audit.log(db, me.id, "update", "user", user.id, changes)
     db.commit()
-    return user
+    free_plan.invalidate()
+    return user_out(db, user)
 
 
 @router.get("/settings")
@@ -70,7 +80,7 @@ def get_settings(db: Session = Depends(get_db), _: User = CurrentUser) -> dict[s
 def put_setting(
     key: str, value: Any = Body(...), db: Session = Depends(get_db), me: User = AdminOnly
 ) -> dict[str, Any]:
-    if key not in settings_svc.DEFAULTS:
+    if key not in settings_svc.DEFAULTS or key == free_plan.SETTING:
         raise HTTPException(404, "Configuración inexistente")
     if key == "network" and isinstance(value, dict) and value.get("lan_enabled") and not has_feature("lan"):
         raise HTTPException(402, f"El modo red local es parte de {PRO_LABEL}.")

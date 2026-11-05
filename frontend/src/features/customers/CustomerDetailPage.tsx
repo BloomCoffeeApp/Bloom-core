@@ -17,12 +17,13 @@ import {
   UserX,
   Wallet,
 } from 'lucide-react'
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { EmptyState } from '@/components/empty-state'
 import { StatCard } from '@/components/stat-card'
+import { LockBadge } from '@/components/lock-badge'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -31,6 +32,9 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useAuth } from '@/lib/auth'
 import { fmtDate, fmtDateTime, fmtMoney, fmtNumber, fmtRelative, PAYMENT_LABEL } from '@/lib/format'
 import { cn } from '@/lib/utils'
+import { useHasFeature } from '@/features/license/api'
+import { LockedNotice } from '@/components/lock-badge'
+import { proModules } from '@pro'
 
 import { useCustomer, useCustomerSales, useDeactivateCustomer, useSaveCustomer } from './api'
 import { CustomerAvatar, CustomerFormDialog, PaymentDialog, PointsDialog } from './components'
@@ -98,6 +102,7 @@ function Detail({ c }: { c: CustomerDetail }) {
   const [confirmOff, setConfirmOff] = useState(false)
   const deactivate = useDeactivateCustomer()
   const save = useSaveCustomer()
+  const stampsPro = useHasFeature('loyalty_pro')
   const m = c.metrics
   const bdayToday = isBirthdayToday(c.birthday)
 
@@ -117,6 +122,7 @@ function Detail({ c }: { c: CustomerDetail }) {
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="font-heading text-3xl font-semibold tracking-tight">{c.name}</h1>
               {!c.active && <Badge variant="outline">Inactivo</Badge>}
+              {c.locked && <LockBadge />}
               {bdayToday && (
                 <Badge className="bg-destructive/10 text-destructive">
                   <Cake /> ¡Hoy cumple años!
@@ -176,6 +182,8 @@ function Detail({ c }: { c: CustomerDetail }) {
         )}
       </Card>
 
+      {c.locked && <LockedNotice what="Este cliente" />}
+
       {/* Metrics */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Total gastado" value={fmtMoney(m.total_spent_cents, { short: true })} icon={Wallet} hint={`${m.tickets} tickets`} />
@@ -198,6 +206,11 @@ function Detail({ c }: { c: CustomerDetail }) {
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
+          {stampsPro && proModules.CustomerStampCards && (
+            <Suspense fallback={null}>
+              <proModules.CustomerStampCards customerId={c.id} />
+            </Suspense>
+          )}
           <SalesHistory customerId={c.id} />
         </div>
         <div className="space-y-6">

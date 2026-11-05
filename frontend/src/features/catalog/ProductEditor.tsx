@@ -10,6 +10,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import { LockedNotice } from '@/components/lock-badge'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { fmtDateTime, fmtMoney, fmtPct } from '@/lib/format'
@@ -204,6 +205,7 @@ export function ProductEditor({
 
         <ScrollArea className="min-h-0 flex-1">
           <div className="space-y-7 p-5">
+            {product?.locked && <LockedNotice what="Este producto" />}
             <Section title="Datos básicos">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="grid gap-1.5 sm:col-span-2">
@@ -461,7 +463,7 @@ export function ProductEditor({
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
-            <Button disabled={!valid || save.isPending} onClick={submit}>
+            <Button disabled={!valid || save.isPending || !!product?.locked} onClick={submit}>
               Guardar
             </Button>
           </div>

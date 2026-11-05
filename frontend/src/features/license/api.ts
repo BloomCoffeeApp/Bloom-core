@@ -12,6 +12,8 @@ export type ProFeature =
   | 'users'
   | 'backup_export'
   | 'orders_pro'
+  | 'loyalty_pro'
+  | 'promos'
 
 /** Mirrors backend app/routers/license.py `_out`. */
 export interface LicenseInfo {
@@ -35,7 +37,15 @@ export interface LicenseInfo {
   app_name: string
   catalog: Record<ProFeature, string>
   /** Free plan caps (signed remote config, or built-in defaults). */
-  free_limits: { products: number; users: number; customers: number; stock_items: number; sales_history_days: number }
+  free_limits: {
+    products: number
+    users: number
+    customers: number
+    stock_items: number
+    sales_history_days: number
+    /** Days between two swaps in "Elegí tus activos". */
+    swap_cooldown_days: number
+  }
   server_configured: boolean
   /** A Mercado Pago purchase started on this PC that hasn't been confirmed yet. */
   pending_checkout: string | null
@@ -206,6 +216,73 @@ export function useAcceptPrice() {
     onSuccess: (s) => {
       qc.setQueryData(subscriptionKey, s)
       void qc.invalidateQueries({ queryKey: licenseKey })
+    },
+    onError: (e: Error) => toast.error(e.message),
+  })
+}
+
+// ---- Free plan "option C": only N items of each kind stay active for use (backend services/free_plan.py)
+
+export type FreeKind = 'products' | 'customers' | 'stock_items' | 'users'
+
+export interface FreeKindStatus {
+  kind: FreeKind
+  /** The cap applies right now (Free). */
+  limited: boolean
+  limit: number
+  total: number
+  active_ids: number[]
+  used: number
+  locked: number
+  free_slots: number
+  /** The owner already chose (otherwise: the oldest ones). */
+  custom: boolean
+  /** Until when taking an item out of the active set waits (swap cooldown). */
+  next_swap_at: string | null
+}
+
+export interface FreePlanOverview {
+  limited: boolean
+  cooldown_days: number
+  kinds: Record<FreeKind, FreeKindStatus>
+}
+
+export interface FreeItem {
+  id: number
+  name: string
+  detail: string | null
+  active: boolean
+  is_admin: boolean
+}
+
+export interface FreeKindItems {
+  status: FreeKindStatus
+  items: FreeItem[]
+}
+
+const freePlanKey = ['license', 'free-plan'] as const
+
+export function useFreePlan() {
+  return useQuery({ queryKey: freePlanKey, queryFn: () => api.get<FreePlanOverview>('/license/free-plan'), staleTime: 30_000 })
+}
+
+export function useFreeKindItems(kind: FreeKind, enabled = true) {
+  return useQuery({
+    queryKey: [...freePlanKey, kind],
+    queryFn: () => api.get<FreeKindItems>(`/license/free-plan/${kind}`),
+    enabled,
+  })
+}
+
+export function useChooseFreeActives(kind: FreeKind) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (ids: number[]) => api.put<FreeKindItems>(`/license/free-plan/${kind}`, { ids }),
+    onSuccess: (data) => {
+      qc.setQueryData([...freePlanKey, kind], data)
+      // Every list shows the lock badge: refresh them all.
+      void qc.invalidateQueries({ predicate: (q) => !(q.queryKey[0] === 'license' && q.queryKey[2] === kind) })
+      toast.success('Listo: tus activos quedaron guardados.')
     },
     onError: (e: Error) => toast.error(e.message),
   })

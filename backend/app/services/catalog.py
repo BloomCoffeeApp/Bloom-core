@@ -53,7 +53,7 @@ from app.schemas.catalog import (
     SizeRecipeOverrideIn,
     SizeUpdate,
 )
-from app.services import audit, recipes
+from app.services import audit, free_plan, recipes
 
 # Fixed list of allergen/diet tags shown in the customer menu (code -> label).
 PRODUCT_TAGS: dict[str, str] = {
@@ -88,13 +88,16 @@ def _get_product(db: Session, product_id: int) -> Product:
     return p
 
 
-def _check_stock_items(db: Session, ids: list[int]) -> None:
+def _check_stock_items(db: Session, ids: list[int], already: set[int] | None = None) -> None:
+    """Existence, and (free plan) no NEW reference to a locked stock item; `already` = ids the
+    recipe used before, which may stay."""
     ids = list(set(ids))
     if not ids:
         return
     found = set(db.scalars(select(StockItem.id).where(StockItem.id.in_(ids))))
     if missing := set(ids) - found:
         raise HTTPException(400, f"Insumo inexistente: {sorted(missing)}")
+    free_plan.ensure_all_usable(db, "stock_items", [i for i in ids if i not in (already or set())])
 
 
 def _check_groups(db: Session, ids: list[int]) -> None:
@@ -194,6 +197,7 @@ def product_out(
         modifier_group_ids=sorted(group_ids.get(p.id, [])),
         sizes=sizes,
         updated_at=p.updated_at,
+        locked=p.active and free_plan.is_locked(db, "products", p.id),
     )
 
 
@@ -317,7 +321,7 @@ def get_product(db: Session, product_id: int) -> ProductOut:
 
 
 def _set_recipe(db: Session, p: Product, items: list) -> None:
-    _check_stock_items(db, [i.stock_item_id for i in items])
+    _check_stock_items(db, [i.stock_item_id for i in items], {ri.stock_item_id for ri in p.recipe_items})
     merged: dict[int, float] = defaultdict(float)
     for i in items:
         merged[i.stock_item_id] += i.qty
@@ -351,7 +355,10 @@ def _set_sizes(db: Session, p: Product, items: list[ProductSizeIn], user: User) 
         raise HTTPException(400, f"Tamaño inexistente: {sorted(missing)}")
     if sum(1 for i in items if i.is_default) > 1:
         raise HTTPException(400, "Solo un tamaño puede ser el predeterminado")
-    _check_stock_items(db, [o.stock_item_id for i in items for o in i.recipe_overrides])
+    _check_stock_items(
+        db, [o.stock_item_id for i in items for o in i.recipe_overrides],
+        {o.stock_item_id for ps in p.sizes for o in ps.recipe_items},
+    )
     old = {ps.size_id: ps for ps in p.sizes}
     keep: set[int] = set()
     for i in items:
@@ -400,6 +407,7 @@ def create_product(db: Session, data: ProductIn, user: User) -> ProductOut:
     _set_groups(db, p.id, data.modifier_group_ids)
     if data.sizes:
         _set_sizes(db, p, data.sizes, user)
+    free_plan.on_created(db, "products", p.id)
     audit.log(db, user.id, "create", "product", p.id, {"name": p.name, "price_cents": p.price_cents})
     db.commit()
     db.refresh(p)
@@ -409,6 +417,15 @@ def create_product(db: Session, data: ProductIn, user: User) -> ProductOut:
 def update_product(db: Session, product_id: int, data: ProductUpdate, user: User) -> ProductOut:
     p = _get_product(db, product_id)
     changes = data.model_dump(exclude_unset=True, exclude={"recipe_items", "modifier_group_ids", "sizes"})
+    edits = set(data.model_dump(exclude_unset=True)) - {"active"}
+    if edits and p.active:
+        free_plan.ensure_usable(db, "products", p.id, p.name)  # locked: only archiving
+    if changes.get("active") is False and p.active:
+        free_plan.on_archived(db, "products", p.id)
+    elif changes.get("active") is True and not p.active:
+        free_plan.on_reactivated(db, "products", p.id)
+    if changes.get("stock_item_id") and changes["stock_item_id"] != p.stock_item_id:
+        free_plan.ensure_all_usable(db, "stock_items", [changes["stock_item_id"]])
     if "tags" in changes:
         changes["tags"] = _clean_tags(changes["tags"] or []) or None
     sized = bool(data.sizes) if data.sizes is not None else bool(p.sizes)
@@ -441,6 +458,8 @@ def update_product(db: Session, product_id: int, data: ProductUpdate, user: User
 
 def deactivate_product(db: Session, product_id: int, user: User) -> None:
     p = _get_product(db, product_id)
+    if p.active:
+        free_plan.on_archived(db, "products", p.id)
     p.active = False
     audit.log(db, user.id, "deactivate", "product", p.id, {"name": p.name})
     db.commit()
@@ -453,7 +472,10 @@ def bulk_price(db: Session, data: BulkPriceIn, user: User) -> BulkPriceOut:
         q = q.where(Product.category_id == data.category_id)
     factor = 1 + data.percent / 100
     rows: list[BulkPriceRow] = []
+    usable = free_plan.active_ids(db, "products")
     for p in db.scalars(q):
+        if usable is not None and p.id not in usable:
+            continue  # locked by the free plan
         if p.sizes:  # one row per size; the product price follows its default size
             for ps in ordered_sizes(p):
                 new = max(0, round_price(ps.price_cents * factor, data.round_to_cents))
@@ -567,7 +589,10 @@ def _validate_group(min_select: int, max_select: int) -> None:
 
 
 def _apply_modifiers(db: Session, g: ModifierGroup, items: list[ModifierIn]) -> None:
-    _check_stock_items(db, [r.stock_item_id for m in items for r in m.recipe_items])
+    _check_stock_items(
+        db, [r.stock_item_id for m in items for r in m.recipe_items],
+        {r.stock_item_id for m in g.modifiers for r in m.recipe_items},
+    )
     existing = {m.id: m for m in g.modifiers}
     keep: set[int] = set()
     for idx, data in enumerate(items):
@@ -636,6 +661,7 @@ def pos_catalog(db: Session) -> PosCatalogOut:
         )
     )
     active_cat_ids = {c.id for c in cats}
+    usable = free_plan.active_ids(db, "products")  # free plan: locked products aren't sold
     products = [
         p
         for p in db.scalars(
@@ -643,7 +669,7 @@ def pos_catalog(db: Session) -> PosCatalogOut:
             .where(Product.active.is_(True), Product.show_in_pos.is_(True))
             .order_by(Product.sort_order, Product.name)
         )
-        if p.category_id is None or p.category_id in active_cat_ids
+        if (p.category_id is None or p.category_id in active_cat_ids) and (usable is None or p.id in usable)
     ]
     groups = {
         g.id: PosModifierGroup(

@@ -26,6 +26,20 @@ class PublicSize(BaseModel):
     is_default: bool = False
 
 
+class PublicPromo(BaseModel):
+    """Active promotion of a product (Pro `promos`): badge + promo price of the shown size."""
+
+    name: str
+    label: str
+    price_cents: int | None = None
+
+
+class PublicCombo(BaseModel):
+    name: str
+    price_cents: int | None = None
+    items: list[str] = []
+
+
 class PublicProduct(BaseModel):
     id: int
     name: str
@@ -38,6 +52,7 @@ class PublicProduct(BaseModel):
     featured: bool = False
     photo_url: str | None = None  # local menu only (/uploads/...)
     sizes: list[PublicSize] = []
+    promo: PublicPromo | None = None
 
 
 class PublicCategory(BaseModel):
@@ -54,3 +69,4 @@ class PublicMenuOut(BaseModel):
     message: str
     categories: list[PublicCategory]
     tag_labels: dict[str, str] = {}
+    combos: list[PublicCombo] = []  # active combos (Pro `promos`)

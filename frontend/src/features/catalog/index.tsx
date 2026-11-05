@@ -1,8 +1,13 @@
-import { CupSoda, Layers, Package, Tags } from 'lucide-react'
+import { BadgePercent, CupSoda, Layers, Package, Tags } from 'lucide-react'
+import { Suspense } from 'react'
 import { Route, Routes, useSearchParams } from 'react-router'
 
 import { PageHeader } from '@/components/page-header'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useHasFeature } from '@/features/license/api'
+import { UpgradeCard } from '@/features/license/pro-gate'
+import { proModules } from '@pro'
 
 import { CategoriesTab } from './CategoriesTab'
 import { ModifiersTab } from './ModifiersTab'
@@ -12,6 +17,7 @@ import { SizesTab } from './SizesTab'
 function CatalogPage() {
   const [params, setParams] = useSearchParams()
   const tab = params.get('tab') || 'productos'
+  const promosPro = useHasFeature('promos')
   return (
     <div>
       <PageHeader title="Productos" description="Carta, tamaños, recetas, costos y márgenes." />
@@ -29,6 +35,9 @@ function CatalogPage() {
           <TabsTrigger value="modificadores">
             <Layers /> Modificadores
           </TabsTrigger>
+          <TabsTrigger value="promos">
+            <BadgePercent /> Promos
+          </TabsTrigger>
         </TabsList>
         <TabsContent value="productos">
           <ProductsTab />
@@ -41,6 +50,17 @@ function CatalogPage() {
         </TabsContent>
         <TabsContent value="modificadores">
           <ModifiersTab />
+        </TabsContent>
+        <TabsContent value="promos">
+          {!proModules.PromosTab ? (
+            <UpgradeCard feature="promos" compact notIncluded />
+          ) : promosPro === false ? (
+            <UpgradeCard feature="promos" compact />
+          ) : (
+            <Suspense fallback={<Skeleton className="h-40 rounded-2xl" />}>
+              <proModules.PromosTab />
+            </Suspense>
+          )}
         </TabsContent>
       </Tabs>
     </div>

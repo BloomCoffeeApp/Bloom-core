@@ -52,6 +52,8 @@ export interface PosCustomer {
   points: number
   balance_cents: number
   credit_limit_cents: number
+  /** Free plan: can't be the customer of a sale. */
+  locked?: boolean
 }
 
 // GET /api/pos/config
@@ -74,6 +76,16 @@ export interface CartLine {
   discount_cents: number
   /** false = already sent to the bar (loaded from a table's open tab). */
   to_bar?: boolean
+  /** Stamp-card reward line (Pro loyalty): $0, "Premio fidelidad". */
+  reward?: { program_id: number; label: string } | null
+}
+
+/** POST /api/pos/quote: automatic promotion of each cart line (Pro promos; none in the free edition). */
+export interface QuoteLine {
+  index: number
+  promo_id: number | null
+  promo_name: string | null
+  discount_cents: number
 }
 
 export interface CartState {
@@ -85,4 +97,6 @@ export interface CartState {
   points_to_redeem: number
   /** Charging a table's open tab ("mesa abierta"). */
   tab?: { id: number; label: string } | null
+  /** Stamp-card discount reward on the whole sale (Pro loyalty). */
+  reward?: { program_id: number; label: string; kind: 'pct' | 'fixed'; value: number } | null
 }

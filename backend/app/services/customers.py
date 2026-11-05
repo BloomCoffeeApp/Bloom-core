@@ -20,7 +20,7 @@ from app.models import (
     User,
     utcnow,
 )
-from app.services import audit
+from app.services import audit, free_plan
 from app.services.timeutil import day_bounds_utc, local_today, to_local
 
 SEGMENTS = ("frecuentes", "inactivos", "cumpleanos_mes", "deudores")
@@ -128,10 +128,12 @@ def list_customers(
         limit = 20 if q else 1000
     stmt = stmt.limit(limit)
     out = []
+    usable = free_plan.active_ids(db, "customers")
     for c, last, visits, spent, n30 in db.execute(stmt).all():
         out.append(
             {
                 **_base(c),
+                "locked": bool(c.active and usable is not None and c.id not in usable),
                 "last_visit_at": last,
                 "visits": int(visits or 0),
                 "visits_30d": int(n30 or 0),
@@ -176,6 +178,7 @@ def create(db: Session, data: dict[str, Any], user: User) -> Customer:
     c = Customer(**data)
     db.add(c)
     db.flush()
+    free_plan.on_created(db, "customers", c.id)
     audit.log(db, user.id, "create", "customer", c.id, {"name": c.name})
     db.commit()
     db.refresh(c)
@@ -189,6 +192,12 @@ def update(db: Session, c: Customer, data: dict[str, Any], user: User) -> Custom
         raise HTTPException(403, "Solo un encargado puede cambiar el límite de cuenta corriente")
     if "active" in data and data["active"] is False and not is_manager:
         raise HTTPException(403, "Solo un encargado puede desactivar clientes")
+    if c.active and set(data) - {"active"}:
+        free_plan.ensure_usable(db, "customers", c.id, c.name)  # locked: only archiving
+    if data.get("active") is False and c.active:
+        free_plan.on_archived(db, "customers", c.id)
+    elif data.get("active") is True and not c.active:
+        free_plan.on_reactivated(db, "customers", c.id)
     for k, v in data.items():
         setattr(c, k, v)
     audit.log(db, user.id, "update", "customer", c.id, {k: str(v) for k, v in data.items()})
@@ -198,6 +207,8 @@ def update(db: Session, c: Customer, data: dict[str, Any], user: User) -> Custom
 
 
 def deactivate(db: Session, c: Customer, user: User) -> None:
+    if c.active:
+        free_plan.on_archived(db, "customers", c.id)
     c.active = False
     audit.log(db, user.id, "deactivate", "customer", c.id, {"name": c.name})
     db.commit()
@@ -273,6 +284,7 @@ def detail(db: Session, c: Customer) -> dict[str, Any]:
     )
     return {
         **_base(c),
+        "locked": c.active and free_plan.is_locked(db, "customers", c.id),
         "metrics": metrics(db, c.id),
         "account_movements": movements,
         "loyalty_transactions": loyalty,
@@ -360,6 +372,7 @@ def register_payment(db: Session, c: Customer, amount_cents: int, method: str, u
 
 
 def adjust_points(db: Session, c: Customer, points: int, reason: str, user: User) -> LoyaltyTransaction:
+    free_plan.ensure_usable(db, "customers", c.id, c.name)
     if points == 0:
         raise HTTPException(400, "Indicá una cantidad de puntos distinta de cero")
     if c.points + points < 0:

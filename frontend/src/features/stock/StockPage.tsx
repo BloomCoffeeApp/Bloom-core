@@ -19,6 +19,8 @@ import { ConfirmDialog } from '@/components/confirm-dialog'
 import { type ColumnDef, DataTable } from '@/components/data-table'
 import { PageHeader } from '@/components/page-header'
 import { StatCard } from '@/components/stat-card'
+import { LockBadge } from '@/components/lock-badge'
+import { FreeLocksBanner } from '@/features/license/free-locks-banner'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -77,7 +79,10 @@ export function StockPage() {
         header: 'Insumo',
         cell: ({ row }) => (
           <div className="min-w-0">
-            <p className="truncate font-medium">{row.original.name}</p>
+            <p className="flex items-center gap-2 font-medium">
+              <span className="truncate">{row.original.name}</span>
+              {row.original.locked && <LockBadge />}
+            </p>
             <p className="truncate text-xs text-muted-foreground">
               {row.original.category_name ?? 'Sin categoría'}
               {row.original.supplier_name ? ` · ${row.original.supplier_name}` : ''}
@@ -179,6 +184,7 @@ export function StockPage() {
   const s = summary.data
   return (
     <div>
+      <FreeLocksBanner kinds={['stock_items']} className="mb-4" />
       <PageHeader
         title="Stock"
         description="Insumos, niveles y valorización del inventario."

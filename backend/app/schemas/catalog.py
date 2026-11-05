@@ -176,6 +176,8 @@ class ProductOut(BaseModel):
     modifier_group_ids: list[int]
     sizes: list[ProductSizeOut] = []
     updated_at: datetime | None = None
+    # Free plan: visible but not usable (services/free_plan.py).
+    locked: bool = False
 
 
 class BulkPriceIn(BaseModel):

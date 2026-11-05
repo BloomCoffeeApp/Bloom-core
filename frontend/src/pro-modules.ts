@@ -19,4 +19,24 @@ export interface ProModules {
   TablesSettings?: Lazy
   /** Configuración → Pedidos: stations and pickup screen (orders_pro). */
   OrdersStationsSettings?: Lazy
+  /** Productos → Promos: combos and scheduled discounts (promos). */
+  PromosTab?: Lazy
+  /** Configuración → Fidelización: stamp-card programs (loyalty_pro). */
+  LoyaltyStampsSettings?: Lazy
+  /** POS: the selected customer's stamp cards with one-tap redeem (loyalty_pro). */
+  PosStampCards?: Lazy<PosStampCardsProps>
+  /** Customer detail: stamp cards and their history (loyalty_pro). */
+  CustomerStampCards?: Lazy<{ customerId: number }>
+}
+
+/** A stamp-card reward the POS adds to the cart. */
+export type StampReward =
+  | { kind: 'product'; program_id: number; label: string; product_id: number; size_id: number | null }
+  | { kind: 'pct' | 'fixed'; program_id: number; label: string; value: number }
+
+export interface PosStampCardsProps {
+  customerId: number
+  /** Programs already redeemed in the current cart (one reward per program per sale in the UI). */
+  redeemed: number[]
+  onRedeem: (reward: StampReward) => void
 }

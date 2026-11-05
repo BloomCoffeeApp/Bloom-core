@@ -129,6 +129,19 @@ class ProductsReport(BaseModel):
     totals: dict[str, Any]
 
 
+class PromoRow(SalesRow):
+    promo_name: str
+    lines: int
+    discount_cents: int
+
+
+class PromosReport(BaseModel):
+    """Pro reports → sales by promotion (snapshot name on each sale line)."""
+
+    rows: list[PromoRow]
+    totals: PromoRow
+
+
 class MovementRow(BaseModel):
     id: int
     ts: datetime

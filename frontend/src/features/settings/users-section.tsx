@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 
 import { AVATAR_COLORS, initials } from '@/components/avatar-utils'
 import { type ColumnDef, DataTable } from '@/components/data-table'
+import { LockBadge } from '@/components/lock-badge'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -191,6 +192,7 @@ export function UsersSection() {
               <p className="font-medium">
                 {row.original.name}
                 {row.original.id === me?.id && <span className="ml-1.5 text-xs text-muted-foreground">(vos)</span>}
+                {row.original.locked && <LockBadge className="ml-1.5" />}
               </p>
               <p className="text-xs text-muted-foreground">
                 {row.original.last_login_at ? `Último ingreso ${fmtRelative(row.original.last_login_at)}` : 'Nunca ingresó'}

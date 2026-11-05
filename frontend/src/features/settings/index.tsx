@@ -7,6 +7,7 @@ import {
   HardDrive,
   Info,
   LayoutGrid,
+  Lock,
   Mail,
   type LucideIcon,
   Palette,
@@ -30,6 +31,7 @@ import { AlertsSection, AppearanceSection, BusinessSection, LoyaltySection, Secu
 import { AccountSection } from '../account/account-section'
 import { NotificationsSection } from '../account/notifications-section'
 import { LicenseSection } from '../license/license-section'
+import { FreeActivesSection } from '../license/free-actives-section'
 import { UpgradeCard } from '../license/pro-gate'
 import { useHasFeature } from '../license/api'
 import { proModules } from '@pro'
@@ -54,6 +56,7 @@ function SettingsPage() {
   const lanPro = useHasFeature('lan')
   const menuPro = useHasFeature('public_menu')
   const ordersPro = useHasFeature('orders_pro')
+  const stampsPro = useHasFeature('loyalty_pro')
 
   const withSettings = (fn: () => ReactNode) => () => (s ? fn() : <CardSkeleton />)
 
@@ -61,13 +64,27 @@ function SettingsPage() {
     ? [
         { value: 'negocio', label: 'Negocio', icon: Building2, render: withSettings(() => <BusinessSection initial={s!.business} />) },
         { value: 'licencia', label: 'Licencia', icon: Sparkles, render: () => <LicenseSection /> },
+        { value: 'activos', label: 'Elegí tus activos', icon: Lock, render: () => <FreeActivesSection /> },
         { value: 'cuenta', label: 'Cuenta', icon: UserRound, render: () => <AccountSection /> },
         { value: 'notificaciones', label: 'Notificaciones', icon: Mail, render: () => <NotificationsSection /> },
         { value: 'usuarios', label: 'Usuarios', icon: Users, render: () => <UsersSection /> },
         ...(payments.isSuccess
           ? [{ value: 'pagos', label: 'Medios de pago', icon: CreditCard, render: () => <PaymentMethodsSection query={payments} /> }]
           : []),
-        { value: 'fidelizacion', label: 'Fidelización', icon: Gift, render: withSettings(() => <LoyaltySection initial={s!.loyalty} />) },
+        { value: 'fidelizacion', label: 'Fidelización', icon: Gift, render: withSettings(() => (
+          <div className="space-y-6">
+            <LoyaltySection initial={s!.loyalty} />
+            {!proModules.LoyaltyStampsSettings ? (
+              <UpgradeCard feature="loyalty_pro" compact notIncluded />
+            ) : stampsPro === false ? (
+              <UpgradeCard feature="loyalty_pro" compact />
+            ) : (
+              <Suspense fallback={<CardSkeleton />}>
+                <proModules.LoyaltyStampsSettings />
+              </Suspense>
+            )}
+          </div>
+        )) },
         { value: 'alertas', label: 'Alertas', icon: Bell, render: withSettings(() => <AlertsSection initial={s!.alerts} />) },
         { value: 'seguridad', label: 'Seguridad', icon: ShieldCheck, render: withSettings(() => <SecuritySection initial={s!.lock_minutes} />) },
         { value: 'respaldo', label: 'Respaldo', icon: HardDrive, render: withSettings(() => <BackupSection settings={s!.backup} />) },

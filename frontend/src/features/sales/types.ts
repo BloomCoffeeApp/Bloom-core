@@ -37,6 +37,12 @@ export interface SaleItem {
   cost_cents: number
   modifiers: SaleItemModifier[] | null
   notes: string | null
+  /** Pro promos: name and amount of the promotion applied (part of discount_cents). */
+  promo_name?: string | null
+  promo_discount_cents?: number
+  /** Pro loyalty: free product of a stamp card ("Premio fidelidad"). */
+  reward_program_id?: number | null
+  courtesy_reason?: string | null
 }
 
 export interface SalePayment {
@@ -70,6 +76,8 @@ export interface Sale {
   cost_cents: number
   points_earned: number
   points_redeemed: number
+  /** Pro loyalty: stamp-card discount reward (included in discount_cents). */
+  reward_discount_cents?: number
   notes: string | null
   void_reason: string | null
   voided_by: number | null
@@ -118,6 +126,8 @@ export interface SaleItemIn {
   discount_cents?: number
   /** false = already sent to the bar (a table's tab). */
   to_bar?: boolean
+  /** Pro loyalty: this line is a stamp-card reward ($0). */
+  reward_program_id?: number | null
 }
 
 export interface PaymentIn {
@@ -140,6 +150,8 @@ export interface SaleIn {
   courtesy_reason?: string | null
   /** Charging a table's open tab: it closes with this sale. */
   tab_id?: number | null
+  /** Pro loyalty: stamp-card reward that discounts the sale. */
+  reward_program_id?: number | null
 }
 
 export interface SalesFilters {

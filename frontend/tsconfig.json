@@ -9,6 +9,9 @@
     },
     {
       "path": "./e2e/tsconfig.json"
+    },
+    {
+      "path": "./e2e-demo/tsconfig.json"
     }
   ],
   "compilerOptions": {

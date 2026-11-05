@@ -25,6 +25,8 @@ export interface StockItem {
   status: StockStatus
   value_cents: number
   next_expiry: string | null
+  /** Free plan: visible but not usable in recipes or stock movements. */
+  locked?: boolean
 }
 
 export interface StockItemInput {

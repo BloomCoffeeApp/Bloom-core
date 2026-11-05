@@ -27,13 +27,14 @@ from app.models import (
     utcnow,
 )
 from app.schemas.sales import PaymentMethodUpdate, SaleIn
-from app.services import audit, orders, recipes, settings, stock
+from app.services import audit, free_plan, orders, recipes, sale_hooks, settings, stock
 from app.services.orders import close_tab, tab_label
 from app.services.cash import CASH, method_names, require_open_session, user_names
 from app.services.timeutil import range_bounds_utc
 
 CC = "cuenta_corriente"
 DISCOUNT_ROLES = ("admin", "encargado")
+REWARD_REASON = "Premio fidelidad"
 
 
 def can_discount(user: User) -> bool:
@@ -122,6 +123,14 @@ def _create_sale(db: Session, data: SaleIn, user: User) -> Sale:
 
     tab = _open_tab(db, data.tab_id) if data.tab_id is not None else None
     ctx = LineContext(db, data.items)
+    priced = price_cart(db, ctx, data.items, with_promos=not courtesy)
+    reward_lines = [
+        sale_hooks.RewardLine(idx, it.reward_program_id, it.product_id, it.size_id if it.size_id else (size.size_id if size else None), it.qty)
+        for idx, (it, _p, size, _m, _u, _g, _promo) in enumerate(priced)
+        if it.reward_program_id is not None
+    ]
+    if courtesy and (reward_lines or data.reward_program_id is not None):
+        raise HTTPException(400, "Una cortesía no lleva premios de fidelidad")
 
     # --- Lines ---
     lines: list[SaleItem] = []
@@ -129,17 +138,20 @@ def _create_sale(db: Session, data: SaleIn, user: User) -> Sale:
     subtotal = 0
     cost_total = 0
     courtesy_value = 0
-    for it in data.items:
-        p, size, mods = ctx.check(it.product_id, it.size_id, it.modifier_ids)
+    for it, p, size, mods, unit, gross, promo in priced:
         mod_ids = [m.id for m in mods]
-        unit = unit_price(p, size, mods)
-        gross = round(unit * it.qty)
+        reward = it.reward_program_id is not None
         if it.discount_cents > gross:
             raise HTTPException(400, f"El descuento de {p.name} supera su importe")
-        line_total = gross - it.discount_cents
-        # Courtesy lines keep the list price but are fully discounted, so every revenue sum sees 0.
-        line_discount = gross if courtesy else it.discount_cents
-        if courtesy:
+        if reward and it.discount_cents:
+            raise HTTPException(400, "Un premio de fidelidad no lleva descuento")
+        # Automatic promotion (Pro `promos`): never more than what's left after the manual discount.
+        promo_disc = min(promo.discount_cents, gross - it.discount_cents) if promo and not reward else 0
+        line_total = gross - it.discount_cents - promo_disc
+        # Courtesy and reward lines keep the list price but are fully discounted, so revenue sums see 0.
+        free_line = courtesy or reward
+        line_discount = gross if free_line else it.discount_cents + promo_disc
+        if free_line:
             line_total = 0
         courtesy_value += gross if courtesy else 0
         unit_cost = recipes.cost_cents(db, p, mod_ids, size)
@@ -161,6 +173,11 @@ def _create_sale(db: Session, data: SaleIn, user: User) -> Sale:
                 cost_cents=line_cost,
                 modifiers=[{"id": m.id, "name": m.name, "price_delta_cents": m.price_delta_cents} for m in mods] or None,
                 notes=(it.notes or "").strip() or None,
+                promo_id=promo.promo_id if promo_disc else None,
+                promo_name=promo.name if promo_disc else None,
+                promo_discount_cents=promo_disc,
+                reward_program_id=it.reward_program_id,
+                courtesy_reason=REWARD_REASON if reward else None,
             )
         )
 
@@ -178,6 +195,7 @@ def _create_sale(db: Session, data: SaleIn, user: User) -> Sale:
         customer = db.get(Customer, data.customer_id)
         if customer is None or not customer.active:
             raise HTTPException(400, "Cliente inexistente o inactivo")
+        free_plan.ensure_usable(db, "customers", customer.id, customer.name)
     cfg = loyalty_cfg(db)
     points_redeemed = data.points_to_redeem
     points_disc = 0
@@ -192,7 +210,18 @@ def _create_sale(db: Session, data: SaleIn, user: User) -> Sale:
             raise HTTPException(400, f"El cliente tiene solo {customer.points} puntos")
         points_disc = min(points_discount_cents(points_redeemed, cfg), subtotal - discount)
 
-    total = subtotal - discount - points_disc
+    # --- Stamp-card rewards (Pro `loyalty_pro`) ---
+    reward_disc = 0
+    if reward_lines or data.reward_program_id is not None:
+        if customer is None:
+            raise HTTPException(400, "Para canjear un premio de fidelidad elegí un cliente")
+        left = subtotal - discount - points_disc
+        reward_disc, _ = sale_hooks.rewards(
+            db, sale_hooks.RewardRequest(customer, reward_lines, data.reward_program_id, left)
+        )
+        reward_disc = max(0, min(reward_disc, left))
+
+    total = subtotal - discount - points_disc - reward_disc
 
     # --- Payments ---
     active_methods = set(db.scalars(select(PaymentMethod.code).where(PaymentMethod.active.is_(True))))
@@ -237,8 +266,10 @@ def _create_sale(db: Session, data: SaleIn, user: User) -> Sale:
         channel=data.channel,
         table_label=(data.table_label or "").strip() or None,
         subtotal_cents=subtotal,
-        discount_cents=discount + points_disc,
+        discount_cents=discount + points_disc + reward_disc,
         total_cents=total,
+        reward_program_id=data.reward_program_id,
+        reward_discount_cents=reward_disc,
         cost_cents=cost_total,
         points_earned=points_earned,
         points_redeemed=points_redeemed,
@@ -275,6 +306,8 @@ def _create_sale(db: Session, data: SaleIn, user: User) -> Sale:
             customer.balance_cents += cc_amount
             db.add(CustomerAccountMovement(customer_id=customer.id, amount_cents=cc_amount, type="charge", method=CC, sale_id=sale.id, user_id=user.id))
 
+    sale_hooks.after_sale(db, sale, user)  # e.g. loyalty stamps (Pro), same transaction
+
     if courtesy:
         audit.log(
             db, user.id, "courtesy", "sale", sale.id,
@@ -294,10 +327,13 @@ class LineContext:
         self.products = {
             p.id: p for p in db.scalars(select(Product).options(selectinload(Product.sizes)).where(Product.id.in_(pids)))
         }
+        usable = free_plan.active_ids(db, "products")
         for pid in pids:
             p = self.products.get(pid)
             if p is None or not p.active:
                 raise HTTPException(400, f"Producto {pid} inexistente o inactivo")
+            if usable is not None and pid not in usable:
+                raise HTTPException(402, free_plan.locked_message("products", p.name))
         self.allowed_groups: dict[int, set[int]] = defaultdict(set)
         for pmg in db.scalars(select(ProductModifierGroup).where(ProductModifierGroup.product_id.in_(pids))):
             self.allowed_groups[pmg.product_id].add(pmg.group_id)
@@ -326,6 +362,41 @@ class LineContext:
             if g.max_select > 0 and n > g.max_select:
                 raise HTTPException(400, f"{p.name}: máximo {g.max_select} en «{g.name}»")
         return p, size, [self.modifiers[mid] for mid in mod_ids]
+
+
+def price_cart(db: Session, ctx: "LineContext", items: list[Any], with_promos: bool = True) -> list[tuple]:
+    """(item, product, size, modifiers, unit, gross, promo|None) per line. Promotions (Pro hook) never
+    apply to stamp-card reward lines."""
+    rows = []
+    quote: list[sale_hooks.QuoteLine] = []
+    for idx, it in enumerate(items):
+        p, size, mods = ctx.check(it.product_id, it.size_id, it.modifier_ids)
+        unit = unit_price(p, size, mods)
+        gross = round(unit * it.qty)
+        rows.append((it, p, size, mods, unit, gross))
+        if getattr(it, "reward_program_id", None) is None:
+            quote.append(sale_hooks.QuoteLine(
+                index=idx, product_id=p.id, category_id=p.category_id, size_id=size.size_id if size else None,
+                qty=it.qty, base_price_cents=size.price_cents if size else p.price_cents,
+                unit_price_cents=unit, gross_cents=gross,
+            ))
+    promos = sale_hooks.price_lines(db, quote) if with_promos and quote else {}
+    return [(*row, promos.get(idx)) for idx, row in enumerate(rows)]
+
+
+def quote(db: Session, items: list[Any]) -> list[dict[str, Any]]:
+    """What the POS shows before charging: the promotion of each line (the sale recalculates)."""
+    ctx = LineContext(db, items)
+    out = []
+    for idx, (it, _p, _s, _m, _u, gross, promo) in enumerate(price_cart(db, ctx, items)):
+        disc = min(promo.discount_cents, gross - it.discount_cents) if promo else 0
+        out.append({
+            "index": idx,
+            "promo_id": promo.promo_id if disc > 0 else None,
+            "promo_name": promo.name if disc > 0 else None,
+            "discount_cents": max(disc, 0),
+        })
+    return out
 
 
 def unit_price(p: Product, size: ProductSize | None, mods: list[Modifier]) -> int:
@@ -401,6 +472,7 @@ def void_sale(db: Session, sale_id: int, reason: str, user: User) -> Sale:
                     customer.balance_cents -= cc
                     db.add(CustomerAccountMovement(customer_id=customer.id, amount_cents=-cc, type="void", method=CC, sale_id=sale.id, user_id=user.id))
 
+        sale_hooks.after_void(db, sale, user)  # e.g. remove loyalty stamps (Pro)
         sale.status = "voided"
         sale.void_reason = reason.strip()
         sale.voided_by = user.id
@@ -445,6 +517,7 @@ def serialize(sale: Sale, unames: dict[int, str], cnames: dict[int, str], cfg: d
         "cost_cents": sale.cost_cents,
         "points_earned": sale.points_earned,
         "points_redeemed": sale.points_redeemed,
+        "reward_discount_cents": sale.reward_discount_cents or 0,
         "notes": sale.notes,
         "void_reason": sale.void_reason,
         "voided_by": sale.voided_by,

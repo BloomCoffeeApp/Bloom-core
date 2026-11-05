@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from app import demo
 from app.config import APP_DISPLAY_NAME, APP_ID, APP_VERSION, FROZEN, FRONTEND_DIST, UPLOAD_DIR
 from app.routers import (
     account,
@@ -40,6 +41,11 @@ async def lifespan(_app: FastAPI):
     from app.jobs import start_jobs, stop_jobs
     from app.migrate import upgrade_db
 
+    if demo.manager() is not None:  # online demo: per-visitor sandboxes, no shared DB, no jobs
+        demo.manager().start()
+        yield
+        demo.manager().shutdown()
+        return
     upgrade_db()
     start_jobs()
     yield
@@ -74,14 +80,20 @@ def create_app(run_lifespan: bool = True) -> FastAPI:
         return response
 
     @app.get("/api/health")
-    def health() -> dict:
+    def health(request: Request) -> dict:
         # `app` lets the desktop launcher verify the port is really ours (not another local app).
-        return {"status": "ok", "app": APP_ID, "name": APP_DISPLAY_NAME, "version": APP_VERSION, "edition": EDITION}
+        info = {"status": "ok", "app": APP_ID, "name": APP_DISPLAY_NAME, "version": APP_VERSION, "edition": EDITION}
+        if demo_info := demo.public_info(request):
+            info["demo"] = demo_info
+        return info
 
     for module in ROUTER_MODULES:
         app.include_router(module.router)
     if bloom_pro:
         bloom_pro.register(app)
+
+    if demo.is_enabled():  # BLOOM_DEMO=1 and not the desktop build (see app/demo)
+        demo.install(app)
 
     app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 

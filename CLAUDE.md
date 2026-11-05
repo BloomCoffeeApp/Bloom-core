@@ -13,6 +13,8 @@ App de gestión para cafetería (POS, caja, stock, compras, clientes, alertas, r
 - Backend tests: `cd backend; .venv\Scripts\python -m pytest`
 - Front: `cd frontend; npm run dev | npm run build | npx tsc -b | npm run lint`
 - E2E (Playwright + Edge, stack aislado en puertos 47899/5199 con DB temporal): `cd frontend; npm run e2e` (`e2e:headed`, `e2e:ui`). Specs en `frontend/e2e/`.
+- Modo demo online (`BLOOM_DEMO=1`, ignorado en el .exe): `backend/app/demo/`, una base SQLite por visitante;
+  tests `tests/test_demo.py` y `npm run e2e:demo` (puertos 48071/5371). No tocar `get_db` sin revisarlo.
 - Nueva migración: `cd backend; .venv\Scripts\alembic revision --autogenerate -m "..."` y revisar el archivo generado.
 - Build del .exe: `./build/build.ps1`
 

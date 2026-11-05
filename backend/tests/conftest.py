@@ -58,6 +58,9 @@ def pro_license():
 
 @pytest.fixture()
 def db():
+    from app.services import free_plan
+
+    free_plan.invalidate()
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
     session = SessionLocal()
@@ -105,6 +108,9 @@ def seeded(client):
     else:
         engine.dispose()
         _sqlite_copy(_TEMPLATE, _DB)
+    from app.services import free_plan
+
+    free_plan.invalidate()
     return client, login(client, "Admin", "0000")
 
 

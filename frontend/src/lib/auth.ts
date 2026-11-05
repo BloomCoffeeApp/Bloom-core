@@ -6,6 +6,8 @@ export interface AuthUser {
   name: string
   role: Role
   color: string
+  /** Free plan: can't log in (only in the login list). */
+  locked?: boolean
 }
 export interface LoginResponse {
   token: string

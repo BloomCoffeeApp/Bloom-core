@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
-import type { PosConfig, CartLine, CartState, PosCustomer, PosModifier, PosProduct, PosSize } from './types'
+import type { PosConfig, CartLine, CartState, PosCustomer, PosModifier, PosProduct, PosSize, QuoteLine } from './types'
 import type { Channel } from '../sales/types'
 import type { Tab } from '../orders/types'
 
@@ -14,6 +14,7 @@ const EMPTY: CartState = {
   discount: { mode: 'amount', value: 0 },
   points_to_redeem: 0,
   tab: null,
+  reward: null,
 }
 
 function load(): CartState {
@@ -34,14 +35,30 @@ export interface CartTotals {
   subtotal: number
   discount: number
   pointsDiscount: number
+  /** Automatic promotions (already inside subtotal; shown as savings). */
+  promoDiscount: number
+  /** Stamp-card discount reward. */
+  rewardDiscount: number
   total: number
   items: number
   pointsEarned: number
 }
 
+/** Net of a cart line: reward lines are free; promotions come from the backend quote. */
+export function lineNet(l: CartLine, promo?: QuoteLine) {
+  if (l.reward) return 0
+  const gross = Math.round(l.unit_cents * l.qty)
+  return Math.max(gross - l.discount_cents - Math.min(promo?.discount_cents ?? 0, gross - l.discount_cents), 0)
+}
+
 /** Preview only: mirrors backend math (the backend always recalculates and validates). */
-export function computeTotals(cart: CartState, cfg?: PosConfig): CartTotals {
-  const subtotal = cart.lines.reduce((a, l) => a + l.unit_cents * l.qty - l.discount_cents, 0)
+export function computeTotals(cart: CartState, cfg?: PosConfig, quote?: QuoteLine[]): CartTotals {
+  const promoOf = (i: number) => quote?.find((q) => q.index === i)
+  const subtotal = cart.lines.reduce((a, l, i) => a + lineNet(l, promoOf(i)), 0)
+  const promoDiscount = cart.lines.reduce(
+    (a, l, i) => a + (l.reward ? 0 : Math.round(l.unit_cents * l.qty) - l.discount_cents - lineNet(l, promoOf(i))),
+    0,
+  )
   const raw = cart.discount.mode === 'pct' ? Math.round((subtotal * cart.discount.value) / 100) : cart.discount.value
   const discount = Math.min(Math.max(raw, 0), subtotal)
   const ppr = cfg?.loyalty.points_per_reward ?? 0
@@ -50,12 +67,17 @@ export function computeTotals(cart: CartState, cfg?: PosConfig): CartTotals {
     cart.points_to_redeem && ppr > 0
       ? Math.min(Math.floor(cart.points_to_redeem / ppr) * rewardValue, subtotal - discount)
       : 0
-  const total = subtotal - discount - pointsDiscount
+  const left = subtotal - discount - pointsDiscount
+  const r = cart.reward
+  const rewardDiscount = r ? Math.min(r.kind === 'pct' ? Math.round((left * Math.min(r.value, 100)) / 100) : r.value, left) : 0
+  const total = left - rewardDiscount
   const ppp = cfg?.loyalty.enabled ? cfg.loyalty.pesos_per_point : 0
   return {
     subtotal,
     discount,
     pointsDiscount,
+    promoDiscount,
+    rewardDiscount,
     total,
     items: cart.lines.reduce((a, l) => a + l.qty, 0),
     pointsEarned: cart.customer && ppp > 0 ? Math.floor(total / (ppp * 100)) : 0,
@@ -98,16 +120,38 @@ export function useCart() {
     })
   }, [])
 
+  /** A stamp-card reward: one free unit (its own $0 line). */
+  const addReward = useCallback((p: PosProduct, size: PosSize | null, reward: { program_id: number; label: string }) => {
+    setCart((c) => {
+      if (c.lines.some((l) => l.reward?.program_id === reward.program_id)) return c
+      const line: CartLine = {
+        key: `reward|${reward.program_id}|${p.id}|${size?.size_id ?? ''}`,
+        product_id: p.id,
+        category_id: p.category_id,
+        name: p.name,
+        size: size ? { size_id: size.size_id, name: size.name, short_label: size.short_label } : null,
+        unit_cents: size ? size.price_cents : p.price_cents,
+        modifiers: [],
+        qty: 1,
+        notes: '',
+        discount_cents: 0,
+        reward,
+      }
+      return { ...c, lines: [...c.lines, line] }
+    })
+  }, [])
+  const setReward = useCallback((reward: CartState['reward']) => setCart((c) => ({ ...c, reward })), [])
+
   const setQty = useCallback((key: string, qty: number) => {
-    setCart((c) => ({
-      ...c,
-      lines:
-        qty <= 0
-          ? c.lines.filter((l) => l.key !== key)
-          : c.lines.map((l) =>
-              l.key === key ? { ...l, qty, discount_cents: Math.min(l.discount_cents, l.unit_cents * qty) } : l,
-            ),
-    }))
+    setCart((c) => {
+      const line = c.lines.find((l) => l.key === key)
+      if (!line || (line.reward && qty > 1)) return c // a reward is always one unit
+      if (qty <= 0) return { ...c, lines: c.lines.filter((l) => l.key !== key) }
+      return {
+        ...c,
+        lines: c.lines.map((l) => (l.key === key ? { ...l, qty, discount_cents: Math.min(l.discount_cents, l.unit_cents * qty) } : l)),
+      }
+    })
   }, [])
 
   const updateLine = useCallback((key: string, patch: Partial<Pick<CartLine, 'qty' | 'notes' | 'discount_cents'>>) => {
@@ -128,7 +172,9 @@ export function useCart() {
   const setChannel = useCallback((channel: Channel) => setCart((c) => ({ ...c, channel })), [])
   const setTable = useCallback((table_label: string) => setCart((c) => ({ ...c, table_label })), [])
   const setCustomer = useCallback(
-    (customer: PosCustomer | null) => setCart((c) => ({ ...c, customer, points_to_redeem: 0 })),
+    // Rewards belong to the customer's card: changing the customer drops them.
+    (customer: PosCustomer | null) =>
+      setCart((c) => ({ ...c, customer, points_to_redeem: 0, reward: null, lines: c.lines.filter((l) => !l.reward) })),
     [],
   )
   const setDiscount = useCallback((discount: CartState['discount']) => setCart((c) => ({ ...c, discount })), [])
@@ -166,8 +212,8 @@ export function useCart() {
   }, [])
 
   return useMemo(
-    () => ({ cart, add, setQty, updateLine, remove, setChannel, setTable, setCustomer, setDiscount, setPoints, clear, loadTab }),
-    [cart, add, setQty, updateLine, remove, setChannel, setTable, setCustomer, setDiscount, setPoints, clear, loadTab],
+    () => ({ cart, add, addReward, setReward, setQty, updateLine, remove, setChannel, setTable, setCustomer, setDiscount, setPoints, clear, loadTab }),
+    [cart, add, addReward, setReward, setQty, updateLine, remove, setChannel, setTable, setCustomer, setDiscount, setPoints, clear, loadTab],
   )
 }
 
