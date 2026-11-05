@@ -3,6 +3,7 @@ rate limits and the list of features that are off in the demo."""
 
 from __future__ import annotations
 
+import hmac
 import json
 import re
 from contextvars import ContextVar
@@ -78,8 +79,19 @@ class DemoMiddleware:
         self.app = app
         self.manager = manager
 
+    def trusted_hops(self, headers: dict[str, str]) -> int:
+        """Forwarded entries we may trust. The Worker's hop counts only with its shared secret, so a
+        visitor calling the server directly can't pick their own IP with a forged X-Forwarded-For."""
+        settings = self.manager.settings
+        hops = settings.proxy_hops
+        if hops > 1:
+            sent = headers.get("x-demo-proxy-secret", "")
+            if not (settings.proxy_secret and hmac.compare_digest(sent, settings.proxy_secret)):
+                hops = 1
+        return hops
+
     def client_ip(self, scope, headers: dict[str, str]) -> str:
-        hops = self.manager.settings.proxy_hops
+        hops = self.trusted_hops(headers)
         if hops:
             # Each trusted proxy appends the address it saw: the visitor is `hops` entries from the
             # right. Entries further left are whatever the visitor sent and can't be trusted.

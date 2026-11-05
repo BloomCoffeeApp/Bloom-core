@@ -57,6 +57,9 @@ class DemoSettings:
     # Proxies in front of the server that append to X-Forwarded-For (0 = trust no header).
     # Render alone: 1. Cloudflare Worker -> Render: 2.
     proxy_hops: int = 0
+    # Shared with the Cloudflare Worker: only requests carrying it may use all `proxy_hops`; anything
+    # that reached the server another way (e.g. the public onrender.com URL) trusts one hop at most.
+    proxy_secret: str = ""
     site_url: str = ""
     cleanup_every_s: int = 60
     users: tuple[dict, ...] = field(default_factory=tuple)
@@ -74,6 +77,7 @@ class DemoSettings:
             new_per_ip_per_hour=_int("BLOOM_DEMO_NEW_PER_IP_HOUR", 10),
             requests_per_minute=_int("BLOOM_DEMO_REQUESTS_PER_MIN", 300),
             proxy_hops=_int("BLOOM_DEMO_PROXY_HOPS", 0, minimum=0),
+            proxy_secret=os.environ.get("BLOOM_DEMO_PROXY_SECRET", "").strip(),
             site_url=os.environ.get("BLOOM_DEMO_SITE_URL", "").strip(),
             cleanup_every_s=_int("BLOOM_DEMO_CLEANUP_EVERY_S", 60),
             users=DEMO_USERS,

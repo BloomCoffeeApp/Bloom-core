@@ -216,11 +216,16 @@ def test_cap_on_concurrent_sandboxes(make_demo):
 def test_client_ip_behind_proxies(make_demo):
     from app.demo.middleware import DemoMiddleware
 
-    mgr_app = make_demo(proxy_hops=2)
+    mgr_app = make_demo(proxy_hops=2, proxy_secret="s3cret")
     mw = DemoMiddleware(mgr_app, demo.manager())
     scope = {"client": ("10.0.0.9", 1)}
+    via_worker = {"x-forwarded-for": "6.6.6.6, 1.2.3.4, 172.64.0.1", "x-demo-proxy-secret": "s3cret"}
     # visitor-sent junk, the visitor (added by the Worker), the Worker (added by Render)
-    assert mw.client_ip(scope, {"x-forwarded-for": "6.6.6.6, 1.2.3.4, 172.64.0.1"}) == "1.2.3.4"
+    assert mw.client_ip(scope, via_worker) == "1.2.3.4"
+    # Straight to the public Render URL with a forged header: only Render's own hop is trusted
+    forged = {"x-forwarded-for": "6.6.6.6, 9.9.9.9", "x-demo-proxy-secret": "wrong"}
+    assert mw.client_ip(scope, forged) == "9.9.9.9"
+    assert mw.client_ip(scope, {"x-forwarded-for": "6.6.6.6, 9.9.9.9"}) == "9.9.9.9"
     assert mw.client_ip(scope, {}) == "10.0.0.9"
     make_demo(proxy_hops=0)
     assert DemoMiddleware(mgr_app, demo.manager()).client_ip(scope, {"x-forwarded-for": "1.2.3.4"}) == "10.0.0.9"
