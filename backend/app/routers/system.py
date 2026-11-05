@@ -2,13 +2,15 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse, Response
 from sqlalchemy.orm import Session
 
-from app.auth import AdminOnly
+from app.auth import AdminOnly, CurrentUser
 from app.licensing import require_feature
 from app.db import get_db
 from app.models import User
 from app.schemas.reports import AuditRow, BackupOut, RestoreIn, RestoreOut, SystemInfo
 from app.services import audit
+from app.schemas.third_party import ThirdPartyNotices
 from app.services import system as svc
+from app.services import third_party
 
 router = APIRouter(prefix="/api", tags=["system"])
 
@@ -16,6 +18,11 @@ router = APIRouter(prefix="/api", tags=["system"])
 @router.get("/system/info", response_model=SystemInfo)
 def system_info(db: Session = Depends(get_db), _: User = AdminOnly) -> dict:
     return svc.info(db)
+
+
+@router.get("/system/third-party-licenses", response_model=ThirdPartyNotices)
+def third_party_licenses(_: User = CurrentUser) -> dict:
+    return third_party.notices()
 
 
 @router.get("/system/backups", response_model=list[BackupOut])

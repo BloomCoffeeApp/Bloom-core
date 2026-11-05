@@ -4,6 +4,7 @@ import { Navigate, Route, Routes } from 'react-router'
 
 import { AppShell } from '@/components/app-shell'
 import { EmptyState } from '@/components/empty-state'
+import { ModuleRoute } from '@/features/business/module-route'
 import { ProModule } from '@/features/license/pro-gate'
 import { proModules as pro } from '@pro'
 import { TourProvider } from '@/features/tutorial/tour'
@@ -49,15 +50,15 @@ export function AppRoutes() {
         >
           <Route index element={<Dashboard />} />
           <Route path="pos/*" element={<Guard roles={['cajero', 'encargado']}><Pos /></Guard>} />
-          <Route path="pedidos/*" element={<Orders />} />
+          <Route path="pedidos/*" element={<ModuleRoute module="orders"><Orders /></ModuleRoute>} />
           <Route path="caja/*" element={<Guard roles={['cajero', 'encargado']}><Cash /></Guard>} />
           <Route path="ventas/*" element={<Guard roles={['cajero', 'encargado']}><Sales /></Guard>} />
-          <Route path="barista/*" element={<Guard roles={['barista', 'encargado']}><ProModule feature="barista" component={pro.Barista} /></Guard>} />
+          <Route path="barista/*" element={<Guard roles={['barista', 'encargado']}><ModuleRoute module="barista"><ProModule feature="barista" component={pro.Barista} /></ModuleRoute></Guard>} />
           <Route path="productos/*" element={<Guard roles={['encargado']}><Catalog /></Guard>} />
-          <Route path="stock/*" element={<Guard roles={['encargado', 'barista']}><Stock /></Guard>} />
-          <Route path="compras/*" element={<Guard roles={['encargado']}><ProModule feature="purchases" component={pro.Purchases} /></Guard>} />
-          <Route path="clientes/*" element={<Guard roles={['cajero', 'encargado']}><Customers /></Guard>} />
-          <Route path="reportes/*" element={<Guard roles={['encargado']}><ProModule feature="reports" component={pro.Reports} /></Guard>} />
+          <Route path="stock/*" element={<Guard roles={['encargado', 'barista']}><ModuleRoute module="stock"><Stock /></ModuleRoute></Guard>} />
+          <Route path="compras/*" element={<Guard roles={['encargado']}><ModuleRoute module="purchases"><ProModule feature="purchases" component={pro.Purchases} /></ModuleRoute></Guard>} />
+          <Route path="clientes/*" element={<Guard roles={['cajero', 'encargado']}><ModuleRoute module="customers"><Customers /></ModuleRoute></Guard>} />
+          <Route path="reportes/*" element={<Guard roles={['encargado']}><ModuleRoute module="reports"><ProModule feature="reports" component={pro.Reports} /></ModuleRoute></Guard>} />
           <Route path="avisos/*" element={<Alerts />} />
           <Route path="config/*" element={<SettingsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />

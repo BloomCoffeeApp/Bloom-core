@@ -34,7 +34,7 @@ from app.models import (
     utcnow,
 )
 from app.models.sales import CHANNELS
-from app.services import audit, settings
+from app.services import audit, business_profile, printing, settings
 from app.services.timeutil import day_bounds_utc, local_today, range_bounds_utc, to_local
 
 ACTIVE = ("pending", "received", "preparing", "ready")
@@ -155,6 +155,7 @@ def route_stations(db: Session, order: Order) -> list[Order]:
         out.append(sibling)
     order.target_minutes = order_target([i.prep_minutes for i in order.items], target)
     db.flush()
+    printing.queue_comandas(db, out)  # direct-printed kitchen tickets, sent after the commit
     return out
 
 
@@ -174,6 +175,8 @@ def create_from_sale(db: Session, sale: Sale, to_bar: list[bool], user: User) ->
     """Sends the bar-bound lines of a POS sale to the order screen (same transaction as the sale)."""
     c = cfg(db)
     if not c["enabled"] or not c["channels"].get(sale.channel, False):
+        return None
+    if not business_profile.is_enabled(db, "orders"):  # hidden for this business type: no stale orders
         return None
     pids = {i.product_id for i in sale.items if i.product_id}
     products = {p.id: p for p in db.scalars(select(Product).where(Product.id.in_(pids)))} if pids else {}
@@ -344,11 +347,17 @@ def board(db: Session, station_id: int | None = None) -> dict[str, Any]:
     sale_numbers = dict(db.execute(select(Sale.id, Sale.number).where(Sale.id.in_(sids))).all()) if sids else {}
     orders = sorted((serialize(o, t, c["warn_pct"], names, sale_numbers) for o in rows), key=_sort_key)
     stations = active_stations(db)
+    direct = printing.station_printers(db) if stations else {}
     return {
         "server_time": t,
         "settings": c,
         "pro": pro(),
-        "stations": [{"id": st.id, "name": st.name, "print_tickets": st.print_tickets} for st in stations],
+        "stations": [
+            {"id": st.id, "name": st.name, "print_tickets": st.print_tickets, "direct_print": st.id in direct}
+            for st in stations
+        ],
+        # Kitchen tickets the thermal printer couldn't print: the station's screen prints them instead.
+        "print_failures": printing.failures(station_id) if direct else [],
         "orders": orders,
         "calls": active_calls(db, t),
         "late_count": sum(1 for o in orders if o["late"] and o["status"] in IN_PROGRESS),
@@ -439,6 +448,44 @@ def close_tab(db: Session, tab: TableTab, sale: Sale) -> None:
     tab.sale_id = sale.id
     for o in db.scalars(select(Order).where(Order.tab_id == tab.id, Order.status != "cancelled")):
         o.sale_id = sale.id
+
+
+def tab_of_sale(db: Session, sale_id: int) -> TableTab | None:
+    """The table tab a sale charged (None for ordinary sales)."""
+    return db.scalar(select(TableTab).where(TableTab.sale_id == sale_id, TableTab.status == "closed"))
+
+
+def reopen_tab(db: Session, sale: Sale, user: User) -> dict[str, Any] | None:
+    """Voiding a sale that charged a table's tab gives the table its bill back (inside the void's
+    transaction). If the table has no other open tab, the same tab is reopened. If it already has one
+    (people sat down again and ordered after the voided charge), the voided tab's orders are moved
+    into that open tab, so the table keeps a single bill, and the voided tab is marked `merged`.
+    The orders keep their status (they were already made and delivered): only their link to the
+    voided sale is removed, and charging the tab again sends its lines with `to_bar=false`, so
+    nothing reaches the bar twice."""
+    tab = tab_of_sale(db, sale.id)
+    if tab is None:
+        return None
+    other = db.scalar(
+        select(TableTab).where(TableTab.table_id == tab.table_id, TableTab.status == "open", TableTab.id != tab.id)
+    )
+    target = other or tab
+    for o in db.scalars(select(Order).where(Order.tab_id == tab.id)):
+        if o.sale_id == sale.id:
+            o.sale_id = None
+        o.tab_id = target.id
+    if other is None:
+        tab.status = "open"
+        tab.closed_at = None
+        tab.sale_id = None
+    else:
+        tab.status = "merged"
+    label = tab_label(db, tab)
+    audit.log(
+        db, user.id, "reopen", "table_tab", target.id,
+        {"sale_number": sale.number, "table": label, "voided_tab_id": tab.id, "merged": other is not None},
+    )
+    return {"tab_id": target.id, "table_label": label, "merged": other is not None}
 
 
 def tab_lines(orders: list[Order]) -> list[dict[str, Any]]:

@@ -33,6 +33,10 @@ class LinkConfirmIn(BaseModel):
     code: str = Field(pattern=r"^\d{6}$")
 
 
+class DeleteConfirmIn(BaseModel):
+    code: str = Field(pattern=r"^\d{6}$")
+
+
 class PreferencesIn(BaseModel):
     news: bool | None = None
     updates: bool | None = None
@@ -98,3 +102,27 @@ def put_preferences(data: PreferencesIn, me: User = AdminOnly, db: Session = Dep
     audit.log(db, me.id, "update", "email_preferences", None, data.model_dump(exclude_none=True))
     db.commit()
     return {"available": True, **result}
+
+
+# ---------------------------------------------------------------- data rights (what the server keeps)
+
+
+@router.post("/data/export")
+def export_data(me: User = AdminOnly, db: Session = Depends(get_db)) -> dict:
+    data = _call(license_client.export_account_data)
+    audit.log(db, me.id, "export", "account_data", None, None)
+    db.commit()
+    return data
+
+
+@router.post("/delete/start")
+def delete_start(_: User = AdminOnly) -> dict:
+    return _call(license_client.delete_account_start)
+
+
+@router.post("/delete/confirm")
+def delete_confirm(data: DeleteConfirmIn, me: User = AdminOnly, db: Session = Depends(get_db)) -> dict:
+    result = _call(license_client.delete_account_confirm, data.code)
+    audit.log(db, me.id, "delete", "account", None, None)
+    db.commit()
+    return {**_info(), "deleted": bool(result.get("deleted")), "retained": result.get("retained") or []}

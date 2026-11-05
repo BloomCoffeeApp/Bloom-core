@@ -4,7 +4,9 @@ import { createPortal } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router'
 
 import { Button } from '@/components/ui/button'
+import { useModules } from '@/features/business/api'
 import { useAuth } from '@/lib/auth'
+import { NAV } from '@/lib/nav'
 import { cn } from '@/lib/utils'
 
 import { TOUR_STEPS, type TourStep } from './steps'
@@ -33,9 +35,16 @@ export function TourProvider({ children }: { children: ReactNode }) {
   const { user, can } = useAuth()
   const [index, setIndex] = useState<number | null>(null)
 
+  const modules = useModules()
   const steps = useMemo(
-    () => TOUR_STEPS.filter((s) => !s.roles?.length || can(...s.roles)),
-    [can],
+    () =>
+      TOUR_STEPS.filter((s) => {
+        if (s.roles?.length && !can(...s.roles)) return false
+        // Sections hidden for this business type aren't in the sidebar: skip their step.
+        const item = s.target?.startsWith('nav-') ? NAV.find((n) => `nav-${n.to}` === s.target) : undefined
+        return !item?.module || modules.on(item.module)
+      }),
+    [can, modules],
   )
 
   const start = useCallback(() => setIndex(0), [])

@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import JSON, DateTime, Float, ForeignKey, String, Text, false
+from sqlalchemy import JSON, DateTime, Float, ForeignKey, Index, String, Text, false
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, IdMixin, TimestampMixin, utcnow
@@ -50,8 +50,16 @@ class CashMovement(IdMixin, Base):
 
 class Sale(IdMixin, Base):
     __tablename__ = "sales"
+    # Hot-query indexes (migration 0007, measured on 200k sales): completed/voided sales by date with
+    # the totals the dashboard and reports add up (index-only scans), and a cash session's sales by
+    # status. No ANALYZE stats in user DBs: SQLite picks the index with more leading equality columns,
+    # so avoid adding (status, is_courtesy, …) indexes — they steal the cash-session queries.
+    __table_args__ = (
+        Index("ix_sales_status_ts", "status", "ts", "is_courtesy", "total_cents", "cost_cents"),
+        Index("ix_sales_cash_session_status", "cash_session_id", "status"),
+    )
     number: Mapped[int] = mapped_column(unique=True)
-    cash_session_id: Mapped[int | None] = mapped_column(ForeignKey("cash_sessions.id"), index=True)
+    cash_session_id: Mapped[int | None] = mapped_column(ForeignKey("cash_sessions.id"))
     user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
     customer_id: Mapped[int | None] = mapped_column(ForeignKey("customers.id"), index=True)
     channel: Mapped[str] = mapped_column(String(10), default="salon")

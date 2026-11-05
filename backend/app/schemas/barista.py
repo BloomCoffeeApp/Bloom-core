@@ -1,5 +1,5 @@
 from datetime import date, datetime
-from typing import Any
+from typing import Annotated, Any
 
 from pydantic import BaseModel, Field
 
@@ -361,7 +361,11 @@ class JournalOut(ORM):
 DRINK_CATEGORY_PATTERN = r"^(espresso|con_leche|frias|filtrados|sin_cafe|otras)$"
 PREREQ_KIND_PATTERN = r"^(equipo|ingrediente|preparación)$"
 STEP_ICON_PATTERN = r"^(grind|tamp|extract|steam|pour|stir|ice|bloom|wait|serve|heat|measure|press)$"
-LAYER_KIND_PATTERN = r"^(espresso|crema|milk|foam|water|chocolate|ice|cream|syrup|tea|coffee)$"
+LAYER_KIND_PATTERN = (
+    r"^(espresso|crema|milk|foam|water|chocolate|ice|cream|syrup|tea|coffee"
+    r"|condensed|caramel|matcha|pistachio|white_chocolate|grounds)$"
+)
+CAFFEINE_PATTERN = r"^(sin|bajo|medio|alto)$"
 
 
 class GuidePrerequisite(BaseModel):
@@ -376,11 +380,22 @@ class GuideStep(BaseModel):
     duration_s: int | None = Field(default=None, ge=1, le=86400)
     tip: str | None = Field(default=None, max_length=500)
     icon: str | None = Field(default=None, pattern=STEP_ICON_PATTERN)
+    # Target temperature for this step (water, machine or milk), in °C.
+    temp_c: int | None = Field(default=None, ge=-20, le=100)
 
 
 class GuideLayer(BaseModel):
     kind: str = Field(pattern=LAYER_KIND_PATTERN)
     ratio: float = Field(gt=0, le=100)
+
+
+class GuideVariation(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+    detail: str = Field(default="", max_length=500)
+
+
+Tip = Annotated[str, Field(min_length=1, max_length=400)]
+EquipmentItem = Annotated[str, Field(min_length=1, max_length=80)]
 
 
 class DrinkGuideFields(BaseModel):
@@ -395,6 +410,12 @@ class DrinkGuideFields(BaseModel):
     prerequisites: list[GuidePrerequisite] = Field(default_factory=list, max_length=40)
     steps: list[GuideStep] = Field(default_factory=list, max_length=30)
     layers: list[GuideLayer] = Field(default_factory=list, max_length=12)
+    tips: list[Tip] = Field(default_factory=list, max_length=10)
+    variations: list[GuideVariation] = Field(default_factory=list, max_length=10)
+    equipment: list[EquipmentItem] = Field(default_factory=list, max_length=20)
+    origin: str | None = Field(default=None, max_length=80)
+    caffeine: str | None = Field(default=None, pattern=CAFFEINE_PATTERN)
+    featured: bool = False
 
 
 class ClassicDrink(DrinkGuideFields):
@@ -417,6 +438,12 @@ class DrinkGuideCreate(BaseModel):
     prerequisites: list[GuidePrerequisite] | None = Field(default=None, max_length=40)
     steps: list[GuideStep] | None = Field(default=None, max_length=30)
     layers: list[GuideLayer] | None = Field(default=None, max_length=12)
+    tips: list[Tip] | None = Field(default=None, max_length=10)
+    variations: list[GuideVariation] | None = Field(default=None, max_length=10)
+    equipment: list[EquipmentItem] | None = Field(default=None, max_length=20)
+    origin: str | None = Field(default=None, max_length=80)
+    caffeine: str | None = Field(default=None, pattern=CAFFEINE_PATTERN)
+    featured: bool | None = None
 
 
 class DrinkGuideUpdate(BaseModel):
@@ -431,6 +458,12 @@ class DrinkGuideUpdate(BaseModel):
     prerequisites: list[GuidePrerequisite] | None = Field(default=None, max_length=40)
     steps: list[GuideStep] | None = Field(default=None, max_length=30)
     layers: list[GuideLayer] | None = Field(default=None, max_length=12)
+    tips: list[Tip] | None = Field(default=None, max_length=10)
+    variations: list[GuideVariation] | None = Field(default=None, max_length=10)
+    equipment: list[EquipmentItem] | None = Field(default=None, max_length=20)
+    origin: str | None = Field(default=None, max_length=80)
+    caffeine: str | None = Field(default=None, pattern=CAFFEINE_PATTERN)
+    featured: bool | None = None
     product_id: int | None = None
     active: bool | None = None
 
@@ -443,6 +476,13 @@ class DrinkGuideOut(DrinkGuideFields, ORM):
     active: bool
     created_at: datetime
     updated_at: datetime
+
+
+class FavoriteToggle(BaseModel):
+    """``ref`` is ``classic:<key>`` or ``guide:<id>``."""
+
+    ref: str = Field(pattern=r"^(classic:[a-z0-9_]{1,60}|guide:\d{1,9})$")
+    favorite: bool = True
 
 
 class GuideableProduct(BaseModel):

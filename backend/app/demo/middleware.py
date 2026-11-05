@@ -33,6 +33,7 @@ DISABLED: list[tuple[frozenset[str] | None, re.Pattern[str], str]] = [
     (frozenset({"PUT"}), re.compile(r"^/api/products/[^/]+/photo$"), f"Subir fotos está desactivado en la demo. {_DOWNLOAD}"),
     (None, re.compile(r"^/api/public-menu/online/.+"), f"El menú online está desactivado en la demo. {_DOWNLOAD}"),
     (None, re.compile(r"^/api/setup$"), "La demo ya está configurada."),
+    (frozenset({"POST", "PUT"}), re.compile(r"^/api/printing/.+"), "La impresión directa está desactivada en la demo: se usa el diálogo de impresión."),
 ]
 
 _FULL_HTML = """<!doctype html><html lang="es"><meta charset="utf-8">

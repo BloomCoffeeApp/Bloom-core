@@ -38,7 +38,8 @@ export function SaleDetailSheet({ id, onOpenChange }: { id: number | null; onOpe
       { id: s.id, reason: reason.trim() },
       {
         onSuccess: () => {
-          toast.success(`Ticket #${s.number} anulado. Se reintegró el stock.`)
+          const tab = s.table_tab ? ` La cuenta de la ${s.table_tab.table_label ?? 'mesa'} se reabrió.` : ''
+          toast.success(`Ticket #${s.number} anulado. Se reintegró el stock.${tab}`)
           setReason('')
           setConfirm(false)
         },
@@ -200,6 +201,12 @@ export function SaleDetailSheet({ id, onOpenChange }: { id: number | null; onOpe
           destructive
           onConfirm={doVoid}
         >
+          {s?.table_tab && (
+            <p className="rounded-xl border border-warning/40 bg-warning/10 p-3 text-sm" data-testid="void-reopens-tab">
+              La cuenta de la {s.table_tab.table_label ?? 'mesa'} se va a reabrir: vuelve a «Mesas abiertas» para cobrarla de nuevo
+              (los pedidos ya entregados no se mandan otra vez a la barra).
+            </p>
+          )}
           <div className="space-y-2">
             <Label htmlFor="void-reason">Motivo</Label>
             <Textarea

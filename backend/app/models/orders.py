@@ -44,7 +44,8 @@ class TableTab(IdMixin, Base):
 
     __tablename__ = "table_tabs"
     table_id: Mapped[int] = mapped_column(ForeignKey("dining_tables.id"), index=True)
-    status: Mapped[str] = mapped_column(String(10), default="open")  # open|closed
+    # open|closed|merged (merged = its sale was voided and its orders moved to the table's open tab)
+    status: Mapped[str] = mapped_column(String(10), default="open")
     opened_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     closed_at: Mapped[datetime | None] = mapped_column(DateTime)
     sale_id: Mapped[int | None] = mapped_column(ForeignKey("sales.id"))

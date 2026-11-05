@@ -9,17 +9,19 @@ import {
   CommandItem,
   CommandList,
 } from '@/components/ui/command'
+import { useModules } from '@/features/business/api'
+import type { ModuleKey } from '@/features/business/types'
 import { useTour } from '@/features/tutorial/use-tour'
 import { useAuth } from '@/lib/auth'
 import { NAV } from '@/lib/nav'
 
 /** Extra quick actions; modules can add entries here. */
-const ACTIONS = [
+const ACTIONS: { label: string; to: string; keywords: string; module?: ModuleKey }[] = [
   { label: 'Nueva venta', to: '/pos', keywords: 'vender cobrar ticket' },
-  { label: 'Registrar shot', to: '/barista/shot', keywords: 'espresso extraccion calibrar' },
-  { label: 'Cargar compra', to: '/compras?nueva=1', keywords: 'factura proveedor' },
-  { label: 'Ajustar stock', to: '/stock', keywords: 'merma inventario' },
-  { label: 'Nuevo cliente', to: '/clientes?nuevo=1', keywords: 'cliente fidelizacion' },
+  { label: 'Registrar shot', to: '/barista/shot', keywords: 'espresso extraccion calibrar', module: 'barista' },
+  { label: 'Cargar compra', to: '/compras?nueva=1', keywords: 'factura proveedor', module: 'purchases' },
+  { label: 'Ajustar stock', to: '/stock', keywords: 'merma inventario', module: 'stock' },
+  { label: 'Nuevo cliente', to: '/clientes?nuevo=1', keywords: 'cliente fidelizacion', module: 'customers' },
 ]
 
 export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
@@ -30,7 +32,9 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
     onOpenChange(false)
     navigate(to)
   }
-  const nav = NAV.filter((n) => n.roles.length === 0 || can(...n.roles))
+  const modules = useModules()
+  const nav = NAV.filter((n) => (n.roles.length === 0 || can(...n.roles)) && (!n.module || modules.on(n.module)))
+  const actions = ACTIONS.filter((a) => !a.module || modules.on(a.module))
   return (
     <CommandDialog open={open} onOpenChange={onOpenChange} title="Buscar" description="Ir a una sección o acción">
       {/* CommandDialog doesn't provide cmdk's root; without it the input/list throw. */}
@@ -39,7 +43,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
         <CommandList>
           <CommandEmpty>Sin resultados.</CommandEmpty>
           <CommandGroup heading="Acciones rápidas">
-            {ACTIONS.map((a) => (
+            {actions.map((a) => (
               <CommandItem key={a.to} value={`${a.label} ${a.keywords}`} onSelect={() => go(a.to)}>
                 {a.label}
               </CommandItem>

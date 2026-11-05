@@ -1,5 +1,5 @@
 from app.models.alerts import Alert, Checklist, ChecklistItem, ChecklistRun, ChecklistRunItem, Notice
-from app.models.barista import BaristaJournal, BrewRecipe, Coffee, DrinkGuide, Equipment, MaintenanceTask, ShotLog
+from app.models.barista import BaristaJournal, BrewRecipe, Coffee, DrinkGuide, DrinkGuideFavorite, Equipment, MaintenanceTask, ShotLog
 from app.models.base import Base, utcnow
 from app.models.catalog import (
     Modifier,

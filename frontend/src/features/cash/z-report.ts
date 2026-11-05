@@ -1,11 +1,18 @@
 import { fmtDateTime, fmtMoney, fmtNumber } from '@/lib/format'
 
+import { printDirect } from '../printing/direct'
 import { esc, printHtml } from '../sales/print'
 import type { CashSessionDetail } from './types'
 
 const signed = (c: number | null) => (c == null ? '—' : `${c > 0 ? '+' : ''}${fmtMoney(c)}`)
 
-export function printZReport(s: CashSessionDetail) {
+/** Z report on the cashier's thermal printer (ESC/POS) or, without one / if it fails, the print dialog. */
+export async function printZReport(s: CashSessionDetail) {
+  if (await printDirect(`/printing/cash-sessions/${s.id}/z`)) return
+  printZReportDialog(s)
+}
+
+export function printZReportDialog(s: CashSessionDetail) {
   const methods = s.by_method
     .map(
       (m) => `<tr><td>${esc(m.name)}</td><td class="r">${esc(fmtMoney(m.sales_cents))}</td><td class="r">${esc(fmtMoney(m.expected_cents))}</td>` +

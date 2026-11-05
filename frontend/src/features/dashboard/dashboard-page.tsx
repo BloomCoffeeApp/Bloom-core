@@ -4,6 +4,7 @@ import { DollarSign, Percent, Receipt, ShoppingBag } from 'lucide-react'
 import { useMemo, useState } from 'react'
 
 import { StatCard } from '@/components/stat-card'
+import { useModules } from '@/features/business/api'
 import { useHasFeature } from '@/features/license/api'
 import { proModules } from '@pro'
 import { PresetToggle } from '@/components/report-kit'
@@ -43,7 +44,8 @@ export function DashboardPage() {
   const dash = useDashboard(range.from, range.to)
   const alerts = useOpenAlerts()
   // The Barista module must be in this build (Pro edition) and licensed.
-  const baristaPro = useHasFeature('barista') && !!proModules.Barista
+  const modules = useModules()
+  const baristaPro = useHasFeature('barista') && !!proModules.Barista && modules.on('barista')
   const barista = useBaristaToday(can('barista', 'encargado') && !!baristaPro)
   const cash = useCashCurrent(can('cajero', 'encargado'))
 
@@ -114,7 +116,7 @@ export function DashboardPage() {
         )}
       </div>
 
-      <OrdersStrip data={d?.orders} periodLabel={periodLabel} />
+      {modules.on('orders') && <OrdersStrip data={d?.orders} periodLabel={periodLabel} />}
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Panel
@@ -136,7 +138,7 @@ export function DashboardPage() {
           <DailyChart data={d?.daily} loading={loading} />
         </Panel>
         <div className="grid gap-4">
-          {can('barista', 'encargado') && (
+          {can('barista', 'encargado') && modules.on('barista') && (
             <RecipeCard data={barista.data} loading={barista.isLoading} failed={barista.isError} />
           )}
           {can('cajero', 'encargado') && (

@@ -5,6 +5,7 @@ import { Route, Routes, useSearchParams } from 'react-router'
 import { PageHeader } from '@/components/page-header'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useModules } from '@/features/business/api'
 import { useHasFeature } from '@/features/license/api'
 import { UpgradeCard } from '@/features/license/pro-gate'
 import { proModules } from '@pro'
@@ -16,7 +17,9 @@ import { SizesTab } from './SizesTab'
 
 function CatalogPage() {
   const [params, setParams] = useSearchParams()
-  const tab = params.get('tab') || 'productos'
+  const promosOn = useModules().on('promos')
+  const requested = params.get('tab') || 'productos'
+  const tab = requested === 'promos' && !promosOn ? 'productos' : requested
   const promosPro = useHasFeature('promos')
   return (
     <div>
@@ -35,9 +38,11 @@ function CatalogPage() {
           <TabsTrigger value="modificadores">
             <Layers /> Modificadores
           </TabsTrigger>
-          <TabsTrigger value="promos">
-            <BadgePercent /> Promos
-          </TabsTrigger>
+          {promosOn && (
+            <TabsTrigger value="promos">
+              <BadgePercent /> Promos
+            </TabsTrigger>
+          )}
         </TabsList>
         <TabsContent value="productos">
           <ProductsTab />

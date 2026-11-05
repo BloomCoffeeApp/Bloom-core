@@ -62,6 +62,8 @@ export interface StationRef {
   id: number
   name: string
   print_tickets: boolean
+  /** Its kitchen tickets go straight to a thermal printer (the backend prints them). */
+  direct_print?: boolean
 }
 
 export interface Board {
@@ -73,6 +75,8 @@ export interface Board {
   orders: Order[]
   calls: WaiterCall[]
   late_count: number
+  /** Kitchen tickets the thermal printer couldn't print: this screen prints them with the dialog. */
+  print_failures?: { order_id: number; error: string }[]
 }
 
 export interface TabLine {

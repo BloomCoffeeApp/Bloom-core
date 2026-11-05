@@ -4,13 +4,16 @@ version = "1.0.0"
 description = "Gestión integral para cafeterías: POS, stock, compras, clientes y asistente de barista."
 requires-python = ">=3.12"
 license = "MIT"
+# Plain uvicorn (not [standard]): the desktop app serves HTTP/1.1 to one local window, so h11 is
+# enough; httptools/websockets/PyYAML/python-dotenv only made the installer bigger.
 dependencies = [
-  "fastapi", "uvicorn[standard]", "sqlalchemy>=2.0", "alembic", "pydantic>=2", "argon2-cffi",
+  "fastapi", "uvicorn", "sqlalchemy>=2.0", "alembic", "pydantic>=2", "argon2-cffi", "cryptography",
   "openpyxl", "pillow", "pywebview", "qrcode[pil]", "tzdata",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest", "httpx", "pyinstaller"]
+# watchfiles: `uvicorn --reload` in scripts/dev.ps1.
+dev = ["pytest", "httpx", "pyinstaller", "watchfiles"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

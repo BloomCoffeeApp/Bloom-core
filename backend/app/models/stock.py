@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from sqlalchemy import Date, DateTime, Float, ForeignKey, String, Text
+from sqlalchemy import Date, DateTime, Float, ForeignKey, Index, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, IdMixin, TimestampMixin, utcnow
@@ -39,7 +39,14 @@ class StockLot(IdMixin, Base):
 
 class StockMovement(IdMixin, Base):
     __tablename__ = "stock_movements"
-    stock_item_id: Mapped[int] = mapped_column(ForeignKey("stock_items.id"), index=True)
+    # Migration 0007: an item's movements newest first; voiding a sale finds its movements by ref;
+    # consumption by type over the last N days (purchase suggestions).
+    __table_args__ = (
+        Index("ix_stock_movements_item_ts", "stock_item_id", "ts"),
+        Index("ix_stock_movements_ref", "ref_type", "ref_id"),
+        Index("ix_stock_movements_type_ts", "type", "ts"),
+    )
+    stock_item_id: Mapped[int] = mapped_column(ForeignKey("stock_items.id"))
     type: Mapped[str] = mapped_column(String(20))
     qty: Mapped[float] = mapped_column(Float)  # signed
     unit_cost_cents: Mapped[float] = mapped_column(Float, default=0)

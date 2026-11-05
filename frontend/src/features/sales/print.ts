@@ -2,6 +2,7 @@ import { toast } from 'sonner'
 
 import { fmtDateTime, fmtMoney, fmtNumber } from '@/lib/format'
 
+import { printDirect } from '../printing/direct'
 import { fetchTicket } from './api'
 import { CHANNEL_LABEL, type TicketData } from './types'
 
@@ -99,11 +100,18 @@ export function ticketHtml({ business, sale, payment_names }: TicketData) {
   `
 }
 
-export async function printTicket(saleId: number) {
+/** Ticket through the system print dialog (fallback of the thermal printer). */
+export async function printTicketDialog(saleId: number) {
   try {
     const data = await fetchTicket(saleId)
     printHtml(`Ticket ${data.sale.number}`, ticketHtml(data))
   } catch (e) {
     toast.error((e as Error).message)
   }
+}
+
+/** Ticket on the cashier's thermal printer (ESC/POS) or, without one / if it fails, the print dialog. */
+export async function printTicket(saleId: number, opts: { openDrawer?: boolean } = {}) {
+  if (await printDirect(`/printing/sales/${saleId}/ticket`, { open_drawer: !!opts.openDrawer })) return
+  await printTicketDialog(saleId)
 }

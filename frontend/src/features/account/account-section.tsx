@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 
 import { CardSkeleton, Field, SettingsCard } from '../settings/form'
 import { useAccount, useLinkConfirm, useLinkStart, useUnlink } from './api'
+import { DataRightsCard } from './data-rights-card'
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
 
@@ -17,17 +18,24 @@ export function AccountSection() {
   const account = useAccount()
   if (!account.data) return <CardSkeleton />
   const info = account.data
-  if (!info.server_configured) {
-    return (
-      <SettingsCard title="Cuenta" description="Vinculá esta computadora a tu cuenta de Bloom.">
-        <p className="text-sm text-muted-foreground" data-testid="account-unavailable">
-          Esta instalación no tiene servidor configurado, así que no hace falta una cuenta. Bloom funciona igual, sin
-          internet.
-        </p>
-      </SettingsCard>
-    )
-  }
-  return info.linked && info.account ? <LinkedCard email={info.account.email} business={info.account.business_name} /> : <LinkForm />
+  const main = !info.server_configured ? (
+    <SettingsCard title="Cuenta" description="Vinculá esta computadora a tu cuenta de Bloom.">
+      <p className="text-sm text-muted-foreground" data-testid="account-unavailable">
+        Esta instalación no tiene servidor configurado, así que no hace falta una cuenta. Bloom funciona igual, sin
+        internet.
+      </p>
+    </SettingsCard>
+  ) : info.linked && info.account ? (
+    <LinkedCard email={info.account.email} business={info.account.business_name} />
+  ) : (
+    <LinkForm />
+  )
+  return (
+    <div className="space-y-6">
+      {main}
+      <DataRightsCard serverConfigured={info.server_configured} />
+    </div>
+  )
 }
 
 function LinkedCard({ email, business }: { email: string | null; business: string | null }) {

@@ -75,6 +75,12 @@ class StationRef(BaseModel):
     id: int
     name: str
     print_tickets: bool
+    direct_print: bool = False  # its kitchen tickets go straight to a thermal printer (backend)
+
+
+class PrintFailure(BaseModel):
+    order_id: int
+    error: str
 
 
 class BoardOut(BaseModel):
@@ -85,6 +91,7 @@ class BoardOut(BaseModel):
     orders: list[OrderOut]
     calls: list[WaiterCallOut]
     late_count: int
+    print_failures: list[PrintFailure] = []
 
 
 class OrderStatusIn(BaseModel):

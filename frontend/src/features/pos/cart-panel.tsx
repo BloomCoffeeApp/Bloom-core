@@ -38,6 +38,15 @@ const CHANNELS: { id: Channel; label: string; icon: typeof Coffee }[] = [
   { id: 'delivery', label: 'Delivery', icon: Bike },
 ]
 
+export interface PosSections {
+  channels: Channel[]
+  tables: boolean
+  customers: boolean
+  loyalty: boolean
+}
+
+const ALL_SECTIONS: PosSections = { channels: ['salon', 'llevar', 'delivery'], tables: true, customers: true, loyalty: true }
+
 function LineDialog({
   line,
   canDiscount,
@@ -216,6 +225,7 @@ export function CartPanel({
   quote,
   pricing = false,
   customerExtras,
+  sections = ALL_SECTIONS,
 }: {
   cartApi: CartApi
   totals: CartTotals
@@ -231,6 +241,8 @@ export function CartPanel({
   pricing?: boolean
   /** Below the customer (Pro: stamp cards). */
   customerExtras?: ReactNode
+  /** What the business type shows (channels, tables, customers, loyalty). */
+  sections?: PosSections
 }) {
   const { cart } = cartApi
   const [editing, setEditing] = useState<CartLine | null>(null)
@@ -238,27 +250,30 @@ export function CartPanel({
   const [custOpen, setCustOpen] = useState(false)
   const canDiscount = !!config?.can_discount
   const loyalty = config?.loyalty
-  const ppr = loyalty?.enabled ? loyalty.points_per_reward : 0
+  const ppr = loyalty?.enabled && sections.loyalty ? loyalty.points_per_reward : 0
+  const channels = CHANNELS.filter((c) => sections.channels.includes(c.id))
   const maxRedeem = cart.customer && ppr > 0 ? Math.floor(cart.customer.points / ppr) * ppr : 0
 
   return (
     <div className="flex min-h-0 flex-col border-t bg-card md:border-t-0 md:border-l">
       {/* Channel + table */}
       <div className="space-y-3 border-b p-3">
-        <div className="grid grid-cols-3 gap-1 rounded-xl bg-muted p-1">
-          {CHANNELS.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => cartApi.setChannel(c.id)}
-              className={cn(
-                'flex h-11 items-center justify-center gap-1.5 rounded-lg text-sm font-medium transition-colors',
-                cart.channel === c.id ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
-              )}
-            >
-              <c.icon className="size-4" /> {c.label}
-            </button>
-          ))}
-        </div>
+        {channels.length > 1 && (
+          <div className={cn('grid gap-1 rounded-xl bg-muted p-1', channels.length === 3 ? 'grid-cols-3' : 'grid-cols-2')}>
+            {channels.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => cartApi.setChannel(c.id)}
+                className={cn(
+                  'flex h-11 items-center justify-center gap-1.5 rounded-lg text-sm font-medium transition-colors',
+                  cart.channel === c.id ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                <c.icon className="size-4" /> {c.label}
+              </button>
+            ))}
+          </div>
+        )}
         {cart.tab ? (
           <div className="flex items-center gap-2 rounded-xl border border-info/40 bg-info/10 px-3 py-2 text-sm" data-testid="pos-tab-banner">
             <LayoutGrid className="size-4 shrink-0 text-info" />
@@ -271,6 +286,7 @@ export function CartPanel({
           </div>
         ) : (
           openTabs > 0 &&
+          sections.tables &&
           onOpenTabs && (
             <Button variant="outline" className="h-11 w-full justify-start border-info/40" onClick={onOpenTabs}>
               <LayoutGrid className="text-info" /> Mesas abiertas
@@ -279,7 +295,7 @@ export function CartPanel({
           )
         )}
         <div className="flex gap-2">
-          {cart.channel === 'salon' && (
+          {cart.channel === 'salon' && sections.tables && (
             <Input
               value={cart.table_label}
               onChange={(e) => cartApi.setTable(e.target.value.slice(0, 20))}
@@ -302,13 +318,13 @@ export function CartPanel({
                 <X className="size-4" />
               </button>
             </div>
-          ) : (
+          ) : sections.customers ? (
             <Button variant="outline" className="h-11 flex-1 justify-start" onClick={() => setCustOpen(true)}>
               <UserRound /> Cliente (opcional)
             </Button>
-          )}
+          ) : null}
         </div>
-        {cart.customer && customerExtras}
+        {cart.customer && sections.loyalty && customerExtras}
         {cart.customer && maxRedeem > 0 && loyalty && (
           <div className="flex items-center gap-2 rounded-xl bg-warning/15 px-3 py-2 text-sm">
             <Gift className="size-4 shrink-0" />

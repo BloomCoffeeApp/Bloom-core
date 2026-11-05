@@ -11,7 +11,7 @@ from app.licensing import has_feature
 from app.licensing.features import PRO_LABEL
 from app.models import User
 from app.schemas.users import UserCreate, UserOut, UserUpdate
-from app.services import audit, free_plan
+from app.services import audit, business_profile, free_plan
 from app.services import settings as settings_svc
 
 router = APIRouter(prefix="/api", tags=["users"])
@@ -80,7 +80,7 @@ def get_settings(db: Session = Depends(get_db), _: User = CurrentUser) -> dict[s
 def put_setting(
     key: str, value: Any = Body(...), db: Session = Depends(get_db), me: User = AdminOnly
 ) -> dict[str, Any]:
-    if key not in settings_svc.DEFAULTS or key == free_plan.SETTING:
+    if key not in settings_svc.DEFAULTS or key in (free_plan.SETTING, business_profile.SETTING):
         raise HTTPException(404, "Configuración inexistente")
     if key == "network" and isinstance(value, dict) and value.get("lan_enabled") and not has_feature("lan"):
         raise HTTPException(402, f"El modo red local es parte de {PRO_LABEL}.")

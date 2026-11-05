@@ -5,7 +5,7 @@ App de gestión para cafetería (POS, caja, stock, compras, clientes, alertas, r
 
 ## Stack
 - Backend: Python 3.13, FastAPI, SQLAlchemy 2.0, Alembic, Pydantic v2, SQLite (WAL). Carpeta `backend/`.
-- Frontend: React 19 + TS + Vite, Tailwind v4, shadcn/ui, TanStack Query/Table, React Router 7, RHF + Zod, Recharts. Carpeta `frontend/`.
+- Frontend: React 19 + TS + Vite, Tailwind v4, shadcn/ui, TanStack Query/Table, React Router 7, Recharts. Carpeta `frontend/`.
 - Escritorio: `launcher.py` levanta Uvicorn en un hilo y abre pywebview. Empaquetado con PyInstaller (onedir) + Inno Setup.
 
 ## Comandos
@@ -49,7 +49,7 @@ App de gestión para cafetería (POS, caja, stock, compras, clientes, alertas, r
 - Tests de pytest para cada regla de la sección 6 de `PLAN.md` y para cada regla de dial-in del barista.
 
 ## Al terminar una fase
-1. Tests verdes (pytest + vitest; Playwright si la fase lo pide).
+1. Tests verdes (pytest; Playwright si la fase lo pide).
 2. Levantar la app y verificar el criterio “Listo cuando” de la fase, sin errores en consola.
 3. Tildar checkboxes en `PLAN.md`, anotar decisiones nuevas en su sección 9.
 4. Commit.

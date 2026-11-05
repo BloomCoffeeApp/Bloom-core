@@ -21,6 +21,11 @@ npm run build
 if ($LASTEXITCODE -ne 0) { throw "Falló el build del frontend" }
 Pop-Location
 
+# Avisos de licencias de terceros (lo que realmente se distribuye: bundle de Vite + dependencias de
+# runtime de Python). Se incluyen en el .exe y se ven en Configuración → Acerca de.
+& $py "$root\build\third_party_notices.py" --out "$root\build\generated"
+if ($LASTEXITCODE -ne 0) { throw "No se pudieron generar los avisos de terceros" }
+
 Write-Host "2/4 Generando ícono..." -ForegroundColor Cyan
 & $py "$root\build\make_icon.py"
 

@@ -473,11 +473,15 @@ def void_sale(db: Session, sale_id: int, reason: str, user: User) -> Sale:
                     db.add(CustomerAccountMovement(customer_id=customer.id, amount_cents=-cc, type="void", method=CC, sale_id=sale.id, user_id=user.id))
 
         sale_hooks.after_void(db, sale, user)  # e.g. remove loyalty stamps (Pro)
+        reopened = orders.reopen_tab(db, sale, user)  # a table's charged tab gets its bill back
         sale.status = "voided"
         sale.void_reason = reason.strip()
         sale.voided_by = user.id
         sale.voided_at = utcnow()
-        audit.log(db, user.id, "void", "sale", sale.id, {"number": sale.number, "reason": reason})
+        details: dict[str, Any] = {"number": sale.number, "reason": reason}
+        if reopened:
+            details["reopened_tab_id"] = reopened["tab_id"]
+        audit.log(db, user.id, "void", "sale", sale.id, details)
         db.commit()
     except Exception:
         db.rollback()
@@ -539,6 +543,9 @@ def get_detail(db: Session, sale_id: int) -> dict[str, Any]:
     out["items"] = sale.items
     out["payments"] = sale.payments
     out["change_cents"] = sum(p.change_cents for p in sale.payments)
+    # Charged a table's tab: voiding it reopens that table's bill (the void dialog warns about it).
+    tab = orders.tab_of_sale(db, sale.id) if sale.status == "completed" else None
+    out["table_tab"] = {"id": tab.id, "table_label": orders.tab_label(db, tab)} if tab else None
     out["customer"] = (
         {"id": customer.id, "name": customer.name, "phone": customer.phone, "points": customer.points, "balance_cents": customer.balance_cents}
         if customer

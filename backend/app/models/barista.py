@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from typing import Any
 
-from sqlalchemy import JSON, Date, DateTime, Float, ForeignKey, String, Text
+from sqlalchemy import JSON, Date, DateTime, Float, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, IdMixin, TimestampMixin, utcnow
@@ -128,3 +128,21 @@ class DrinkGuide(IdMixin, TimestampMixin, Base):
     hot: Mapped[bool] = mapped_column(default=True)
     product_id: Mapped[int | None] = mapped_column(ForeignKey("products.id", ondelete="SET NULL"), unique=True)
     active: Mapped[bool] = mapped_column(default=True)
+    # Extras shown in the "Info" tab: ["tip", ...], [{"name": "...", "detail": "..."}], ["Molino", ...]
+    tips: Mapped[list[str]] = mapped_column(JSON, default=list)
+    variations: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
+    equipment: Mapped[list[str]] = mapped_column(JSON, default=list)
+    origin: Mapped[str | None] = mapped_column(String(80))
+    caffeine: Mapped[str | None] = mapped_column(String(10))  # sin | bajo | medio | alto
+    # Starred by the owner: shown in the "Destacadas" carousel next to the featured classics.
+    featured: Mapped[bool] = mapped_column(default=False)
+
+
+class DrinkGuideFavorite(IdMixin, Base):
+    """A user's favorite guide: ``ref`` is ``classic:<key>`` or ``guide:<id>``."""
+
+    __tablename__ = "drink_guide_favorites"
+    __table_args__ = (UniqueConstraint("user_id", "ref"),)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    ref: Mapped[str] = mapped_column(String(80))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)

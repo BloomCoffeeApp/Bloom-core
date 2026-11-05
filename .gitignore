@@ -36,6 +36,7 @@ uploads/
 build/output/
 build/dist/
 build/work/
+build/generated/
 dist/
 *.spec.bak
 installer/

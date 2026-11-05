@@ -30,6 +30,8 @@ DEFAULTS: dict[str, Any] = {
     },
     # Free plan "Elegí tus activos" (services/free_plan.py); only changed through /api/free-plan.
     "free_actives": {},
+    # Business type and module on/off overrides (services/business_profile.py); only via /api/business.
+    "business_profile": {"profile": "salon", "modules": {}},
     "setup_done": False,
 }
 

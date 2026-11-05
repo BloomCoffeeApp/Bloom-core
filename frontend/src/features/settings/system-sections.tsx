@@ -37,6 +37,7 @@ import {
 } from './api'
 import { Field, NumberInput, SettingsCard, SwitchRow } from './form'
 import { LanHelp } from './lan-help'
+import { ThirdPartyLicenses } from './third-party-licenses'
 import type { BackupRow, BackupSettings, PaymentMethod, RestoreResult } from './types'
 import { Logo } from '@/components/logo'
 import { useHasFeature } from '@/features/license/api'
@@ -367,6 +368,7 @@ export function AboutSection({ isAdmin }: { isAdmin: boolean }) {
           </div>
         </div>
       </div>
+      <ThirdPartyLicenses />
       <p className="text-center text-xs text-muted-foreground">
         Hecho con FastAPI, SQLite, React, Tailwind, shadcn/ui y Recharts.
       </p>

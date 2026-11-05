@@ -7,7 +7,7 @@ from app.db import get_db
 from app.models import User, UserSession
 from app.schemas.common import Ok
 from app.schemas.users import LoginIn, LoginOut, SetupIn, UserPublic
-from app.services import audit, free_plan, settings
+from app.services import audit, business_profile, free_plan, settings
 
 router = APIRouter(prefix="/api", tags=["auth"])
 
@@ -27,6 +27,11 @@ def setup(data: SetupIn, db: Session = Depends(get_db)) -> LoginOut:
     biz = settings.get(db, "business")
     settings.put(db, "business", {**biz, "name": data.business_name})
     settings.put(db, "setup_done", True)
+    if data.profile is not None:
+        try:
+            business_profile.save(db, data.profile, data.modules)
+        except business_profile.ProfileError as e:
+            raise HTTPException(422, str(e)) from e
     db.flush()
     from app.seed import seed_base, seed_demo
 

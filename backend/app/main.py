@@ -11,11 +11,13 @@ from app.routers import (
     account,
     alerts,
     auth,
+    business,
     catalog,
     customers,
     dashboard,
     license,
     orders,
+    printing,
     remote_config,
     sales,
     stock,
@@ -31,7 +33,8 @@ except ImportError:
 
 ROUTER_MODULES = (
     account,
-    auth, license, remote_config, users, dashboard, catalog, stock, sales, orders, customers, alerts, system, updates,
+    auth, license, remote_config, users, business, dashboard, catalog, stock, sales, orders, customers, alerts, system, updates,
+    printing,
 )
 EDITION = "pro" if bloom_pro else "free"
 

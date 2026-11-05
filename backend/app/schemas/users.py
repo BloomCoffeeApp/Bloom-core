@@ -51,3 +51,6 @@ class SetupIn(BaseModel):
     admin_name: str = Field(min_length=1)
     admin_pin: str = Field(pattern=r"^\d{4,6}$")
     load_demo: bool = True
+    # Business type chosen in the setup wizard (services/business_profile.py) and its module overrides.
+    profile: str | None = None
+    modules: dict[str, bool] = {}

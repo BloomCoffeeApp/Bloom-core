@@ -92,6 +92,8 @@ export interface SaleDetail extends Sale {
   payments: SalePayment[]
   customer: { id: number; name: string; phone: string | null; points: number; balance_cents: number } | null
   change_cents: number
+  /** Set while the sale is completed and charged a table's tab: voiding it reopens that tab. */
+  table_tab?: { id: number; table_label: string | null } | null
 }
 
 export interface SaleList {

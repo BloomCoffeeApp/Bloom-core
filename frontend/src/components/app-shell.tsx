@@ -37,6 +37,7 @@ import {
 } from '@/components/ui/sidebar'
 import { useSidebar } from '@/components/ui/sidebar-context'
 import { AVATAR_COLORS, initials } from '@/components/avatar-utils'
+import { useModules } from '@/features/business/api'
 import { hasFeature, useLicense } from '@/features/license/api'
 import { LICENSE_TAB, LicenseBanner, ProBadge, TrialEndedDialog } from '@/features/license/pro-gate'
 import { describePlan } from '@/features/license/describe-plan'
@@ -80,6 +81,7 @@ export function AppShell() {
   const marginDrag = useTitleBarDrag({ selfOnly: true })
   const location = useLocation()
   const navigate = useNavigate()
+  const modules = useModules()
   useIdleLock()
 
   const { data: alertSummary } = useQuery({
@@ -105,7 +107,7 @@ export function AppShell() {
   }, [can, navigate])
 
   if (!user) return null
-  const items = NAV.filter((n) => n.roles.length === 0 || can(...n.roles))
+  const items = NAV.filter((n) => (n.roles.length === 0 || can(...n.roles)) && (!n.module || modules.on(n.module)))
   const groups = Object.entries(NAV_GROUPS)
     .map(([key, label]) => ({ key, label, items: items.filter((i) => i.group === key) }))
     .filter((g) => g.items.length)

@@ -11,6 +11,7 @@ import {
   Mail,
   type LucideIcon,
   Palette,
+  Printer,
   QrCode,
   ShieldCheck,
   Sparkles,
@@ -38,12 +39,18 @@ import { proModules } from '@pro'
 import { AboutSection, BackupSection, NetworkSection, PaymentMethodsSection } from './system-sections'
 import { UsersSection } from './users-section'
 import { OrdersSettingsSection } from '../orders/settings-section'
+import { PrintersSection } from '../printing/settings-section'
+import { useModules } from '../business/api'
+import { BusinessProfileSection } from '../business/profile-section'
+import type { ModuleKey } from '../business/types'
 
 interface TabDef {
   value: string
   label: string
   icon: LucideIcon
   render: () => ReactNode
+  /** Hidden when the business type doesn't use this module. */
+  module?: ModuleKey
 }
 
 function SettingsPage() {
@@ -57,12 +64,18 @@ function SettingsPage() {
   const menuPro = useHasFeature('public_menu')
   const ordersPro = useHasFeature('orders_pro')
   const stampsPro = useHasFeature('loyalty_pro')
+  const modules = useModules()
 
   const withSettings = (fn: () => ReactNode) => () => (s ? fn() : <CardSkeleton />)
 
   const adminTabs: TabDef[] = isAdmin
     ? [
-        { value: 'negocio', label: 'Negocio', icon: Building2, render: withSettings(() => <BusinessSection initial={s!.business} />) },
+        { value: 'negocio', label: 'Negocio', icon: Building2, render: withSettings(() => (
+          <div className="space-y-6">
+            <BusinessSection initial={s!.business} />
+            <BusinessProfileSection />
+          </div>
+        )) },
         { value: 'licencia', label: 'Licencia', icon: Sparkles, render: () => <LicenseSection /> },
         { value: 'activos', label: 'Elegí tus activos', icon: Lock, render: () => <FreeActivesSection /> },
         { value: 'cuenta', label: 'Cuenta', icon: UserRound, render: () => <AccountSection /> },
@@ -71,7 +84,7 @@ function SettingsPage() {
         ...(payments.isSuccess
           ? [{ value: 'pagos', label: 'Medios de pago', icon: CreditCard, render: () => <PaymentMethodsSection query={payments} /> }]
           : []),
-        { value: 'fidelizacion', label: 'Fidelización', icon: Gift, render: withSettings(() => (
+        { value: 'fidelizacion', label: 'Fidelización', icon: Gift, module: 'loyalty', render: withSettings(() => (
           <div className="space-y-6">
             <LoyaltySection initial={s!.loyalty} />
             {!proModules.LoyaltyStampsSettings ? (
@@ -91,10 +104,11 @@ function SettingsPage() {
         { value: 'red', label: 'Red local', icon: Wifi, render: withSettings(() =>
           lanPro === false ? <UpgradeCard feature="lan" compact /> : <NetworkSection initialEnabled={!!s!.network?.lan_enabled} />,
         ) },
-        { value: 'pedidos', label: 'Pedidos', icon: ClipboardList, render: () => (
+        { value: 'impresoras', label: 'Impresoras', icon: Printer, render: () => <PrintersSection /> },
+        { value: 'pedidos', label: 'Pedidos', icon: ClipboardList, module: 'orders', render: () => (
           <div className="space-y-6">
             <OrdersSettingsSection />
-            {!proModules.OrdersStationsSettings ? (
+            {!modules.on('stations') ? null : !proModules.OrdersStationsSettings ? (
               <UpgradeCard feature="orders_pro" compact notIncluded />
             ) : ordersPro === false ? (
               <UpgradeCard feature="orders_pro" compact />
@@ -105,7 +119,7 @@ function SettingsPage() {
             )}
           </div>
         ) },
-        { value: 'mesas', label: 'Mesas y pedidos QR', icon: LayoutGrid, render: () =>
+        { value: 'mesas', label: 'Mesas y pedidos QR', icon: LayoutGrid, module: 'tables', render: () =>
           !proModules.TablesSettings ? (
             <UpgradeCard feature="public_menu" compact notIncluded />
           ) : menuPro === false ? (
@@ -116,7 +130,7 @@ function SettingsPage() {
             </Suspense>
           ),
         },
-        { value: 'menu-clientes', label: 'Menú para clientes', icon: QrCode, render: withSettings(() =>
+        { value: 'menu-clientes', label: 'Menú para clientes', icon: QrCode, module: 'public_menu', render: withSettings(() =>
           !proModules.PublicMenuSettings ? (
             <UpgradeCard feature="public_menu" compact notIncluded />
           ) : menuPro === false ? (
@@ -133,7 +147,7 @@ function SettingsPage() {
     ...adminTabs,
     { value: 'apariencia', label: 'Apariencia', icon: Palette, render: () => <AppearanceSection /> },
     { value: 'acerca', label: 'Acerca de', icon: Info, render: () => <AboutSection isAdmin={isAdmin} /> },
-  ]
+  ].filter((t: TabDef) => !t.module || modules.on(t.module))
   const requested = params.get('tab')
   const current = tabs.some((t) => t.value === requested) ? requested! : tabs[0].value
 

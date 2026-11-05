@@ -1,6 +1,7 @@
 import { BellRing, ClipboardList, Expand, Minimize, MonitorPlay, Receipt, Volume2 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Route, Routes } from 'react-router'
+import { toast } from 'sonner'
 
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { Button } from '@/components/ui/button'
@@ -94,6 +95,7 @@ function OrdersPage() {
   const seen = useRef<Set<number> | null>(null)
   const seenCalls = useRef<Set<number>>(new Set())
   const printed = useRef<Set<number>>(new Set())
+  const fallbackPrinted = useRef<Set<number>>(new Set())
   const lateAlerted = useRef<Set<number>>(new Set())
   const prefsRef = useRef(prefs)
   useEffect(() => {
@@ -108,6 +110,7 @@ function OrdersPage() {
       seen.current = new Set(data.orders.map((o) => o.id))
       seenCalls.current = new Set(data.calls.map((c) => c.id))
       printed.current = new Set(data.orders.map((o) => o.id))
+      for (const f of data.print_failures ?? []) fallbackPrinted.current.add(f.order_id)
       for (const o of data.orders) if (o.late) lateAlerted.current.add(o.id)
       return
     }
@@ -131,10 +134,20 @@ function OrdersPage() {
     }
     // Pro: the station's screen prints a kitchen ticket for each order that reaches it.
     const st = data.pro ? data.stations.find((s) => s.id === effectiveStation) : undefined
+    // With a thermal printer assigned (Configuración → Impresoras) the backend prints it instead,
+    // and this screen only prints the ones the printer couldn't (fallback with the print dialog).
     for (const o of data.orders) {
       if (printed.current.has(o.id) || o.status === 'pending') continue
       printed.current.add(o.id)
-      if (st?.print_tickets && o.station_id === st.id) printKitchenTicket(o, st.name)
+      if (st?.print_tickets && !st.direct_print && o.station_id === st.id) printKitchenTicket(o, st.name)
+    }
+    for (const f of st ? (data.print_failures ?? []) : []) {
+      if (fallbackPrinted.current.has(f.order_id)) continue
+      fallbackPrinted.current.add(f.order_id)
+      const o = data.orders.find((x) => x.id === f.order_id)
+      if (!o || o.station_id !== st!.id) continue
+      toast.error(`No se pudo imprimir la comanda #${o.number}: ${f.error}. Se abrió el diálogo de impresión.`, { duration: 8000 })
+      printKitchenTicket(o, st!.name)
     }
   }, [data, effectiveStation])
 

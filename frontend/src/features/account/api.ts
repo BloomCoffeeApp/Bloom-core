@@ -4,7 +4,7 @@ import { toast } from 'sonner'
 import { api } from '@/lib/api'
 
 import { licenseKey } from '../license/api'
-import type { AccountInfo, EmailPreferences, LinkConfirmResult } from './types'
+import type { AccountInfo, DeleteConfirmResult, DeleteStartResult, EmailPreferences, LinkConfirmResult } from './types'
 
 export const accountKey = ['account'] as const
 export const emailPrefsKey = ['account', 'preferences'] as const
@@ -71,5 +71,42 @@ export function useSaveEmailPreferences() {
       toast.success('Preferencias de mails guardadas.')
     },
     onError: (e: Error) => toast.error(e.message),
+  })
+}
+
+/** Ley 25.326 — what the license server keeps about the account, downloaded as JSON. */
+export function useExportAccountData() {
+  return useMutation({
+    mutationFn: () => api.post<unknown>('/account/data/export'),
+    onSuccess: (data) => {
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(blob)
+      a.download = `bloom-mis-datos-${new Date().toISOString().slice(0, 10)}.json`
+      a.click()
+      URL.revokeObjectURL(a.href)
+      toast.success('Descargaste los datos de tu cuenta.')
+    },
+    onError: (e: Error) => toast.error(e.message),
+  })
+}
+
+export function useDeleteAccountStart() {
+  return useMutation({
+    mutationFn: () => api.post<DeleteStartResult>('/account/delete/start'),
+    onError: (e: Error) => toast.error(e.message),
+  })
+}
+
+export function useDeleteAccountConfirm() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (code: string) => api.post<DeleteConfirmResult>('/account/delete/confirm', { code }),
+    onSuccess: (r) => {
+      qc.setQueryData(accountKey, { linked: r.linked, account: r.account, server_configured: r.server_configured })
+      void qc.invalidateQueries({ queryKey: emailPrefsKey })
+      void qc.invalidateQueries({ queryKey: licenseKey })
+      toast.success('Eliminamos tu cuenta de nuestros servidores.')
+    },
   })
 }

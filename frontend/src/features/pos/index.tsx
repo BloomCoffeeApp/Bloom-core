@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { fmtMoney } from '@/lib/format'
+import { useModules } from '@/features/business/api'
 import { useHasFeature } from '@/features/license/api'
 import type { StampReward } from '@/pro-modules'
 import { proModules } from '@pro'
@@ -13,12 +14,14 @@ import { proModules } from '@pro'
 import { useCurrentCash } from '../cash/api'
 import { OpenCashDialog } from '../cash/dialogs'
 import { useCreateSale, usePaymentMethods } from '../sales/api'
-import { printTicket } from '../sales/print'
-import type { SaleDetail } from '../sales/types'
+import { afterSale } from '../printing/direct'
+import { usePrintingStatus } from '../printing/api'
+import { printTicket, printTicketDialog } from '../sales/print'
+import type { Channel, SaleDetail } from '../sales/types'
 import { useOpenTabs } from '../orders/api'
 import { usePosCatalog, usePosConfig, usePosQuote } from './api'
 import { TabsDialog } from './tabs-dialog'
-import { CartPanel } from './cart-panel'
+import { CartPanel, type PosSections } from './cart-panel'
 import { CheckoutDialog, type CheckoutConfirm } from './checkout-dialog'
 import { ModifierDialog } from './modifier-dialog'
 import { ProductGrid } from './product-grid'
@@ -26,6 +29,8 @@ import type { PosProduct } from './types'
 import { computeTotals, useCart } from './use-cart'
 
 function SuccessDialog({ sale, onNew }: { sale: SaleDetail | null; onNew: () => void }) {
+  // Ticket mode (Configuración → Impresoras): "nunca" doesn't offer the ticket here (reprint from Ventas).
+  const offerTicket = usePrintingStatus().data?.ticket_mode !== 'never'
   return (
     <Dialog open={sale != null} onOpenChange={(o) => !o && onNew()}>
       <DialogContent className="sm:max-w-md" showCloseButton={false}>
@@ -52,10 +57,12 @@ function SuccessDialog({ sale, onNew }: { sale: SaleDetail | null; onNew: () => 
                 {sale.customer.name} sumó {sale.points_earned} puntos (total {sale.customer.points}).
               </p>
             )}
-            <div className="grid w-full grid-cols-2 gap-2">
-              <Button variant="outline" className="h-14 text-base" onClick={() => printTicket(sale.id)}>
-                <Printer /> Imprimir ticket
-              </Button>
+            <div className={offerTicket ? 'grid w-full grid-cols-2 gap-2' : 'grid w-full gap-2'}>
+              {offerTicket && (
+                <Button variant="outline" className="h-14 text-base" onClick={() => printTicket(sale.id)}>
+                  <Printer /> Imprimir ticket
+                </Button>
+              )}
               <Button className="h-14 text-base" onClick={onNew} autoFocus>
                 <Plus /> Nueva venta
               </Button>
@@ -82,6 +89,21 @@ function PosPage() {
   const [openCash, setOpenCash] = useState(false)
   const [tabsOpen, setTabsOpen] = useState(false)
   const tabs = useOpenTabs()
+
+  // Business type: only the channels/sections this kind of business uses.
+  const modules = useModules()
+  const sections = useMemo<PosSections>(() => {
+    const channels = (
+      [['dine_in', 'salon'], ['takeaway', 'llevar'], ['delivery', 'delivery']] as const
+    ).flatMap(([m, c]): Channel[] => (modules.on(m) ? [c] : []))
+    return { channels, tables: modules.on('tables'), customers: modules.on('customers'), loyalty: modules.on('loyalty') }
+  }, [modules])
+  const { setChannel } = cartApi
+  const channel = cartApi.cart.channel
+  const onTab = !!cartApi.cart.tab
+  useEffect(() => {
+    if (!onTab && sections.channels.length && !sections.channels.includes(channel)) setChannel(sections.channels[0])
+  }, [channel, onTab, sections.channels, setChannel])
 
   // Automatic promotions (Pro): the backend prices the cart; checkout waits for a fresh quote.
   const promosOn = useHasFeature('promos') === true && proModules.edition === 'pro'
@@ -186,6 +208,8 @@ function PosPage() {
           setCheckout(false)
           cartApi.clear()
           setDone(sale)
+          // Thermal printer: automatic ticket and/or cash drawer (falls back to the print dialog).
+          void afterSale(sale, () => printTicketDialog(sale.id))
         },
         onError: (e) => toast.error(e.message),
       },
@@ -212,6 +236,7 @@ function PosPage() {
           onOpenTabs={() => setTabsOpen(true)}
           quote={quoteLines}
           pricing={pricing}
+          sections={sections}
           customerExtras={
             stampsOn && cartApi.cart.customer && proModules.PosStampCards ? (
               <Suspense fallback={null}>

@@ -121,6 +121,8 @@ export interface Plan {
   frequency: number
   frequency_type: 'months' | 'days'
   devices: number
+  /** Business types (profiles) this plan is recommended for; older servers don't send it. */
+  profiles?: string[]
 }
 
 export interface PlansInfo {

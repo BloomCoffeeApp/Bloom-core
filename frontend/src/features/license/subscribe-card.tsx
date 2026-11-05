@@ -29,6 +29,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { fmtDate, fmtMoney } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
+import { useBusinessModules } from '../business/api'
 import { SettingsCard } from '../settings/form'
 import {
   type Plan,
@@ -54,13 +55,18 @@ export type CheckoutRef = { id: string; url: string | null }
 
 export function SubscribeCard({ proLabel, onStarted }: { proLabel: string; onStarted: (c: CheckoutRef) => void }) {
   const plans = usePlans(true)
+  const business = useBusinessModules()
   const start = useStartCheckout()
   const [plan, setPlan] = useState<string | null>(null)
   const [email, setEmail] = useState('')
 
   if (plans.isLoading) return <Skeleton className="h-48 rounded-2xl" />
   if (!plans.data?.enabled) return null
-  const entries = Object.entries(plans.data.plans)
+  // Plans recommended for this business type go first (stable: the server's order otherwise).
+  const profile = business.data?.profile
+  const fits = (p: Plan) => !!profile && !!p.profiles?.includes(profile)
+  const entries = Object.entries(plans.data.plans).sort(([, a], [, b]) => Number(fits(b)) - Number(fits(a)))
+  const profileLabel = business.data?.profiles.find((x) => x.key === profile)?.label
   const selected = plan ?? entries[0]?.[0] ?? null
   const chosen = selected ? plans.data.plans[selected] : null
 
@@ -95,6 +101,11 @@ export function SubscribeCard({ proLabel, onStarted }: { proLabel: string; onSta
               selected === key ? 'border-primary bg-primary/5 ring-2 ring-primary/30' : 'hover:bg-muted/50',
             )}
           >
+            {fits(p) && (
+              <span className="rounded-full bg-primary px-2 py-0.5 text-[11px] font-medium text-primary-foreground" data-testid="plan-recommended">
+                Recomendado{profileLabel ? ` para ${profileLabel.toLowerCase()}` : ''}
+              </span>
+            )}
             <span className="font-medium">{p.label}</span>
             <span className="font-heading text-2xl font-semibold tabular">{fmtMoney(p.amount_cents, { short: true })}</span>
             <span className="text-xs text-muted-foreground">{period(p)}</span>

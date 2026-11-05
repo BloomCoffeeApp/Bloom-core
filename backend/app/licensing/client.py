@@ -300,7 +300,7 @@ def unlink_account() -> None:
     write_state(account=None)
 
 
-def _account_auth() -> dict:
+def _account_auth(missing: str = "Vinculá esta computadora a tu cuenta para elegir qué mails recibís.") -> dict:
     """The account token if linked, else the license token (a paid license also identifies the customer)."""
     acc = read_state().get("account") or {}
     if acc.get("token"):
@@ -308,7 +308,28 @@ def _account_auth() -> dict:
     try:
         return _token_body()
     except LicenseServerError as e:
-        raise LicenseServerError("Vinculá esta computadora a tu cuenta para elegir qué mails recibís.") from e
+        raise LicenseServerError(missing) from e
+
+
+# Data rights (Ley 25.326) over what the license server keeps about the account. The business data in
+# this computer never goes there: it's exported with the backup and deleted by uninstalling.
+_NO_ACCOUNT = "Esta computadora no está vinculada a una cuenta ni tiene una licencia paga: no hay datos tuyos en el servidor."
+
+
+def export_account_data() -> dict:
+    return _post("/v1/account/data/export", _account_auth(_NO_ACCOUNT))
+
+
+def delete_account_start() -> dict:
+    return _post("/v1/account/data/delete/start", _account_auth(_NO_ACCOUNT))
+
+
+def delete_account_confirm(code: str) -> dict:
+    """After the server erased the account, the link is forgotten here (its token no longer works)."""
+    resp = _post("/v1/account/data/delete/confirm", {**_account_auth(_NO_ACCOUNT), "code": code.strip()})
+    if resp.get("deleted"):
+        write_state(account=None)
+    return resp
 
 
 def email_preferences() -> dict:

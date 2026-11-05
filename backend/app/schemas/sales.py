@@ -246,11 +246,18 @@ class SaleOut(BaseModel):
     items_count: float
 
 
+class SaleTableTab(BaseModel):
+    id: int
+    table_label: str | None
+
+
 class SaleDetail(SaleOut):
     items: list[SaleItemOut]
     payments: list[SalePaymentOut]
     customer: CustomerMini | None
     change_cents: int
+    # Set while the sale is completed and charged a table's tab (voiding it reopens that tab).
+    table_tab: SaleTableTab | None = None
 
 
 class SaleListOut(BaseModel):
