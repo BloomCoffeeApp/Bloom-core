@@ -39,7 +39,9 @@ def daily_backup_if_needed(keep: int = 30) -> Path | None:
     return path
 
 
-def backup_before_migration() -> None:
+def backup_before_migration() -> Path | None:
     if DB_PATH.exists() and DB_PATH.stat().st_size > 0:
-        create_backup("pre-migracion")
+        path = create_backup("pre-migracion")
         prune(40)
+        return path
+    return None

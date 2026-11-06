@@ -70,7 +70,11 @@ def db_clock_evidence() -> float:
         import sqlite3
         from datetime import UTC, datetime
 
-        with sqlite3.connect(f"file:{Path(DB_PATH).as_posix()}?mode=ro", uri=True, timeout=1) as con:
+        from contextlib import closing
+
+        # closing(): "with sqlite3.connect()" only commits; a connection left open during a migration
+        # or backup is asking for trouble.
+        with closing(sqlite3.connect(f"file:{Path(DB_PATH).as_posix()}?mode=ro", uri=True, timeout=1)) as con:
             for table in ("audit_log", "sales"):
                 try:
                     (value,) = con.execute(f"SELECT max(ts) FROM {table}").fetchone()  # noqa: S608 (fixed names)

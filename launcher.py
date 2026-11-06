@@ -13,6 +13,7 @@ import sys
 import threading
 import time
 import urllib.request
+from contextlib import closing
 from pathlib import Path
 
 ROOT = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
@@ -34,7 +35,8 @@ def lan_enabled() -> bool:
     if not DB_PATH.exists():
         return False
     try:
-        with sqlite3.connect(DB_PATH) as con:
+        # closing(): "with sqlite3.connect()" only commits, it doesn't close the connection.
+        with closing(sqlite3.connect(DB_PATH)) as con:
             row = con.execute("SELECT value FROM settings WHERE key='network'").fetchone()
         enabled = bool(row and json.loads(row[0]).get("lan_enabled"))
     except Exception:
