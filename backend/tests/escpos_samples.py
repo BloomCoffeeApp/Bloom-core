@@ -44,6 +44,17 @@ def ticket(**kw):
     return {"business": BUSINESS, "sale": sale(**kw), "payment_names": {"efectivo": "Efectivo", "mercadopago": "Mercado Pago"}}
 
 
+def delivery_ticket():
+    """Delivery sale: 2 medialunas + $ 500,00 de envío (el total ya lo incluye)."""
+    return ticket(
+        channel="delivery", table_label=None, delivery_fee_cents=50000, subtotal_cents=180000, discount_cents=0,
+        points_discount_cents=0, total_cents=230000, points_earned=0, points_redeemed=0, customer=None,
+        items=[_item("Medialuna de manteca", 2, 90000, 180000)],
+        payments=[{"id": 1, "method": "mercadopago", "amount_cents": 230000, "tendered_cents": None, "change_cents": 0}],
+        change_cents=0,
+    )
+
+
 def courtesy_ticket():
     return ticket(
         is_courtesy=True, courtesy_cents=270000, courtesy_reason="Cumpleaños del dueño", subtotal_cents=0, discount_cents=0,

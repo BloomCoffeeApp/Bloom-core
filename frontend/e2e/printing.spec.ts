@@ -3,7 +3,7 @@ import net from 'node:net'
 import type { Page } from '@playwright/test'
 
 import { expect, test } from './fixtures'
-import { authHeaders, cartLine, confirmCheckout, openCheckout, openPos, productTile, ticketNumber } from './helpers'
+import { authHeaders, cartLine, confirmCheckout, ensureCashOpenApi, openCheckout, openPos, productTile, ticketNumber } from './helpers'
 
 /**
  * Direct thermal printing (ESC/POS): the settings screen with a network printer that is really a
@@ -99,6 +99,41 @@ test.describe('Impresión directa (ESC/POS)', () => {
       expect(printer.text()).toContain('Medialuna')
       expect(await printDialogs(page)).toBe(0)
       expect(errors.consoleErrors).toEqual([])
+    } finally {
+      await resetPrinting(page)
+      await printer.close()
+    }
+  })
+
+  test('delivery sale: the thermal ticket prints the shipping line', async ({ page, request }) => {
+    const printer = await fakePrinter()
+    await page.goto('/config?tab=impresoras')
+    const headers = await authHeaders(page)
+    try {
+      const put = await request.put('/api/printing/config', {
+        headers,
+        data: {
+          printers: [{ name: 'Caja', kind: 'network', target: '127.0.0.1', port: printer.port, paper_mm: 80, chars: 48, codepage: 'cp858', cut: 'partial', feed_lines: 4 }],
+          cashier_printer: null, ticket_mode: 'ask', cash_drawer: false, drawer_pin: 0, stations: {},
+        },
+      })
+      expect(put.ok(), await put.text()).toBeTruthy()
+      const cfg = await put.json()
+      await request.put('/api/printing/config', { headers, data: { ...cfg, cashier_printer: cfg.printers[0].id } })
+      await ensureCashOpenApi(page, request)
+      const products: { id: number; name: string; price_cents: number }[] = await (await request.get('/api/products', { headers })).json()
+      const med = products.find((x) => x.name === 'Medialuna')!
+      const sale = await request.post('/api/sales', {
+        headers,
+        data: { items: [{ product_id: med.id }], channel: 'delivery', delivery_fee_cents: 50000, payments: [{ method: 'efectivo', amount_cents: med.price_cents + 50000 }] },
+      })
+      expect(sale.ok(), await sale.text()).toBeTruthy()
+      const id = (await sale.json()).id as number
+      printer.clear()
+      const r = await request.post(`/api/printing/sales/${id}/ticket`, { headers, data: {} })
+      expect(r.ok(), await r.text()).toBeTruthy()
+      // cp858 encodes the "í" differently from latin1: match "Env" and the amount instead.
+      await expect.poll(() => printer.text()).toMatch(/Env.o\s+\$ 500,00/)
     } finally {
       await resetPrinting(page)
       await printer.close()

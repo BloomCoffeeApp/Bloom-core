@@ -20,6 +20,7 @@ ESC, GS = b"\x1b", b"\x1d"
 def _docs() -> dict[str, bytes]:
     return {
         "ticket_80mm": escpos.ticket(S.ticket(), escpos.Layout(), open_drawer=True),
+        "ticket_delivery_80mm": escpos.ticket(S.delivery_ticket(), escpos.Layout()),
         "ticket_courtesy_58mm": escpos.ticket(S.courtesy_ticket(), escpos.Layout(chars=32, cut="full")),
         "ticket_ascii": escpos.ticket(S.ticket(), escpos.Layout(codepage="ascii", cut="none", feed_lines=0)),
         "z_58mm": escpos.z_report(S.z_session(), escpos.Layout(chars=32), printed_at=S.TS),
@@ -67,6 +68,15 @@ def test_ticket_contents_in_cp858():
     assert "Mesa Mesa" not in text
     assert ESC + b"p" not in data  # drawer only when asked
     assert data.endswith(ESC + b"d\x04" + GS + b"V\x01")  # feed 4 + partial cut
+
+
+def test_delivery_fee_line_is_printed_before_total():
+    lines = _lines(escpos.ticket(S.delivery_ticket(), escpos.Layout()))
+    env = next(i for i, ln in enumerate(lines) if ln.startswith("Envío"))
+    total = next(i for i, ln in enumerate(lines) if ln.startswith("TOTAL"))
+    assert env < total and "$ 500,00" in lines[env]
+    no_fee = "\n".join(_lines(escpos.ticket(S.ticket(channel="delivery"), escpos.Layout())))
+    assert "Envío" not in no_fee
 
 
 def test_courtesy_and_voided_marks():

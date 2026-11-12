@@ -69,7 +69,8 @@ export function ticketHtml({ business, sale, payment_names }: TicketData) {
       return `<div class="row"><span>${esc(fmtNumber(it.qty))} x ${esc(it.name_snapshot)}${it.size_name ? ` ${esc(it.size_name)}` : ''}</span><span>${esc(fmtMoney(it.total_cents + it.discount_cents))}</span></div>${mods}${note}${disc}`
     })
     .join('')
-  const manualDisc = sale.discount_cents - sale.points_discount_cents
+  const reward = sale.reward_discount_cents ?? 0
+  const manualDisc = sale.discount_cents - sale.points_discount_cents - reward
   const pays = sale.payments
     .map(
       (p) =>
@@ -86,7 +87,7 @@ export function ticketHtml({ business, sale, payment_names }: TicketData) {
     ${business.cuit ? `<div class="c s">CUIT ${esc(business.cuit)}</div>` : ''}
     <hr/>
     <div class="row b"><span>Ticket #${esc(sale.number)}</span><span>${esc(fmtDateTime(sale.ts))}</span></div>
-    <div class="row s"><span>${esc(CHANNEL_LABEL[sale.channel] ?? sale.channel)}${sale.table_label ? ` · Mesa ${esc(sale.table_label)}` : ''}</span><span>${esc(sale.user_name ?? '')}</span></div>
+    <div class="row s"><span>${esc(CHANNEL_LABEL[sale.channel] ?? sale.channel)}${sale.table_label ? ` · ${/^mesa/i.test(sale.table_label) ? '' : 'Mesa '}${esc(sale.table_label)}` : ''}</span><span>${esc(sale.user_name ?? '')}</span></div>
     ${sale.customer ? `<div class="s">Cliente: ${esc(sale.customer.name)}</div>` : ''}
     ${sale.status === 'voided' ? `<div class="void">ANULADO</div>` : ''}
     ${sale.is_courtesy ? `<div class="c b">CORTESÍA · INVITA LA CASA</div>${sale.courtesy_reason ? `<div class="c s">${esc(sale.courtesy_reason)}</div>` : ''}` : ''}
@@ -96,6 +97,7 @@ export function ticketHtml({ business, sale, payment_names }: TicketData) {
     <div class="row"><span>Subtotal</span><span>${esc(fmtMoney(sale.subtotal_cents))}</span></div>
     ${manualDisc > 0 ? `<div class="row"><span>Descuento</span><span>-${esc(fmtMoney(manualDisc))}</span></div>` : ''}
     ${sale.points_discount_cents > 0 ? `<div class="row"><span>Canje ${esc(sale.points_redeemed)} pts</span><span>-${esc(fmtMoney(sale.points_discount_cents))}</span></div>` : ''}
+    ${reward > 0 ? `<div class="row"><span>Premio fidelidad</span><span>-${esc(fmtMoney(reward))}</span></div>` : ''}
     ${sale.delivery_fee_cents > 0 ? `<div class="row"><span>Envío</span><span>${esc(fmtMoney(sale.delivery_fee_cents))}</span></div>` : ''}
     <div class="row big"><span>TOTAL</span><span>${esc(fmtMoney(sale.total_cents))}</span></div>
     <hr/>

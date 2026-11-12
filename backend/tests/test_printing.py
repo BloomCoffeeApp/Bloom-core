@@ -131,6 +131,22 @@ def test_ticket_drawer_and_failures(seeded, db, fake):
     assert client.post("/api/printing/sales/999999/ticket", headers=cajero, json={}).status_code in (404, 502)
 
 
+def test_delivery_ticket_prints_the_shipping_line(seeded, db, fake):
+    client, admin = seeded
+    _configure(client, admin)
+    r = client.post("/api/sales", headers=admin, json={
+        "items": [{"product_id": _pid(db, "Latte")}], "channel": "delivery", "delivery_fee_cents": 50000,
+        "payments": [{"method": "efectivo", "amount_cents": LATTE + 50000}]})
+    assert r.status_code == 200, r.text
+    sale = r.json()
+    assert client.post(f"/api/printing/sales/{sale['id']}/ticket", headers=admin, json={}).status_code == 200
+    text = fake.jobs[-1][1].decode("cp858", errors="replace")
+    assert "Envío" in text and "$ 500,00" in text
+    plain = _sale(client, admin, db)
+    client.post(f"/api/printing/sales/{plain['id']}/ticket", headers=admin, json={})
+    assert "Envío" not in fake.jobs[-1][1].decode("cp858", errors="replace")
+
+
 def test_ticket_voided_and_unknown_sale(seeded, db, fake):
     client, admin = seeded
     _configure(client, admin)

@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test'
 
 import { addMedialuna, expect, test } from './fixtures'
-import { confirmCheckout, openCheckout, openPos, ticketNumber } from './helpers'
+import { authHeaders, confirmCheckout, ensureCashOpenApi, openCheckout, openPos, ticketNumber } from './helpers'
 
 /** Sells one medialuna in cash and returns the ticket number. */
 async function sellOne(page: Page) {
@@ -79,5 +79,25 @@ test.describe('Ventas', () => {
     await page.getByPlaceholder('N° de ticket').clear()
     await pickOption(page, 'Todos los estados', 'Anuladas')
     await expect(row).toBeVisible()
+  })
+
+  test('delivery sale: the detail shows the shipping line and the total includes it', async ({ page, request }) => {
+    await ensureCashOpenApi(page, request)
+    const headers = await authHeaders(page)
+    const products: { id: number; name: string; price_cents: number }[] = await (await request.get('/api/products', { headers })).json()
+    const med = products.find((x) => x.name === 'Medialuna')!
+    const fee = 50000
+    const res = await request.post('/api/sales', {
+      headers,
+      data: { items: [{ product_id: med.id }], channel: 'delivery', delivery_fee_cents: fee, payments: [{ method: 'efectivo', amount_cents: med.price_cents + fee }] },
+    })
+    expect(res.ok(), await res.text()).toBeTruthy()
+    const n = (await res.json()).number as number
+    await page.goto('/ventas')
+    await page.getByPlaceholder('N° de ticket').fill(String(n))
+    await page.getByRole('row').filter({ hasText: `#${n}` }).click()
+    const sheet = page.getByRole('dialog', { name: new RegExp(`Ticket #${n}`) })
+    await expect(sheet.getByText('Envío', { exact: true })).toBeVisible()
+    await expect(sheet.getByText(/500,00/).first()).toBeVisible()
   })
 })
