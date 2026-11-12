@@ -384,7 +384,7 @@ Cada fase termina con: tests pasando, app levantando sin errores de consola, com
 - **Rutas del front**: cada módulo (`features/<modulo>/index.tsx`) define sus propias sub-rutas; el router global solo monta `/<ruta>/*` con control de roles.
 - **shadcn/ui estilo `radix-nova`** con tokens de color propios (paleta café) y tokens extra `success`, `warning`, `info`.
 - **TanStack Table v8** (v9 todavía cambia la API).
-- **Commits con identidad neutra** (`ControlApp <controlapp@users.noreply.github.com>`) para no exponer datos personales en un repo público.
+- **Commits con identidad neutra** (`Bloom <bloom@bloom.invalid>`, dominio reservado que no se puede asociar a ninguna cuenta) para no exponer datos personales en un repo público. Antes se usaba `controlapp@users.noreply.github.com`, que es de otra cuenta de GitHub: reemplazado en todo el historial el 12/11/2026.
 - **Zona horaria**: la DB guarda UTC; los "días" de negocio se calculan en `America/Argentina/Buenos_Aires` (`services/timeutil.py`).
 
 - **Menú para clientes** (`/menu` celular por QR, `/menu/pantalla` TV): sin login, `GET /api/public/menu` expone solo nombre, descripción, precio y modificadores. Se activa/oculta desde Configuración (`public_menu`). Para acceder desde otros dispositivos hace falta "Modo red local".
