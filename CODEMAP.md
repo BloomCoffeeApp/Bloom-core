@@ -10,7 +10,7 @@ fases y decisiones en `PLAN.md`. Los módulos Pro tienen su propio mapa en el re
 | App de escritorio (Uvicorn en hilo + pywebview) | `launcher.py`, `desktop_window.py` |
 | App FastAPI, registro de routers, carga de `bloom_pro` | `backend/app/main.py` |
 | Config (data dir `CAFE_DATA_DIR`, puerto `CAFE_PORT`) | `backend/app/config.py`, `db.py` |
-| Migraciones al iniciar (backup previo, recuperación, rollback) | `backend/app/migrate.py`, `alembic/versions/` (head: `0015_collect_payments`) |
+| Migraciones al iniciar (backup previo, recuperación, rollback) | `backend/app/migrate.py`, `backend/migrations/versions/` |
 | Auth por PIN, `Perm(...)`, `CurrentUser`, `login_throttle` | `backend/app/auth.py` |
 | Catálogo de permisos y roles predefinidos | `backend/app/permissions.py`; roles editables `services/roles.py` |
 | Licencia Free/Pro (token Ed25519 offline, `require_feature`) | `backend/app/licensing/` (`features.py`, `status.py`, `token.py`, `client.py`) |

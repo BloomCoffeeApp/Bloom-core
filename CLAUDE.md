@@ -54,3 +54,12 @@ App de gestión para cafetería (POS, caja, stock, compras, clientes, alertas, r
 2. Levantar la app y verificar el criterio “Listo cuando” de la fase, sin errores en consola.
 3. Tildar checkboxes en `PLAN.md`, anotar decisiones nuevas en su sección 9.
 4. Commit.
+
+## Commits (varias sesiones trabajan en esta misma carpeta)
+- Identidad: **ControlApp <controlapp@users.noreply.github.com>** (ya configurada en el repo con `git config`; no la
+  cambies ni uses otra). Sin líneas de atribución (Co-Authored-By, "Generated with…").
+- Antes de commitear mirá `git status` y agregá **solo tus archivos** por nombre (nunca `git add -A` / `git add .`):
+  puede haber cambios sin commitear de otra sesión.
+- Las migraciones nuevas (`backend/migrations/versions/*.py`) se agregan siempre con el cambio que las usa.
+- Nunca se commitean: `test-results/`, `playwright-report/`, bases de datos (`*.db`), builds, `.env`.
+- Un commit por repo (core y pro son repos distintos). Mensajes en inglés.
