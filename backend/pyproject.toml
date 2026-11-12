@@ -1,5 +1,5 @@
 [project]
-name = "cafeteria-controlapp"
+name = "bloom"
 version = "1.0.0"
 description = "Gestión integral para cafeterías: POS, stock, compras, clientes y asistente de barista."
 requires-python = ">=3.12"

@@ -45,7 +45,7 @@
 ## 2. Estructura de carpetas
 
 ```
-ControlApp/
+Bloom/
 ├─ PLAN.md                 ← este archivo
 ├─ CLAUDE.md               ← convenciones para el agente
 ├─ backend/
