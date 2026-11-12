@@ -3,17 +3,18 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.auth import CurrentUser, require_role
+from app.auth import CurrentUser, Perm
 from app.db import get_db
 from app.models import User
 from app.schemas.common import Ok
 from app.schemas.orders import BoardOut, OrderOut, OrdersSettings, OrderStatusIn, TabOut
+from app.services import order_flows
 from app.services import orders as svc
 
 router = APIRouter(prefix="/api", tags=["orders"])
 
-Manager = Depends(require_role("encargado"))
-Seller = Depends(require_role("cajero", "encargado"))
+Manager = Perm("orders.manage")
+Seller = Perm("pos.sell")
 
 
 @router.get("/orders/board", response_model=BoardOut)
@@ -24,12 +25,19 @@ def board(station_id: int | None = None, db: Session = Depends(get_db), _: User 
 
 @router.post("/orders/{order_id}/status", response_model=OrderOut)
 def set_status(order_id: int, data: OrderStatusIn, db: Session = Depends(get_db), user: User = CurrentUser) -> dict:
-    svc.set_status(db, order_id, data.status, user, data.reason)
+    params = {"eta_minutes": data.eta_minutes} if data.eta_minutes is not None else None
+    svc.set_status(db, order_id, data.status, user, data.reason, params)
     row = next((o for o in svc.board(db)["orders"] if o["id"] == order_id), None)
     if row is not None:
         return row
     o = svc.get_order(db, order_id)
     return svc.serialize(o, svc.now(), svc.cfg(db)["warn_pct"], {}, {})
+
+
+@router.get("/orders/flows")
+def flows(_: User = CurrentUser) -> list[dict]:
+    """Each channel's flow: states in order, allowed next states and the buttons of each state."""
+    return order_flows.describe_all()
 
 
 @router.post("/waiter-calls/{call_id}/resolve", response_model=Ok)

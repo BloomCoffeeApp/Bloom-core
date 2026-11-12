@@ -11,6 +11,7 @@ The signature covers `BLOOM1.<payload>`. Payload fields:
   exp      paid/valid through (unix seconds), null = perpetual
   grace    days the token keeps working after `exp` while offline
   pkey     (optional) the subscription plan it was sold under, e.g. "pro_mensual"
+  limits   (optional) plan limits, e.g. {"tables": 10}; absent key = no limit
 """
 
 import base64

@@ -1,24 +1,27 @@
-import { BellRing, ClipboardList, Expand, Minimize, MonitorPlay, Receipt, Volume2 } from 'lucide-react'
+import { BellRing, ClipboardList, Expand, Globe, MessageCircle, Minimize, MonitorPlay, Receipt, Volume2 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Route, Routes } from 'react-router'
 import { toast } from 'sonner'
 
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
 import { useNow } from '@/hooks/use-now'
+import { fmtMoney } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 import { useHasFeature } from '../license/api'
-import { useBoard, useResolveCall, useSetOrderStatus } from './api'
+import { useBoard, useOnlineOrderAction, useResolveCall, useSetOrderStatus, whatsappLink } from './api'
 import { OrderCard } from './order-card'
 import { printKitchenTicket } from './print'
 import { audioReady, loadPrefs, notify, playAlert, savePrefs, type SoundPrefs, unlockAudio } from './sound'
 import { SoundMenu } from './sound-menu'
 import { fmtClock, liveElapsed, liveLevel } from './timing'
-import type { Level, Order, OrderStatus, WaiterCall } from './types'
+import type { BoardColumn, Level, Order, OrderAction, WaiterCall } from './types'
 
 const STATION_KEY = 'bloom.orders.station'
 
@@ -37,11 +40,26 @@ interface Row {
   level: Level
 }
 
-const COLUMNS: { status: OrderStatus; title: string; empty: string }[] = [
-  { status: 'received', title: 'Nuevos', empty: 'Sin pedidos nuevos' },
-  { status: 'preparing', title: 'En preparación', empty: 'Nada en preparación' },
-  { status: 'ready', title: 'Listos para entregar', empty: 'Nada para entregar' },
+// Columns come from each state's `column` (backend order_flows): every channel shares the same board.
+const COLUMNS: { column: BoardColumn; title: string; empty: string }[] = [
+  { column: 'queue', title: 'Nuevos', empty: 'Sin pedidos nuevos' },
+  { column: 'preparing', title: 'En preparación', empty: 'Nada en preparación' },
+  { column: 'ready', title: 'Listos para entregar', empty: 'Nada para entregar' },
 ]
+const ETA_CHOICES = [10, 15, 20, 30, 45, 60]
+
+/** Opens WhatsApp (Desktop if installed, else Web) with the message already written. */
+async function openWhatsApp(o: Order, kind: 'accepted' | 'ready' | 'dispatched' | 'generic') {
+  try {
+    const { url } = await whatsappLink(o.id, kind)
+    window.open(url, '_blank', 'noopener')
+  } catch (e) {
+    toast.error((e as Error).message)
+  }
+}
+
+const waKind = (o: Order) =>
+  o.status === 'awaiting_pay' || o.status === 'accepted' ? 'accepted' : o.status === 'ready' ? 'ready' : o.status === 'dispatched' ? 'dispatched' : 'generic'
 
 const describe = (o: Order) => `${o.table_label || ''}${o.table_label ? ' · ' : ''}${o.items.reduce((a, i) => a + i.qty, 0)} productos`
 const callText = (c: WaiterCall) => (c.kind === 'bill' ? `Mesa ${c.table_label} pide la cuenta` : `Mesa ${c.table_label} llama al mozo`)
@@ -50,8 +68,10 @@ function OrdersPage() {
   const [station, setStationState] = useState<number | null>(loadStation)
   const [prefs, setPrefsState] = useState<SoundPrefs>(loadPrefs)
   const [audioOk, setAudioOk] = useState(audioReady)
-  const [cancelling, setCancelling] = useState<Order | null>(null)
+  const [asking, setAsking] = useState<{ order: Order; action: OrderAction } | null>(null)
   const [reason, setReason] = useState('')
+  const [eta, setEta] = useState(20)
+  const [waNotify, setWaNotify] = useState(true)
   const [fullscreen, setFullscreen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
 
@@ -63,6 +83,7 @@ function OrdersPage() {
   const current = stations.find((s) => s.id === station) ?? null
   const now = useNow(1000).getTime()
   const setStatus = useSetOrderStatus()
+  const online = useOnlineOrderAction()
   const resolveCall = useResolveCall()
 
   const setPrefs = (p: SoundPrefs) => {
@@ -120,7 +141,9 @@ function OrdersPage() {
       const first = fresh[0]
       playAlert('new', p, first.channel, data.pro)
       notify(
-        first.status === 'pending' ? `Pedido de ${first.table_label ?? 'una mesa'} para confirmar` : `Nuevo pedido #${first.number}`,
+        first.online
+          ? `Nuevo pedido online #${first.number} · ${first.online.customer_name ?? ''}`
+          : first.status === 'pending' ? `Pedido de ${first.table_label ?? 'una mesa'} para confirmar` : `Nuevo pedido #${first.number}`,
         fresh.length > 1 ? `${fresh.length} pedidos nuevos` : describe(first),
         p,
         `order-${first.id}`,
@@ -137,7 +160,7 @@ function OrdersPage() {
     // With a thermal printer assigned (Configuración → Impresoras) the backend prints it instead,
     // and this screen only prints the ones the printer couldn't (fallback with the print dialog).
     for (const o of data.orders) {
-      if (printed.current.has(o.id) || o.status === 'pending') continue
+      if (printed.current.has(o.id) || o.received_at == null) continue
       printed.current.add(o.id)
       if (st?.print_tickets && !st.direct_print && o.station_id === st.id) printKitchenTicket(o, st.name)
     }
@@ -154,7 +177,7 @@ function OrdersPage() {
   useEffect(() => {
     for (const r of rows) {
       if (r.level !== 'late' || lateAlerted.current.has(r.order.id)) continue
-      if (r.order.status !== 'received' && r.order.status !== 'preparing') continue
+      if (r.order.column !== 'queue' && r.order.column !== 'preparing') continue
       lateAlerted.current.add(r.order.id)
       playAlert('late', prefsRef.current)
       notify(`Pedido #${r.order.number} atrasado`, `${fmtClock(r.elapsed)} (objetivo ${r.order.target_minutes} min)`, prefsRef.current, `late-${r.order.id}`)
@@ -182,16 +205,33 @@ function OrdersPage() {
   }, [])
 
   const act = {
-    busy: setStatus.isPending,
-    onStatus: (o: Order, status: OrderStatus) => setStatus.mutate({ id: o.id, status }),
-    onCancel: (o: Order) => {
-      setReason('')
-      setCancelling(o)
+    busy: setStatus.isPending || online.isPending,
+    onAction: (o: Order, a: OrderAction) => {
+      if (a.needs) {
+        setReason('')
+        setEta(o.online?.eta_minutes ?? 20)
+        setWaNotify(true)
+        setAsking({ order: o, action: a })
+      } else setStatus.mutate({ id: o.id, status: a.to })
     },
+    onWhatsApp: (o: Order) => void openWhatsApp(o, waKind(o)),
+    onOnline: (o: Order, action: 'check-payment' | 'register-sale' | 'update-customer') => online.mutate({ id: o.id, action }),
+  }
+  const confirmAsk = () => {
+    if (!asking) return
+    const { order: o, action: a } = asking
+    if (a.needs === 'reason' && !reason.trim()) return
+    setStatus.mutate(
+      { id: o.id, status: a.to, reason: reason.trim() || undefined, eta_minutes: a.needs === 'eta' ? eta : undefined },
+      { onSuccess: (row) => a.needs === 'eta' && waNotify && row.online?.customer_phone && void openWhatsApp(row, 'accepted') },
+    )
+    setAsking(null)
   }
 
-  const pending = rows.filter((r) => r.order.status === 'pending')
-  const inProgress = rows.filter((r) => r.order.status === 'received' || r.order.status === 'preparing')
+  const pending = rows.filter((r) => r.order.column === 'confirm')
+  const payment = rows.filter((r) => r.order.column === 'payment')
+  const fresh = pending.filter((r) => r.order.online)
+  const inProgress = rows.filter((r) => r.order.column === 'queue' || r.order.column === 'preparing')
   const late = inProgress.filter((r) => r.level === 'late').length
 
   return (
@@ -203,6 +243,7 @@ function OrdersPage() {
             <span>{inProgress.length} en curso</span>
             {late > 0 && <span className="rounded-full bg-destructive px-2 font-medium text-white">{late} atrasado{late > 1 ? 's' : ''}</span>}
             {pending.length > 0 && <span className="rounded-full bg-info px-2 font-medium text-info-foreground">{pending.length} por confirmar</span>}
+            {payment.length > 0 && <span className="rounded-full bg-warning/30 px-2 font-medium">{payment.length} esperando pago</span>}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -251,6 +292,27 @@ function OrdersPage() {
         </div>
       )}
 
+      {fresh.length > 0 && (
+        <section aria-label="Pedidos online nuevos" className="flex flex-col gap-2" data-testid="online-banner">
+          {fresh.map(({ order: o }) => (
+            <div key={o.id} role="alert" className="flex flex-wrap items-center gap-3 rounded-2xl border-2 border-primary bg-primary/10 py-2 pr-2 pl-3">
+              <Globe className="size-5 animate-pulse text-primary" />
+              <span className="font-medium">
+                Nuevo pedido online #{o.number} · {o.online!.customer_name} · {o.channel === 'delivery' ? 'Delivery' : 'Retira'} ·{' '}
+                {fmtMoney(o.online!.total_cents)}
+              </span>
+              <span className="ml-auto flex gap-2">
+                {o.actions.map((a) => (
+                  <Button key={a.to} variant={a.tone === 'outline' ? 'outline' : 'default'} className="h-11" onClick={() => act.onAction(o, a)}>
+                    {a.label}
+                  </Button>
+                ))}
+              </span>
+            </div>
+          ))}
+        </section>
+      )}
+
       {data && data.calls.length > 0 && (
         <section aria-label="Llamados de mesas" className="flex flex-wrap gap-2">
           {data.calls.map((c) => (
@@ -286,18 +348,28 @@ function OrdersPage() {
               </div>
             </section>
           )}
-          {rows.length === pending.length && pending.length === 0 ? (
+          {payment.length > 0 && (
+            <section aria-label="Esperando pago" className="space-y-2">
+              <h2 className="font-heading text-xl font-semibold">Esperando pago</h2>
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,18rem),1fr))] gap-3">
+                {payment.map((r) => (
+                  <OrderCard key={r.order.id} order={r.order} elapsed={r.elapsed} level={r.level} actions={act} />
+                ))}
+              </div>
+            </section>
+          )}
+          {rows.length === 0 ? (
             <div className="flex flex-1 flex-col items-center justify-center gap-3 py-20 text-center text-muted-foreground">
               <ClipboardList className="size-12 text-primary/60" />
               <p className="font-heading text-xl text-foreground">No hay pedidos en curso</p>
-              <p className="max-w-sm text-sm">Las ventas del punto de venta y los pedidos de las mesas aparecen acá al instante.</p>
+              <p className="max-w-sm text-sm">Las ventas del punto de venta, los pedidos de las mesas y los pedidos online aparecen acá al instante.</p>
             </div>
           ) : (
             <div className="grid flex-1 grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] items-start gap-4">
               {COLUMNS.map((col) => {
-                const items = rows.filter((r) => r.order.status === col.status)
+                const items = rows.filter((r) => r.order.column === col.column)
                 return (
-                  <section key={col.status} aria-label={col.title} className="flex min-w-0 flex-col gap-3 rounded-2xl bg-muted/40 p-2.5">
+                  <section key={col.column} aria-label={col.title} className="flex min-w-0 flex-col gap-3 rounded-2xl bg-muted/40 p-2.5">
                     <h2 className="flex items-center justify-between px-1 font-heading text-lg font-semibold">
                       {col.title}
                       <span className="rounded-full bg-card px-2.5 text-base tabular-nums">{items.length}</span>
@@ -316,22 +388,66 @@ function OrdersPage() {
       )}
 
       <ConfirmDialog
-        open={cancelling != null}
-        onOpenChange={(o) => !o && setCancelling(null)}
-        title={cancelling?.status === 'pending' ? `¿Rechazar el pedido #${cancelling?.number}?` : `¿Cancelar el pedido #${cancelling?.number}?`}
-        description={
-          cancelling?.status === 'pending'
-            ? 'No llega a la barra y no se cobra. El cliente ve el pedido como cancelado.'
-            : 'Sale de la pantalla. Si ya se cobró, anulá la venta desde Ventas.'
+        open={asking != null}
+        onOpenChange={(o) => !o && setAsking(null)}
+        title={
+          asking?.action.needs === 'eta'
+            ? `Aceptar el pedido #${asking.order.number}`
+            : `¿${asking?.action.label} el pedido #${asking?.order.number}?`
         }
-        confirmLabel={cancelling?.status === 'pending' ? 'Rechazar' : 'Cancelar pedido'}
-        destructive
-        onConfirm={() => {
-          if (cancelling) setStatus.mutate({ id: cancelling.id, status: 'cancelled', reason: reason.trim() || undefined })
-          setCancelling(null)
-        }}
+        description={
+          asking?.action.needs === 'eta'
+            ? asking.order.online?.payment_method === 'cash'
+              ? 'Se cobra al entregar. Pasa directo a preparación.'
+              : 'Al aceptar se habilita el pago para el cliente; se prepara cuando esté pagado.'
+            : asking?.action.needs === 'reason'
+              ? 'El cliente ve el motivo en la página de su pedido.'
+              : asking?.order.payment_status === 'paid' && asking.order.online?.payment_method === 'online'
+                ? 'Se devuelve el pago completo por el mismo medio.'
+                : asking?.order.status === 'pending'
+                  ? 'No llega a la barra y no se cobra. El cliente ve el pedido como cancelado.'
+                  : 'Sale de la pantalla. Si ya se cobró en la caja, anulá la venta desde Ventas.'
+        }
+        confirmLabel={asking?.action.needs === 'eta' ? 'Aceptar' : (asking?.action.label ?? 'Confirmar')}
+        destructive={asking?.action.tone === 'danger' || asking?.action.to === 'rejected' || asking?.action.to === 'cancelled'}
+        onConfirm={confirmAsk}
       >
-        <Textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Motivo (opcional)" maxLength={200} rows={2} aria-label="Motivo" />
+        {asking?.action.needs === 'eta' ? (
+          <div className="space-y-3">
+            <p className="text-sm font-medium">Tiempo estimado</p>
+            <div className="flex flex-wrap gap-2" role="group" aria-label="Tiempo estimado">
+              {ETA_CHOICES.map((m) => (
+                <Button key={m} type="button" variant={eta === m ? 'default' : 'outline'} className="h-11 min-w-16" onClick={() => setEta(m)}>
+                  {m} min
+                </Button>
+              ))}
+              <Input
+                type="number"
+                min={1}
+                max={600}
+                value={eta}
+                onChange={(e) => setEta(Math.max(1, Math.min(600, Number(e.target.value) || 1)))}
+                className="h-11 w-24"
+                aria-label="Minutos"
+              />
+            </div>
+            {asking.order.online?.customer_phone && (
+              <label className="flex min-h-11 items-center gap-2 text-sm">
+                <Checkbox checked={waNotify} onCheckedChange={(v) => setWaNotify(v === true)} />
+                <MessageCircle className="size-4" /> Avisar por WhatsApp (con el link para seguirlo y pagar)
+              </label>
+            )}
+          </div>
+        ) : asking?.action.needs === 'confirm' ? null : (
+          <Textarea
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder={asking?.action.needs === 'reason' ? 'Motivo (el cliente lo ve)' : 'Motivo (opcional)'}
+            maxLength={200}
+            rows={2}
+            aria-label="Motivo"
+          />
+        )}
       </ConfirmDialog>
     </div>
   )

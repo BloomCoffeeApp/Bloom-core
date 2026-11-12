@@ -13,7 +13,7 @@ test('category, modifier group and product with recipe: price edit, bulk increas
   await page.getByRole('button', { name: 'Nueva categoría' }).click()
   const catDlg = page.getByRole('dialog', { name: 'Nueva categoría' })
   await catDlg.getByLabel('Nombre').fill(cat)
-  await catDlg.getByRole('button', { name: 'Guardar' }).click()
+  await catDlg.getByRole('button', { name: 'Guardar', exact: true }).click()
   await expect(catDlg).toBeHidden()
   await expect(page.getByText(cat, { exact: true })).toBeVisible()
 
@@ -50,7 +50,7 @@ test('category, modifier group and product with recipe: price edit, bulk increas
   await expect(costBox).toContainText(money(500_000 - lineCost))
   await expect(costBox).toContainText('%')
   await editor.getByText(group).click() // modifier group checkbox
-  await editor.getByRole('button', { name: 'Guardar' }).click()
+  await editor.getByRole('button', { name: 'Guardar', exact: true }).click()
   await expect(editor).toBeHidden()
 
   await page.getByPlaceholder('Buscar producto…').fill(product)
@@ -72,7 +72,7 @@ test('category, modifier group and product with recipe: price edit, bulk increas
   await row.click()
   let sheet = page.getByRole('dialog', { name: product })
   await sheet.getByLabel('Precio de venta').fill('5500')
-  await sheet.getByRole('button', { name: 'Guardar' }).click()
+  await sheet.getByRole('button', { name: 'Guardar', exact: true }).click()
   await expect(sheet).toBeHidden()
   await expect(row).toContainText(money(550_000))
   await row.click()

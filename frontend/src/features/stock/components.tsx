@@ -17,14 +17,13 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { useDepsChanged } from '@/hooks/use-deps-changed'
-import { fmtDateTime, fmtMoney, fmtNumber, fmtQty } from '@/lib/format'
+import { fmtDateTime, fmtNumber, fmtQty } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 import { useSuppliersLite } from './purchasing'
 import {
   useAdjustStock,
   useMovements,
-  useRegisterWaste,
   useSaveStockItem,
   useStockCategories,
 } from './api'
@@ -225,81 +224,6 @@ export function AdjustDialog({ item, onOpenChange }: { item: StockItem | null; o
             </Button>
             <Button type="submit" disabled={!valid || adjust.isPending}>
               Guardar ajuste
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-const WASTE_REASONS = ['Vencido', 'Se cayó / se rompió', 'Prueba de barista', 'Mal estado', 'Error de preparación']
-
-export function WasteDialog({ item, onOpenChange }: { item: StockItem | null; onOpenChange: (o: boolean) => void }) {
-  const [qty, setQty] = useState('')
-  const [reason, setReason] = useState('')
-  const waste = useRegisterWaste()
-
-  if (useDepsChanged([item]) && item) {
-    setQty('')
-    setReason('')
-  }
-
-  if (!item) return null
-  const n = Number(qty.replace(',', '.'))
-  const valid = n > 0 && reason.trim().length > 0
-
-  return (
-    <Dialog open={!!item} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Registrar merma</DialogTitle>
-          <DialogDescription>
-            {item.name} · stock actual {fmtQty(item.current_qty, item.unit)}
-          </DialogDescription>
-        </DialogHeader>
-        <form
-          className="grid gap-4"
-          onSubmit={(e) => {
-            e.preventDefault()
-            if (valid) waste.mutate({ stock_item_id: item.id, qty: n, reason: reason.trim() }, { onSuccess: () => onOpenChange(false) })
-          }}
-        >
-          <div className="grid gap-1.5">
-            <Label htmlFor="w-qty">Cantidad perdida ({item.unit})</Label>
-            <Input id="w-qty" inputMode="decimal" autoFocus className="tabular" value={qty} onChange={(e) => setQty(e.target.value)} />
-          </div>
-          <div className="grid gap-1.5">
-            <Label htmlFor="w-reason">Motivo</Label>
-            <div className="flex flex-wrap gap-1.5">
-              {WASTE_REASONS.map((r) => (
-                <button
-                  key={r}
-                  type="button"
-                  onClick={() => setReason(r)}
-                  className={cn(
-                    'rounded-full border px-3 py-1 text-xs transition-colors',
-                    reason === r ? 'border-primary bg-primary/10 text-primary' : 'hover:bg-muted',
-                  )}
-                >
-                  {r}
-                </button>
-              ))}
-            </div>
-            <Input id="w-reason" placeholder="O escribí el motivo…" value={reason} onChange={(e) => setReason(e.target.value)} />
-          </div>
-          {n > 0 && (
-            <div className="flex items-center justify-between rounded-xl bg-destructive/10 px-3 py-2 text-sm text-destructive">
-              <span>Pérdida estimada</span>
-              <span className="tabular font-semibold">{fmtMoney(Math.round(n * item.avg_cost_cents))}</span>
-            </div>
-          )}
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancelar
-            </Button>
-            <Button type="submit" variant="destructive" disabled={!valid || waste.isPending}>
-              Registrar merma
             </Button>
           </DialogFooter>
         </form>

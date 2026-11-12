@@ -9,6 +9,8 @@ import {
   Plus,
   RotateCcw,
   Scale,
+  Smartphone,
+  Tablet,
   Wifi,
   WifiOff,
 } from 'lucide-react'
@@ -301,7 +303,50 @@ export function NetworkSection({ initialEnabled }: { initialEnabled: boolean }) 
           </div>
         )}
       </SettingsCard>
+      {enabled && url && <InstallHint url={url} />}
     </div>
+  )
+}
+
+/** "Instalá Bloom en la tablet": how to get an app icon on phones/tablets of the LAN. */
+function InstallHint({ url }: { url: string }) {
+  return (
+    <SettingsCard
+      title={`Instalá ${BRAND.name} en la tablet`}
+      description="Así queda con su ícono en la pantalla principal y se abre a pantalla completa, como una app."
+    >
+      <div className="grid gap-4 text-sm sm:grid-cols-2" data-testid="pwa-install-hint">
+        <div className="space-y-1.5 rounded-xl border p-4">
+          <p className="flex items-center gap-2 font-medium">
+            <Smartphone className="size-4" /> Android (Chrome)
+          </p>
+          <ol className="list-decimal space-y-1 pl-5 text-muted-foreground">
+            <li>
+              Abrí <span className="font-mono text-foreground">{url}</span> (o escaneá el QR).
+            </li>
+            <li>
+              Menú <b className="text-foreground">⋮</b> → <b className="text-foreground">Agregar a la pantalla principal</b>.
+            </li>
+          </ol>
+        </div>
+        <div className="space-y-1.5 rounded-xl border p-4">
+          <p className="flex items-center gap-2 font-medium">
+            <Tablet className="size-4" /> iPhone / iPad (Safari)
+          </p>
+          <ol className="list-decimal space-y-1 pl-5 text-muted-foreground">
+            <li>Abrí la dirección en Safari.</li>
+            <li>
+              Botón <b className="text-foreground">Compartir</b> → <b className="text-foreground">Agregar a inicio</b>.
+            </li>
+          </ol>
+        </div>
+      </div>
+      <p className="mt-4 text-xs text-muted-foreground">
+        Por la red local la conexión es <span className="font-mono">http</span> (sin candado), así que el ícono abre la app pero
+        necesita la PC del local prendida: no funciona sin conexión. Si la PC está apagada vas a ver «Sin conexión con la PC del
+        local» y con <b>Reintentar</b> vuelve sola.
+      </p>
+    </SettingsCard>
   )
 }
 

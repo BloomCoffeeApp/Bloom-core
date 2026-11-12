@@ -4,7 +4,8 @@ from pydantic import BaseModel, Field
 
 from app.schemas.common import ORM
 
-ROLE_PATTERN = r"^(admin|encargado|cajero|barista)$"
+# Built-in roles or a custom role key (validated against the roles table: services/roles.py).
+ROLE_PATTERN = r"^[a-z0-9_]{1,20}$"
 
 
 class UserPublic(ORM):
@@ -14,6 +15,13 @@ class UserPublic(ORM):
     color: str
     # Free plan: this user can't log in (services/free_plan.py).
     locked: bool = False
+    role_name: str | None = None
+
+
+class UserMe(UserPublic):
+    """The logged-in user: what the UI may show (permissions from services/roles.py)."""
+
+    permissions: list[str] = []
 
 
 class UserOut(UserPublic):
@@ -43,7 +51,7 @@ class LoginIn(BaseModel):
 
 class LoginOut(BaseModel):
     token: str
-    user: UserPublic
+    user: UserMe
 
 
 class SetupIn(BaseModel):

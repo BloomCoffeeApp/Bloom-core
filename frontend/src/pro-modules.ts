@@ -19,6 +19,8 @@ export interface ProModules {
   TablesSettings?: Lazy
   /** Configuración → Pedidos: stations and pickup screen (orders_pro). */
   OrdersStationsSettings?: Lazy
+  /** Configuración → Pedidos online: take away / delivery from the online menu (online_orders). */
+  OnlineOrdersSettings?: Lazy
   /** Productos → Promos: combos and scheduled discounts (promos). */
   PromosTab?: Lazy
   /** Configuración → Fidelización: stamp-card programs (loyalty_pro). */
@@ -27,6 +29,14 @@ export interface ProModules {
   PosStampCards?: Lazy<PosStampCardsProps>
   /** Customer detail: stamp cards and their history (loyalty_pro). */
   CustomerStampCards?: Lazy<{ customerId: number }>
+  /** Empleados: team, time entries, hours report and advances (staff). */
+  Staff?: Lazy
+  /** Login screen: "Fichar" button + PIN time clock. Renders nothing without staff or employees. */
+  TimeClockButton?: Lazy
+  /** User menu → Fichar: the same time clock, preselecting the logged-in user's employee. */
+  TimeClockDialog?: Lazy<{ open: boolean; onOpenChange: (open: boolean) => void; userId?: number }>
+  /** Configuración → Cobros: «Conectar Mercado Pago», the store/POS for the QR and the Point device (payments). */
+  MercadoPagoConnect?: Lazy
 }
 
 /** A stamp-card reward the POS adds to the cart. */

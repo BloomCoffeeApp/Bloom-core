@@ -50,7 +50,7 @@ test('sizes: define them, price a product per size and sell a Grande in the POS'
     await dlg.getByLabel('Nombre').fill(name)
     await dlg.getByLabel('Abreviatura').fill(label)
     await dlg.getByLabel('Volumen en ml (opcional)').fill(ml)
-    await dlg.getByRole('button', { name: 'Guardar' }).click()
+    await dlg.getByRole('button', { name: 'Guardar', exact: true }).click()
     await expect(dlg).toBeHidden()
     await expect(page.getByTestId('size-card').filter({ hasText: name })).toContainText(`${ml} ml`)
   }
@@ -74,7 +74,7 @@ test('sizes: define them, price a product per size and sell a Grande in the POS'
   await shot(page, 'product-editor-sizes')
   await shot(page, 'product-editor-sizes', 'dark')
   await page.emulateMedia({ colorScheme: 'light' })
-  await editor.getByRole('button', { name: 'Guardar' }).click()
+  await editor.getByRole('button', { name: 'Guardar', exact: true }).click()
   await expect(editor).toBeHidden()
   const row = page.getByRole('row').filter({ hasText: product })
   await expect(row).toContainText(`${money(300_000)} – ${money(420_000)}`)

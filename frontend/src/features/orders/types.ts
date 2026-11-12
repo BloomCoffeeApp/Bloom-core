@@ -1,7 +1,65 @@
 // Mirrors backend/app/schemas/orders.py (order screen, open tabs, metrics).
 import type { Channel } from '../sales/types'
 
-export type OrderStatus = 'pending' | 'received' | 'preparing' | 'ready' | 'delivered' | 'cancelled'
+export type OrderStatus =
+  | 'pending'
+  | 'received'
+  | 'accepted'
+  | 'awaiting_pay'
+  | 'paid'
+  | 'preparing'
+  | 'ready'
+  | 'dispatched'
+  | 'delivered'
+  | 'cancelled'
+  | 'rejected'
+  | 'expired'
+/** Each channel's flow (backend services/order_flows.py). */
+export type FlowKey = 'caja' | 'mesa' | 'take_away' | 'delivery'
+export type BoardColumn = 'confirm' | 'payment' | 'queue' | 'preparing' | 'ready' | 'done'
+
+/** A button of the order's current state, rendered from data. */
+export interface OrderAction {
+  to: OrderStatus
+  label: string
+  tone: 'primary' | 'success' | 'secondary' | 'outline' | 'danger'
+  place: 'main' | 'menu'
+  /** eta = accept dialog; reason = required reason; reason_optional; confirm. */
+  needs: 'eta' | 'reason' | 'reason_optional' | 'confirm' | null
+  icon: string | null
+}
+
+export interface CustomerChange {
+  field: string
+  label: string
+  saved: string | null
+  new: string | null
+}
+
+/** Take away / delivery from the online menu (Pro online_orders). */
+export interface OnlineInfo {
+  customer_id: number | null
+  customer_name: string | null
+  customer_phone: string | null
+  address: string | null
+  address_ref: string | null
+  delivery_zone: string | null
+  delivery_fee_cents: number
+  total_cents: number
+  payment_method: 'online' | 'transfer' | 'cash' | null
+  payment_url: string | null
+  charge_id: number | null
+  refunded_cents: number
+  eta_minutes: number | null
+  accepted_at: string | null
+  paid_at: string | null
+  expires_at: string | null
+  expires_in_s: number | null
+  tracking_url: string | null
+  cancel_reason: string | null
+  sale_registered: boolean
+  customer_changes: CustomerChange[]
+}
 export type Level = 'pending' | 'ok' | 'warn' | 'late'
 
 export interface OrdersSettings {
@@ -27,7 +85,7 @@ export interface Order {
   id: number
   /** Per local day; stations share the number of the same sale. */
   number: number
-  source: 'pos' | 'table'
+  source: 'pos' | 'table' | 'online'
   status: OrderStatus
   channel: Channel
   table_id: number | null
@@ -47,6 +105,14 @@ export interface Order {
   elapsed_s: number
   late: boolean
   level: Level
+  flow: FlowKey
+  /** The step's name in this order's flow ("Servido", "Retirado", "Cancelado · devuelto"…). */
+  status_label: string
+  column: BoardColumn
+  /** Buttons of the current state (backend order_flows), already filtered by its guards. */
+  actions: OrderAction[]
+  payment_status: 'unpaid' | 'pending' | 'paid' | 'refunded' | 'refund_due'
+  online: OnlineInfo | null
 }
 
 export interface WaiterCall {
@@ -115,8 +181,14 @@ export interface OrdersSummary {
 export const STATUS_LABEL: Record<OrderStatus, string> = {
   pending: 'Por confirmar',
   received: 'Nuevo',
+  accepted: 'Aceptado',
+  awaiting_pay: 'Pago pendiente',
+  paid: 'Pagado',
   preparing: 'En preparación',
   ready: 'Listo',
+  dispatched: 'Enviado',
   delivered: 'Entregado',
   cancelled: 'Cancelado',
+  rejected: 'Rechazado',
+  expired: 'Vencido',
 }

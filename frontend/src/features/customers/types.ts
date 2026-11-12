@@ -7,6 +7,8 @@ export interface Customer {
   email: string | null
   birthday: string | null
   notes: string | null
+  address?: string | null
+  address_ref?: string | null
   points: number
   balance_cents: number
   credit_limit_cents: number

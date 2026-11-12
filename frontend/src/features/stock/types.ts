@@ -27,6 +27,54 @@ export interface StockItem {
   next_expiry: string | null
   /** Free plan: visible but not usable in recipes or stock movements. */
   locked?: boolean
+  /** Package types (stock stays in the base unit); the default one drives "4 × Sachet 1 L + 730 ml". */
+  packages: StockPackage[]
+}
+
+export interface StockPackage {
+  id: number
+  name: string
+  /** Base units (g/ml/u) per package. */
+  content_qty: number
+  barcode: string | null
+  /** Last price paid per package (cents). */
+  cost_cents: number | null
+  is_default: boolean
+}
+
+export type PackageInput = Omit<StockPackage, 'id' | 'barcode' | 'cost_cents'> & {
+  id?: number | null
+  barcode?: string | null
+  cost_cents?: number | null
+}
+
+export type DiscardReason = 'expired' | 'spill' | 'breakage' | 'leftover' | 'other'
+
+export interface DiscardInput {
+  stock_item_id: number
+  qty?: number
+  package_id?: number
+  packages?: number
+  all?: boolean
+  lot_id?: number | null
+  reason_code: DiscardReason
+  note?: string | null
+}
+
+export interface StockLot {
+  id: number
+  qty_remaining: number
+  expiry_date: string | null
+  created_at: string
+}
+
+/** Lightweight item for the quick discard of the POS / barista. */
+export interface QuickItem {
+  id: number
+  name: string
+  unit: Unit
+  current_qty: number
+  packages: StockPackage[]
 }
 
 export interface StockItemInput {

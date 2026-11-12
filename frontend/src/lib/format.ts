@@ -65,6 +65,8 @@ export const PAYMENT_LABEL: Record<string, string> = {
   credito: 'Crédito',
   transferencia: 'Transferencia',
   qr: 'QR / Billetera',
+  mp_qr: 'QR Mercado Pago',
+  mp_point: 'Point (posnet)',
   cuenta_corriente: 'Cuenta corriente',
 }
 

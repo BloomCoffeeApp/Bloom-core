@@ -45,6 +45,9 @@ export default defineConfig({
         BLOOM_DEMO: '1',
         BLOOM_DEMO_DIR: path.join(DATA_DIR, 'demo'),
         BLOOM_DEMO_SITE_URL: 'https://bloom.example.com',
+        // Every test browser comes from 127.0.0.1: relax the per-IP caps (pytest covers them).
+        BLOOM_DEMO_BURST_COUNT: '50',
+        BLOOM_DEMO_NEW_PER_IP_DAY: '50',
         CAFE_DATA_DIR: DATA_DIR,
         CAFE_DB_PATH: path.join(DATA_DIR, 'unused.db'),
         CAFE_PORT: String(API_PORT),

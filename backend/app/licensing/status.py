@@ -44,6 +44,8 @@ class LicenseStatus:
     machine_id: str = ""
     problem: str | None = None  # why a stored license isn't being honoured
     trial_ended: bool = False  # this PC already used its one Pro trial and it ran out
+    # Plan limits signed into the token (e.g. {"tables": 10}); absent = no limit.
+    limits: dict[str, int] = field(default_factory=dict)
 
     def has(self, feature: str) -> bool:
         return self.valid and ("*" in self.features or feature in self.features)
@@ -104,6 +106,13 @@ def write_state(**changes) -> None:
         pass
 
 
+def parse_limits(raw) -> dict[str, int]:
+    """Signed plan limits: only non-negative integers are honoured (anything else = no limit)."""
+    if not isinstance(raw, dict):
+        return {}
+    return {str(k): v for k, v in raw.items() if isinstance(v, int) and not isinstance(v, bool) and v >= 0}
+
+
 def evaluate(token: str | None, now: float | None = None) -> LicenseStatus:
     """Pure evaluation of a token at `now` for this machine (no caching, no I/O but the clock state)."""
     now_arg_missing = now is None
@@ -137,6 +146,7 @@ def evaluate(token: str | None, now: float | None = None) -> LicenseStatus:
     grace_days = int(p.get("grace", 0))
     status.plan = "trial" if p.get("plan") == "trial" else "pro"
     status.features = list(p.get("features") or [])
+    status.limits = parse_limits(p.get("limits"))
     status.perpetual = exp is None
     if exp is not None:
         status.expires_at = int(exp)

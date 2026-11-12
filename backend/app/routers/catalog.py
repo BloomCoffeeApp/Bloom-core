@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
-from app.auth import CurrentUser, Manager
+from app.auth import CurrentUser, Perm
 from app.db import get_db
 from app.models import User
 from app.schemas.catalog import (
@@ -27,6 +27,7 @@ from app.schemas.common import Ok
 from app.services import catalog as svc
 from app.services import free_plan, product_images
 
+Manager = Perm("catalog.edit")
 router = APIRouter(prefix="/api", tags=["catalog"])
 
 
@@ -71,7 +72,7 @@ def list_products(
 
 
 @router.post("/products/bulk-price", response_model=BulkPriceOut)
-def bulk_price(data: BulkPriceIn, db: Session = Depends(get_db), me: User = Manager) -> BulkPriceOut:
+def bulk_price(data: BulkPriceIn, db: Session = Depends(get_db), me: User = Perm("prices.edit")) -> BulkPriceOut:
     return svc.bulk_price(db, data, me)
 
 

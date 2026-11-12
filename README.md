@@ -173,6 +173,22 @@ Todo sale de [`brand.json`](brand.json) en la raíz:
 
 El ícono del `.exe` se regenera solo en `build/build.ps1` (`build/make_icon.py`); el logo de la app es `frontend/public/logo.svg` y `src/components/logo.tsx`.
 
+## Cobros con QR, Point y transferencia (Pro)
+
+La plata va **a la cuenta de cada local**, nunca a Bloom (Configuración → Cobros):
+
+- **QR de Mercado Pago con el monto**: es interoperable en Argentina, así que el cliente lo puede pagar con
+  Mercado Pago o con la app de su banco o billetera (MODO y bancos como Santander, Naranja X, Ualá…). Para
+  **recibir** el pago, el local necesita una cuenta de Mercado Pago («Conectar Mercado Pago»).
+- **Point (posnet)** de Mercado Pago vinculado al local, y **links de pago** (los usan los pedidos online).
+- **Transferencia**: para locales que solo tienen cuenta en un banco. El alias/CBU/CVU se muestra en la pantalla
+  del cliente y el cajero confirma «Pago recibido».
+- **Pantalla del cliente**: una tablet o TV en la red local abre `/pantalla-cliente?token=…` y muestra la compra,
+  el total y el QR; después, «¡Pago aprobado!». La venta se registra sola cuando el pago se aprueba.
+- La PC del local no recibe webhooks: mientras hay un cobro abierto, la app consulta su estado cada 2 s.
+- Otros proveedores (Getnet, Payway, MODO, Naranja X / Ualá Bis) se pueden sumar como adaptadores: ver
+  `PLAN.md` §9.
+
 ## Seguridad
 
 - Acceso por usuario + PIN con roles; todas las rutas de la API exigen sesión salvo login/configuración inicial.

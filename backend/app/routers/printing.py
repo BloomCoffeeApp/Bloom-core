@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.auth import AdminOnly, CurrentUser, require_role
+from app.auth import CurrentUser, Perm
 from app.db import get_db
 from app.models import User
 from app.schemas.printing import (
@@ -19,7 +19,8 @@ from app.services import printing as svc
 
 router = APIRouter(prefix="/api/printing", tags=["printing"])
 
-Seller = Depends(require_role("cajero", "encargado"))
+Seller = Perm("pos.sell")
+AdminOnly = Perm("settings.manage")
 
 
 @router.get("/status", response_model=PrintingStatus)
@@ -59,5 +60,5 @@ def open_drawer(sale_id: int, db: Session = Depends(get_db), _: User = Seller) -
 
 
 @router.post("/cash-sessions/{session_id}/z", response_model=PrintResult)
-def print_z(session_id: int, db: Session = Depends(get_db), _: User = Seller) -> dict:
+def print_z(session_id: int, db: Session = Depends(get_db), _: User = Perm("cash.open_close")) -> dict:
     return svc.print_z(db, session_id)

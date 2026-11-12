@@ -27,18 +27,19 @@ from app.models import (
     utcnow,
 )
 from app.schemas.sales import PaymentMethodUpdate, SaleIn
-from app.services import audit, free_plan, orders, recipes, sale_hooks, settings, stock
+from app.services import audit, channel_supplies, free_plan, orders, recipes, sale_hooks, settings, stock
 from app.services.orders import close_tab, tab_label
 from app.services.cash import CASH, method_names, require_open_session, user_names
 from app.services.timeutil import range_bounds_utc
 
 CC = "cuenta_corriente"
-DISCOUNT_ROLES = ("admin", "encargado")
 REWARD_REASON = "Premio fidelidad"
 
 
 def can_discount(user: User) -> bool:
-    return user.role in DISCOUNT_ROLES
+    from app.services import roles
+
+    return roles.has(user, "pos.discount")
 
 
 def loyalty_cfg(db: Session) -> dict[str, Any]:
@@ -112,6 +113,10 @@ def _create_sale(db: Session, data: SaleIn, user: User) -> Sale:
     wants_discount = data.discount_cents > 0 or (data.discount_pct or 0) > 0 or any(i.discount_cents > 0 for i in data.items)
     if courtesy:
         # On the house: any cashier can do it (it's audited), but nothing else about money applies.
+        from app.services import roles
+
+        if not roles.has(user, "pos.courtesy"):
+            raise HTTPException(403, "Tu rol no permite registrar cortesías")
         if wants_discount:
             raise HTTPException(400, "Una cortesía no lleva descuentos")
         if data.points_to_redeem:
@@ -119,7 +124,7 @@ def _create_sale(db: Session, data: SaleIn, user: User) -> Sale:
         if any(p.amount_cents > 0 for p in data.payments):
             raise HTTPException(400, "Una cortesía no se cobra: sacá los pagos")
     elif wants_discount and not can_discount(user):
-        raise HTTPException(403, "Solo un encargado o administrador puede aplicar descuentos")
+        raise HTTPException(403, "Solo un encargado o administrador puede aplicar descuentos (tu rol no lo permite)")
 
     tab = _open_tab(db, data.tab_id) if data.tab_id is not None else None
     ctx = LineContext(db, data.items)
@@ -291,6 +296,9 @@ def _create_sale(db: Session, data: SaleIn, user: User) -> Sale:
     # Lines charged from a table's tab already went to the bar as that table's orders.
     orders.create_from_sale(db, sale, [it.to_bar for it in data.items], user)
 
+    # Supplies by channel ("Insumos según el canal", e.g. vaso + tapa to go), same transaction; a void reverses them.
+    for sid, q in channel_supplies.consumption(db, sale.channel, [(p, size.size_id if size else None, it.qty) for it, p, size, *_ in priced]).items():
+        consumption[sid] += q
     for sid, q in consumption.items():
         reason = f"Cortesía #{sale.number}" if courtesy else f"Venta #{sale.number}"
         stock.apply_movement(db, sid, -q, "sale", ref_type="sale", ref_id=sale.id, reason=reason, user_id=user.id)

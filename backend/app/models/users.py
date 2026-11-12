@@ -41,3 +41,14 @@ class Setting(Base):
     __tablename__ = "settings"
     key: Mapped[str] = mapped_column(String(80), primary_key=True)
     value: Mapped[Any] = mapped_column(JSON)
+
+
+class Role(IdMixin, TimestampMixin, Base):
+    """Custom roles and edited built-in ones (a built-in role without a row uses its defaults:
+    `app/permissions.py`). `users.role` stores `key`. The admin role never has a row."""
+
+    __tablename__ = "roles"
+    key: Mapped[str] = mapped_column(String(20), unique=True)
+    name: Mapped[str] = mapped_column(String(40))
+    permissions: Mapped[list[str]] = mapped_column(JSON, default=list)
+    builtin: Mapped[bool] = mapped_column(default=False)

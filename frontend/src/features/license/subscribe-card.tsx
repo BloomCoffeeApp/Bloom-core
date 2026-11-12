@@ -112,6 +112,7 @@ export function SubscribeCard({ proLabel, onStarted }: { proLabel: string; onSta
             {p.description && <span className="mt-1 text-xs text-muted-foreground">{p.description}</span>}
             <span className="mt-auto flex items-center gap-1 pt-1 text-xs text-muted-foreground">
               <Monitor className="size-3" /> {p.devices} {p.devices === 1 ? 'computadora' : 'computadoras'}
+              {p.max_tables != null && <> · hasta {p.max_tables} mesas</>}
             </span>
           </button>
         ))}

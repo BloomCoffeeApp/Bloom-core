@@ -5,7 +5,10 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-OrderStatus = Literal["pending", "received", "preparing", "ready", "delivered", "cancelled"]
+OrderStatus = Literal[
+    "pending", "received", "accepted", "awaiting_pay", "paid", "preparing", "ready", "dispatched", "delivered",
+    "cancelled", "rejected", "expired",
+]
 Level = Literal["pending", "ok", "warn", "late"]
 
 
@@ -38,10 +41,52 @@ class OrderItemOut(BaseModel):
     notes: str | None
 
 
+class OrderAction(BaseModel):
+    """A button of the order's current state (services/order_flows.py)."""
+
+    to: str
+    label: str
+    tone: str
+    place: str
+    needs: str | None = None
+    icon: str | None = None
+
+
+class CustomerChange(BaseModel):
+    field: str
+    label: str
+    saved: str | None = None
+    new: str | None = None
+
+
+class OnlineInfo(BaseModel):
+    customer_id: int | None = None
+    customer_name: str | None = None
+    customer_phone: str | None = None
+    address: str | None = None
+    address_ref: str | None = None
+    delivery_zone: str | None = None
+    delivery_fee_cents: int = 0
+    total_cents: int = 0
+    payment_method: str | None = None
+    payment_url: str | None = None
+    charge_id: int | None = None  # collection charge (services/collect.py) of an online payment
+    refunded_cents: int = 0
+    eta_minutes: int | None = None
+    accepted_at: datetime | None = None
+    paid_at: datetime | None = None
+    expires_at: datetime | None = None
+    expires_in_s: int | None = None
+    tracking_url: str | None = None
+    cancel_reason: str | None = None
+    sale_registered: bool = False
+    customer_changes: list[CustomerChange] = []
+
+
 class OrderOut(BaseModel):
     id: int
     number: int
-    source: Literal["pos", "table"]
+    source: Literal["pos", "table", "online"]
     status: OrderStatus
     channel: str
     table_id: int | None
@@ -60,6 +105,12 @@ class OrderOut(BaseModel):
     elapsed_s: int
     late: bool
     level: Level
+    flow: str = "caja"  # caja | mesa | take_away | delivery
+    status_label: str = ""
+    column: str = "queue"  # confirm | payment | queue | preparing | ready | done
+    actions: list[OrderAction] = []
+    payment_status: str = "unpaid"
+    online: OnlineInfo | None = None
 
 
 class WaiterCallOut(BaseModel):
@@ -97,6 +148,7 @@ class BoardOut(BaseModel):
 class OrderStatusIn(BaseModel):
     status: OrderStatus
     reason: str | None = Field(default=None, max_length=200)
+    eta_minutes: int | None = Field(default=None, ge=1, le=600)  # «Aceptar» an online order
 
 
 class TabLineOut(BaseModel):

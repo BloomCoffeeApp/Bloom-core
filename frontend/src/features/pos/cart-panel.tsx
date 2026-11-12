@@ -264,6 +264,7 @@ export function CartPanel({
               <button
                 key={c.id}
                 onClick={() => cartApi.setChannel(c.id)}
+                aria-pressed={cart.channel === c.id}
                 className={cn(
                   'flex h-11 items-center justify-center gap-1.5 rounded-lg text-sm font-medium transition-colors',
                   cart.channel === c.id ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',

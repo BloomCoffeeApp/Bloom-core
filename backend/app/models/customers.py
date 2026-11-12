@@ -11,6 +11,9 @@ class Customer(IdMixin, TimestampMixin, Base):
     name: Mapped[str] = mapped_column(String(120), index=True)
     phone: Mapped[str | None] = mapped_column(String(40), index=True)
     email: Mapped[str | None] = mapped_column(String(120))
+    # Delivery address (online orders fill it in; migration 0009).
+    address: Mapped[str | None] = mapped_column(String(200))
+    address_ref: Mapped[str | None] = mapped_column(String(200))
     birthday: Mapped[date | None] = mapped_column(Date)
     notes: Mapped[str | None] = mapped_column(Text)
     points: Mapped[int] = mapped_column(default=0)

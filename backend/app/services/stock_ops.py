@@ -18,6 +18,7 @@ from app.models import (
     StockItem,
     StockLot,
     StockMovement,
+    StockPackage,
     Supplier,
     User,
     utcnow,
@@ -37,6 +38,11 @@ from app.schemas.stock import (
     StockSummary,
     SuggestionGroup,
     SuggestionItem,
+    DISCARD_REASONS,
+    PackageIn,
+    PackageOut,
+    QuickDiscardIn,
+    QuickItemOut,
     WasteIn,
 )
 from app.services import audit, free_plan
@@ -102,6 +108,7 @@ def item_out(
         value_cents=item_value_cents(item),
         next_expiry=(expiries or {}).get(item.id),
         locked=bool(item.active and usable is not None and item.id not in usable),
+        packages=[PackageOut.model_validate(p) for p in item.packages],
     )
 
 
@@ -297,17 +304,118 @@ def _consume_lots(db: Session, item_id: int, qty: float) -> None:
         remaining -= take
 
 
-def waste(db: Session, data: WasteIn, user: User) -> StockItemOut:
+def _discard_qty(db: Session, item: StockItem, data: WasteIn) -> tuple[float, StockLot | None]:
+    lot = None
+    if data.lot_id is not None:
+        lot = db.get(StockLot, data.lot_id)
+        if lot is None or lot.stock_item_id != item.id:
+            raise HTTPException(400, "Ese lote no es de este insumo")
+    if data.all:
+        qty = lot.qty_remaining if lot is not None else item.current_qty
+    elif data.packages is not None:
+        pkg = db.get(StockPackage, data.package_id)
+        if pkg is None or pkg.stock_item_id != item.id:
+            raise HTTPException(400, "Ese envase no es de este insumo")
+        qty = data.packages * pkg.content_qty
+    else:
+        qty = data.qty or 0
+    qty = round(qty, 4)
+    if qty <= 0:
+        raise HTTPException(400, "No hay nada para descartar" if data.all else "La cantidad tiene que ser mayor a cero")
+    if lot is not None and qty > lot.qty_remaining + 1e-9:
+        raise HTTPException(400, f"El lote tiene {lot.qty_remaining:g} {item.unit}")
+    return qty, lot
+
+
+def discard_reason(code: str | None, note: str | None, free_text: str | None = None) -> str:
+    parts = [DISCARD_REASONS[code]] if code else []
+    for extra in (note, free_text):
+        if extra and extra.strip():
+            parts.append(extra.strip())
+    return " — ".join(parts)[:300]
+
+
+def waste(db: Session, data: WasteIn, user: User, *, quick: bool = False) -> StockItemOut:
+    """Discard (merma) through apply_movement, so it shows in the losses reports. From a specific lot
+    when given; otherwise lots are consumed FEFO."""
     item = _usable_item(db, data.stock_item_id)
-    mv = apply_movement(db, item.id, -data.qty, "waste", reason=data.reason, user_id=user.id)
-    if item.track_expiry:
-        _consume_lots(db, item.id, data.qty)
+    qty, lot = _discard_qty(db, item, data)
+    reason = discard_reason(data.reason_code, data.note, data.reason)
+    mv = apply_movement(db, item.id, -qty, "waste", reason=reason, user_id=user.id)
+    if lot is not None:
+        lot.qty_remaining = round(lot.qty_remaining - qty, 4)
+    elif item.track_expiry:
+        _consume_lots(db, item.id, qty)
     db.flush()
     audit.log(
-        db, user.id, "stock_waste", "stock_item", item.id,
-        {"qty": data.qty, "reason": data.reason, "value_cents": round(data.qty * item.avg_cost_cents), "movement_id": mv.id},
+        db, user.id, "stock_quick_discard" if quick else "stock_waste", "stock_item", item.id,
+        {"qty": qty, "reason": reason, "lot_id": lot.id if lot else None, "value_cents": round(qty * item.avg_cost_cents),
+         "movement_id": mv.id},
     )
     db.commit()
+    return get_item(db, item.id)
+
+
+# Quick discard from the POS/barista is for small spills: bigger losses go through Stock (with permission).
+QUICK_MAX = {"g": 1000.0, "ml": 1000.0, "u": 10.0}
+
+
+def quick_discard(db: Session, data: QuickDiscardIn, user: User) -> StockItemOut:
+    item = _get_item(db, data.stock_item_id)
+    if not item.active:
+        raise HTTPException(400, "Ese insumo está archivado")
+    cap = QUICK_MAX.get(item.unit, 10.0)
+    if data.qty > cap:
+        raise HTTPException(400, f"Desde acá se descartan hasta {cap:g} {item.unit}. Para más, usá Stock → Descartar.")
+    return waste(db, WasteIn(stock_item_id=item.id, qty=data.qty, reason_code=data.reason_code, note=data.note), user, quick=True)
+
+
+def quick_items(db: Session) -> list[QuickItemOut]:
+    usable = free_plan.active_ids(db, "stock_items")
+    rows = db.scalars(select(StockItem).where(StockItem.active.is_(True)).order_by(StockItem.name))
+    return [
+        QuickItemOut(id=i.id, name=i.name, unit=i.unit, current_qty=i.current_qty,
+                     packages=[PackageOut.model_validate(p) for p in i.packages])
+        for i in rows if usable is None or i.id in usable
+    ]
+
+
+def lots(db: Session, item_id: int) -> list[StockLot]:
+    _get_item(db, item_id)
+    return list(db.scalars(
+        select(StockLot).where(StockLot.stock_item_id == item_id, StockLot.qty_remaining > 0)
+        .order_by(StockLot.expiry_date.is_(None), StockLot.expiry_date, StockLot.id)
+    ))
+
+
+# ---------------------------------------------------------------- packages
+def set_packages(db: Session, item_id: int, rows: list[PackageIn], user: User) -> StockItemOut:
+    """Replaces the item's package types (ids keep existing ones). At most one default; the first if none."""
+    item = _usable_item(db, item_id)
+    names = [r.name.strip().lower() for r in rows]
+    if len(set(names)) != len(names):
+        raise HTTPException(400, "Hay dos envases con el mismo nombre")
+    existing = {p.id: p for p in item.packages}
+    keep: list[StockPackage] = []
+    default_seen = False
+    for i, r in enumerate(rows):
+        pkg = existing.get(r.id) if r.id is not None else None
+        if r.id is not None and pkg is None:
+            raise HTTPException(400, "Envase inexistente")
+        if pkg is None:
+            pkg = StockPackage(stock_item_id=item.id)
+        pkg.name, pkg.content_qty = r.name.strip(), round(r.content_qty, 4)
+        pkg.barcode = (r.barcode or "").strip() or None
+        pkg.cost_cents, pkg.sort_order = r.cost_cents, i
+        pkg.is_default = r.is_default and not default_seen
+        default_seen = default_seen or pkg.is_default
+        keep.append(pkg)
+    if keep and not default_seen:
+        keep[0].is_default = True
+    item.packages = keep
+    audit.log(db, user.id, "packages", "stock_item", item.id, {"packages": [r.model_dump() for r in rows]})
+    db.commit()
+    db.refresh(item)
     return get_item(db, item.id)
 
 

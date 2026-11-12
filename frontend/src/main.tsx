@@ -10,6 +10,7 @@ import { Toaster } from '@/components/ui/sonner'
 import { DesktopProvider } from '@/components/window-controls'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { AuthProvider } from '@/lib/auth-provider'
+import { registerPwa } from '@/lib/pwa'
 import { ThemeProvider } from '@/lib/theme-provider'
 
 const queryClient = new QueryClient({
@@ -17,6 +18,8 @@ const queryClient = new QueryClient({
     queries: { staleTime: 15_000, refetchOnWindowFocus: false, retry: 1 },
   },
 })
+
+registerPwa()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

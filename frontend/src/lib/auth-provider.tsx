@@ -2,7 +2,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 
 import { api, setUnauthorizedHandler, tokenStore } from '@/lib/api'
-import { AuthContext, type AuthUser, type LoginResponse, type Role } from '@/lib/auth'
+import { AuthContext, type AuthUser, type LoginResponse, type Permission } from '@/lib/auth'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
@@ -44,7 +44,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [clear])
 
   const can = useCallback(
-    (...roles: Role[]) => !!user && (user.role === 'admin' || roles.includes(user.role)),
+    (...perms: Permission[]) =>
+      !!user && (user.role === 'admin' || perms.some((p) => user.permissions?.includes(p))),
     [user],
   )
 

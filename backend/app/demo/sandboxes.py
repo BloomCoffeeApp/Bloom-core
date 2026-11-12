@@ -28,6 +28,8 @@ log = logging.getLogger("cafeteria.demo")
 # so a cookie can never point outside the sandbox folder.
 SID_RE = re.compile(r"[0-9a-f]{32}")
 TEMPLATE_NAME = "template.db"
+DEMO_MARKER = "demo_sandbox"  # settings key present only in demo databases
+ENDED_KEEP_S = 24 * 3600  # how long we remember why a sandbox ended (for the end screen)
 
 
 class SandboxesFull(Exception):
@@ -83,6 +85,8 @@ def build_template(path: Path) -> None:
             biz = settings_svc.get(db, "business")
             settings_svc.put(db, "business", {**biz, "name": DEMO_BUSINESS, "ticket_footer": "Demo de Bloom: datos de ejemplo"})
             settings_svc.put(db, "backup", {"enabled": False, "keep": 1})
+            # Marks every copy as demo data: restoring a backup made from it is refused (system.restore_backup).
+            settings_svc.put(db, DEMO_MARKER, True)
             alerts_engine.evaluate(db)
             db.commit()
     finally:
@@ -130,6 +134,8 @@ class SandboxManager:
     _boxes: dict[str, Sandbox] = field(default_factory=dict)
     _template: Path | None = None
     _new_by_ip: dict[str, list[float]] = field(default_factory=dict)
+    _blocked: dict[str, float] = field(default_factory=dict)  # ip -> blocked until
+    _ended: dict[str, tuple[str, float]] = field(default_factory=dict)  # sid -> (reason, when)
     _req_windows: dict[str, _Window] = field(default_factory=dict)
     _stop: threading.Event = field(default_factory=threading.Event)
     _threads: list[threading.Thread] = field(default_factory=list)
@@ -199,20 +205,47 @@ class SandboxManager:
         with self._lock:
             return len(self._boxes)
 
-    def peek(self, sid: str | None) -> bool:
-        """Whether `sid` names a live sandbox (without counting as activity)."""
-        if not valid_sid(sid):
-            return False
-        with self._lock:
-            return sid in self._boxes
+    def _expired(self, box: Sandbox, now: float) -> bool:
+        return now - box.created >= self.settings.lifetime_seconds
 
-    def get(self, sid: str | None) -> Sandbox | None:
+    def peek(self, sid: str | None, now: float | None = None) -> bool:
+        """Whether `sid` names a live sandbox (without counting as activity)."""
+        return self.expires_in(sid, now) is not None
+
+    def expires_in(self, sid: str | None, now: float | None = None) -> int | None:
+        """Seconds left of the sandbox's absolute lifetime; None if there's no live sandbox."""
         if not valid_sid(sid):
             return None
+        now = time.time() if now is None else now
         with self._lock:
             box = self._boxes.get(sid)  # type: ignore[arg-type]
-            if box is not None:
-                box.last_seen = time.time()
+            if box is None or self._expired(box, now):
+                return None
+            return max(0, int(box.created + self.settings.lifetime_seconds - now))
+
+    def ended_reason(self, sid: str | None) -> str | None:
+        """"lifetime" | "idle" for a sandbox this server deleted (or expired) recently."""
+        if not valid_sid(sid):
+            return None
+        now = time.time()
+        with self._lock:
+            box = self._boxes.get(sid)  # type: ignore[arg-type]
+            if box is not None and self._expired(box, now):
+                return "lifetime"
+            ended = self._ended.get(sid)  # type: ignore[arg-type]
+            return ended[0] if ended else None
+
+    def get(self, sid: str | None, now: float | None = None) -> Sandbox | None:
+        """The live sandbox. Past its absolute lifetime it's gone for the visitor at once (deleted by the
+        next cleanup, never while a request is using it)."""
+        if not valid_sid(sid):
+            return None
+        now = time.time() if now is None else now
+        with self._lock:
+            box = self._boxes.get(sid)  # type: ignore[arg-type]
+            if box is None or self._expired(box, now):
+                return None
+            box.last_seen = now
             return box
 
     def create(self) -> Sandbox:
@@ -256,13 +289,24 @@ class SandboxManager:
         now = time.time() if now is None else now
         limit = self.settings.idle_seconds
         with self._lock:
-            expired = [b for b in self._boxes.values() if b.active == 0 and now - b.last_seen > limit]
+            expired = []
+            for b in list(self._boxes.values()):
+                if b.active:
+                    continue
+                if self._expired(b, now):
+                    expired.append(b)
+                    self._ended[b.sid] = ("lifetime", now)
+                elif now - b.last_seen > limit:
+                    expired.append(b)
+                    self._ended[b.sid] = ("idle", now)
             for b in expired:
                 del self._boxes[b.sid]
+            self._ended = {k: v for k, v in self._ended.items() if now - v[1] < ENDED_KEEP_S}
+            self._blocked = {ip: until for ip, until in self._blocked.items() if until > now}
             known = {b.path.name for b in self._boxes.values()}
             # Forget rate-limit windows that no longer matter.
-            hour_ago = now - 3600
-            self._new_by_ip = {ip: [t for t in ts if t > hour_ago] for ip, ts in self._new_by_ip.items() if any(t > hour_ago for t in ts)}
+            day_ago = now - 86400
+            self._new_by_ip = {ip: [t for t in ts if t > day_ago] for ip, ts in self._new_by_ip.items() if any(t > day_ago for t in ts)}
             self._req_windows = {k: w for k, w in self._req_windows.items() if now - w.start < 120}
         for b in expired:
             b.engine.dispose()
@@ -272,7 +316,7 @@ class SandboxManager:
                 if f.name not in known and now - f.stat().st_mtime > 300:
                     _remove_db_files(f)
         if expired:
-            log.info("demo: deleted %d idle sandbox(es), %d left", len(expired), len(known))
+            log.info("demo: deleted %d idle/expired sandbox(es), %d left", len(expired), len(known))
         return len(expired)
 
     def _cleanup_loop(self) -> None:
@@ -285,16 +329,37 @@ class SandboxManager:
     # ------------------------------------------------------------------ rate limits
 
     def allow_new(self, ip: str, now: float | None = None) -> bool:
-        """At most `new_per_ip_per_hour` sandboxes per client IP per rolling hour."""
+        """check_new + record_new in one step (tests and simple callers)."""
+        if self.check_new(ip, now) is not None:
+            return False
+        self.record_new(ip, now)
+        return True
+
+    def check_new(self, ip: str, now: float | None = None) -> str | None:
+        """None if `ip` may get a new sandbox (call `record_new` once it exists), or why not: "blocked"
+        (temporary block after a burst), "burst" (this attempt started the block), "day" (rolling 24 h cap)
+        or "hour" (rolling hour cap)."""
+        now = time.time() if now is None else now
+        s = self.settings
+        with self._lock:
+            if self._blocked.get(ip, 0) > now:
+                return "blocked"
+            recent = [t for t in self._new_by_ip.get(ip, []) if now - t < 86400]
+            self._new_by_ip[ip] = recent
+            if sum(1 for t in recent if now - t < s.burst_minutes * 60) >= s.burst_count:
+                self._blocked[ip] = now + s.block_minutes * 60
+                log.warning("demo: %s blocked for %g min (sandboxes in a burst)", ip, s.block_minutes)
+                return "burst"
+            if len(recent) >= s.new_per_ip_per_day:
+                return "day"
+            if sum(1 for t in recent if now - t < 3600) >= s.new_per_ip_per_hour:
+                return "hour"
+            return None
+
+    def record_new(self, ip: str, now: float | None = None) -> None:
         now = time.time() if now is None else now
         with self._lock:
-            recent = [t for t in self._new_by_ip.get(ip, []) if now - t < 3600]
-            if len(recent) >= self.settings.new_per_ip_per_hour:
-                self._new_by_ip[ip] = recent
-                return False
-            recent.append(now)
-            self._new_by_ip[ip] = recent
-            return True
+            self._new_by_ip.setdefault(ip, []).append(now)
 
     def allow_request(self, key: str, now: float | None = None) -> bool:
         """Fixed one-minute window of `requests_per_minute` per key (client IP)."""

@@ -27,8 +27,8 @@ export function useBoard(station: number | null) {
 export function useSetOrderStatus() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, status, reason }: { id: number; status: OrderStatus; reason?: string }) =>
-      api.post<Order>(`/orders/${id}/status`, { status, reason }),
+    mutationFn: ({ id, status, reason, eta_minutes }: { id: number; status: OrderStatus; reason?: string; eta_minutes?: number }) =>
+      api.post<Order>(`/orders/${id}/status`, { status, reason, eta_minutes }),
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ['orders'] })
     },
@@ -69,5 +69,26 @@ export function useOpenTabs(enabled = true) {
     queryFn: () => api.get<Tab[]>('/tabs'),
     enabled,
     refetchInterval: 10_000,
+  })
+}
+
+// ---------------------------------------------------------------- online take away / delivery (Pro online_orders)
+
+/** wa.me link with the message already written (opens WhatsApp Desktop or Web). */
+export async function whatsappLink(id: number, kind: 'accepted' | 'ready' | 'dispatched' | 'generic') {
+  return api.get<{ url: string; text: string }>(`/online-orders/${id}/whatsapp`, { kind })
+}
+
+export function useOnlineOrderAction() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, action }: { id: number; action: 'check-payment' | 'register-sale' | 'update-customer' }) =>
+      api.post<Order>(`/online-orders/${id}/${action}`),
+    onSuccess: (_o, v) => {
+      if (v.action === 'update-customer') toast.success('Datos del cliente actualizados')
+      if (v.action === 'register-sale') toast.success('Venta registrada')
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ['orders'] }),
+    onError: (e: Error) => toast.error(e.message),
   })
 }

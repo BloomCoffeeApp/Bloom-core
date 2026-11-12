@@ -19,6 +19,9 @@ PRO_FEATURES: dict[str, str] = {
     "orders_pro": "Pedidos avanzados (estaciones, tiempos por producto, pantalla de retiro)",
     "loyalty_pro": "Fidelidad por compras (tarjeta de sellos)",
     "promos": "Promociones: combos y descuentos programados",
+    "payments": "Cobros con QR, posnet y links de pago",
+    "staff": "Empleados: fichaje, horas y sueldos",
+    "online_orders": "Pedidos online: take away y delivery desde el menú online",
 }
 
 # Free plan caps. The vendor can change them without a new .exe through the signed remote config

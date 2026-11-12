@@ -6,6 +6,7 @@ import {
   Gift,
   Landmark,
   QrCode,
+  Smartphone,
   Split,
   Trash2,
   Wallet,
@@ -30,6 +31,8 @@ const ICONS: Record<string, LucideIcon> = {
   credito: CreditCard,
   transferencia: Landmark,
   qr: QrCode,
+  mp_qr: QrCode,
+  mp_point: Smartphone,
   cuenta_corriente: BookUser,
 }
 

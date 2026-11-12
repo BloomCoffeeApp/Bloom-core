@@ -22,6 +22,13 @@ class Coffee(IdMixin, TimestampMixin, Base):
     tasting_notes: Mapped[str | None] = mapped_column(Text)
     stock_item_id: Mapped[int | None] = mapped_column(ForeignKey("stock_items.id"))
     active: Mapped[bool] = mapped_column(default=True)
+    # Tasting profile ("perfil"): expected notes (keys of the flavor wheel), roast point
+    # (light..dark scale key) and expected 1..5 values {body, aroma, sweetness, bitterness, acidity}.
+    flavor_notes: Mapped[list[str] | None] = mapped_column(JSON)
+    roast_point: Mapped[str | None] = mapped_column(String(20))
+    taste_profile: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    # Shown to customers as the coffee in use: house | decaf | origin (None = not on the menu).
+    menu_role: Mapped[str | None] = mapped_column(String(10))
 
 
 class Equipment(IdMixin, TimestampMixin, Base):
@@ -83,12 +90,17 @@ class ShotLog(IdMixin, Base):
     tds: Mapped[float | None] = mapped_column(Float)
     ratio: Mapped[float | None] = mapped_column(Float)
     ey_pct: Mapped[float | None] = mapped_column(Float)
-    # Sensory scales: acidity/bitterness/body/sweetness 1..5, score 1..5
+    # Sensory scales: acidity/bitterness/body/sweetness/aroma 1..5, score 1..5
     acidity: Mapped[int | None]
     bitterness: Mapped[int | None]
     body: Mapped[int | None]
     sweetness: Mapped[int | None]
+    aroma: Mapped[int | None]
     score: Mapped[int | None]
+    # Optional cupping scores 0..10: {fragrance, flavor, aftertaste, acidity, body, balance, overall}
+    cupping: Mapped[dict[str, float] | None] = mapped_column(JSON)
+    # Flavor notes: keys of the flavor wheel (bloom_pro/services/flavor_wheel.json)
+    flavor_notes: Mapped[list[str] | None] = mapped_column(JSON)
     channeling: Mapped[bool] = mapped_column(default=False)
     notes: Mapped[str | None] = mapped_column(Text)
     suggestion: Mapped[str | None] = mapped_column(Text)

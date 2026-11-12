@@ -63,6 +63,42 @@ class PublicCategory(BaseModel):
     products: list[PublicProduct]
 
 
+class PublicFlavorNote(BaseModel):
+    key: str
+    label: str
+    category: str  # top-level wheel category (color token suffix: `color`)
+    color: str
+
+
+class PublicCoffee(BaseModel):
+    """Coffee in use shown to customers (Pro barista: "Café de hoy"), linked to the products that
+    use it (recipe) and to the options of the "Tipo de café" modifier group."""
+
+    id: int
+    name: str
+    role: str  # house | decaf | origin
+    role_label: str
+    roaster: str | None = None
+    origin: str | None = None
+    variety: str | None = None
+    process: str | None = None
+    altitude_m: int | None = None
+    roast_point: str | None = None
+    roast_label: str | None = None
+    notes: list[PublicFlavorNote] = []
+    profile: dict[str, int] | None = None  # body/aroma/sweetness/bitterness/acidity 1..5
+    product_ids: list[int] = []
+    modifier_ids: list[int] = []
+
+
+class PublicWifi(BaseModel):
+    """«WiFi» button (Pro): network, password and a QR (PNG data URL) to join it."""
+
+    ssid: str
+    password: str = ""
+    qr: str | None = None
+
+
 class PublicMenuOut(BaseModel):
     business_name: str
     show_prices: bool
@@ -70,3 +106,5 @@ class PublicMenuOut(BaseModel):
     categories: list[PublicCategory]
     tag_labels: dict[str, str] = {}
     combos: list[PublicCombo] = []  # active combos (Pro `promos`)
+    coffees: list[PublicCoffee] = []  # coffees in use (Pro barista)
+    wifi: PublicWifi | None = None  # «WiFi» button, when the café turned it on (Pro)

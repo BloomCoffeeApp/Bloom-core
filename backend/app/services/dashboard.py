@@ -45,11 +45,12 @@ MOVEMENT_LABEL = {
     "purchase": "Compra", "sale": "Venta", "adjustment": "Ajuste", "waste": "Merma",
     "internal": "Consumo interno", "void": "Anulación", "count": "Conteo",
 }
-COST_ROLES = ("admin", "encargado")
 
 
 def can_see_costs(user: User) -> bool:
-    return user.role in COST_ROLES
+    from app.services import roles
+
+    return roles.has(user, "reports.view")
 
 
 # ---------------------------------------------------------------- helpers

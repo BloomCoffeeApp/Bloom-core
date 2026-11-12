@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -40,6 +40,28 @@ class StockItemUpdate(BaseModel):
     active: bool | None = None
 
 
+class PackageIn(BaseModel):
+    id: int | None = None  # existing package (kept), or None = new
+    name: str = Field(min_length=1, max_length=60)
+    content_qty: float = Field(gt=0, le=1_000_000)  # base units (g/ml/u) per package
+    barcode: str | None = Field(default=None, max_length=40)
+    cost_cents: int | None = Field(default=None, ge=0)
+    is_default: bool = False
+
+
+class PackageOut(ORM):
+    id: int
+    name: str
+    content_qty: float
+    barcode: str | None
+    cost_cents: int | None
+    is_default: bool
+
+
+class PackagesIn(BaseModel):
+    packages: list[PackageIn] = Field(max_length=20)
+
+
 class StockItemOut(BaseModel):
     id: int
     name: str
@@ -58,6 +80,8 @@ class StockItemOut(BaseModel):
     next_expiry: str | None = None
     # Free plan: visible but not usable in recipes or stock movements (services/free_plan.py).
     locked: bool = False
+    # Package types (stock stays in the base unit); the default one drives "4 envases + 730 ml".
+    packages: list[PackageOut] = []
 
 
 class MovementOut(BaseModel):
@@ -88,10 +112,65 @@ class AdjustIn(BaseModel):
         return self
 
 
+DISCARD_REASONS: dict[str, str] = {
+    "expired": "Vencido",
+    "spill": "Derrame / se cayó",
+    "breakage": "Rotura",
+    "leftover": "Sobrante de preparación",
+    "other": "Otro",
+}
+
+
 class WasteIn(BaseModel):
+    """Discard (merma). The amount is ONE of: `qty` (base units), `packages` of `package_id`, `all`
+    (everything left, or everything left in `lot_id`)."""
+
+    stock_item_id: int
+    qty: float | None = Field(default=None, gt=0)
+    package_id: int | None = None
+    packages: float | None = Field(default=None, gt=0)
+    all: bool = False
+    lot_id: int | None = None
+    reason_code: str | None = Field(default=None, pattern=r"^(expired|spill|breakage|leftover|other)$")
+    note: str | None = Field(default=None, max_length=300)
+    reason: str | None = Field(default=None, max_length=300)  # free text (older clients)
+
+    @model_validator(mode="after")
+    def _amount(self) -> "WasteIn":
+        given = sum([self.qty is not None, self.packages is not None, self.all])
+        if given != 1:
+            raise ValueError("Indicá cuánto descartar: una cantidad, envases o todo")
+        if self.packages is not None and self.package_id is None:
+            raise ValueError("Elegí el envase")
+        if not (self.reason_code or (self.reason or "").strip()):
+            raise ValueError("Elegí un motivo")
+        if self.reason_code == "other" and not (self.note or "").strip():
+            raise ValueError("Contá brevemente qué pasó")
+        return self
+
+
+class QuickDiscardIn(BaseModel):
+    """Small spills from the POS/barista ("se cayeron 10 ml de leche")."""
+
     stock_item_id: int
     qty: float = Field(gt=0)
-    reason: str = Field(min_length=1, max_length=300)
+    reason_code: str = Field(default="spill", pattern=r"^(expired|spill|breakage|leftover|other)$")
+    note: str | None = Field(default=None, max_length=300)
+
+
+class QuickItemOut(BaseModel):
+    id: int
+    name: str
+    unit: str
+    current_qty: float
+    packages: list[PackageOut] = []
+
+
+class LotOut(ORM):
+    id: int
+    qty_remaining: float
+    expiry_date: date | None
+    created_at: datetime
 
 
 class CountCreate(BaseModel):

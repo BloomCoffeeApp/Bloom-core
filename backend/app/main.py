@@ -13,12 +13,16 @@ from app.routers import (
     auth,
     business,
     catalog,
+    channel_supplies,
+    collect,
     customers,
     dashboard,
+    expenses,
     license,
     orders,
     printing,
     remote_config,
+    roles,
     sales,
     stock,
     system,
@@ -33,8 +37,8 @@ except ImportError:
 
 ROUTER_MODULES = (
     account,
-    auth, license, remote_config, users, business, dashboard, catalog, stock, sales, orders, customers, alerts, system, updates,
-    printing,
+    auth, license, remote_config, users, roles, business, dashboard, catalog, stock, sales, orders, customers, alerts, system, updates,
+    printing, expenses, collect, channel_supplies,
 )
 EDITION = "pro" if bloom_pro else "free"
 
@@ -108,10 +112,17 @@ def create_app(run_lifespan: bool = True) -> FastAPI:
             # Unknown API paths (e.g. a Pro endpoint in the Free edition) are a 404, never the app page.
             if path == "api" or path.startswith("api/"):
                 raise HTTPException(404, "Not Found")
+            # PWA: the service worker, the manifest and the shell must be revalidated on every load,
+            # or tablets would keep an old version (hashed /assets/* can be cached forever).
+            revalidate = {"Cache-Control": "no-cache"}
             candidate = (FRONTEND_DIST / path).resolve()
             if path and candidate.is_file() and FRONTEND_DIST.resolve() in candidate.parents:
+                if path == "manifest.webmanifest":
+                    return FileResponse(candidate, media_type="application/manifest+json", headers=revalidate)
+                if path in ("sw.js", "index.html"):
+                    return FileResponse(candidate, headers=revalidate)
                 return FileResponse(candidate)
-            return FileResponse(FRONTEND_DIST / "index.html")
+            return FileResponse(FRONTEND_DIST / "index.html", headers=revalidate)
 
     return app
 

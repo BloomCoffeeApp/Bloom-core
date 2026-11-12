@@ -1,4 +1,4 @@
-import type { Role } from '@/lib/auth'
+import type { Permission } from '@/lib/permissions'
 import { BRAND } from '@/lib/brand'
 
 export interface TourStep {
@@ -6,8 +6,8 @@ export interface TourStep {
   target?: string
   title: string
   body: string
-  /** Roles that see this step besides admin. Empty = everyone. */
-  roles?: Role[]
+  /** Permissions that show this step (any; admin always). Empty = everyone. */
+  perms?: Permission[]
   /** Navigate here before showing the step. */
   route?: string
 }
@@ -31,55 +31,55 @@ export const TOUR_STEPS: TourStep[] = [
   {
     target: 'nav-/pos',
     title: 'Punto de venta',
-    roles: ['cajero', 'encargado'],
+    perms: ['pos.sell'],
     body: 'Para cobrar. Tocá los productos, elegí modificadores (leche, shot extra…) y cobrá con uno o varios medios de pago. Atajo: F1.',
   },
   {
     target: 'nav-/caja',
     title: 'Caja',
-    roles: ['cajero', 'encargado'],
+    perms: ['cash.open_close', 'cash.movements'],
     body: 'Abrí la caja al empezar el turno, registrá ingresos y retiros, y cerrala con el arqueo al final del día.',
   },
   {
     target: 'nav-/barista',
     title: 'Barista',
-    roles: ['barista', 'encargado'],
+    perms: ['barista.use'],
     body: 'Registrá cada shot (dosis, rendimiento, tiempo, molienda, temperatura) y el asistente te sugiere cómo calibrar el espresso.',
   },
   {
     target: 'nav-/productos',
     title: 'Productos',
-    roles: ['encargado'],
+    perms: ['catalog.edit', 'prices.edit'],
     body: 'El menú del local: precios, categorías y recetas con su costo y margen calculados en vivo.',
   },
   {
     target: 'nav-/stock',
     title: 'Stock',
-    roles: ['encargado', 'barista'],
+    perms: ['stock.view'],
     body: 'Insumos con semáforo de stock, mermas, conteos físicos y sugerencias de compra.',
   },
   {
     target: 'nav-/compras',
     title: 'Compras',
-    roles: ['encargado'],
+    perms: ['purchases.manage'],
     body: 'Proveedores, órdenes de compra, facturas, pagos y vencimientos.',
   },
   {
     target: 'nav-/clientes',
     title: 'Clientes',
-    roles: ['cajero', 'encargado'],
+    perms: ['customers.edit'],
     body: 'Fichas de clientes, puntos de fidelización y cuenta corriente.',
   },
   {
     target: 'nav-/ventas',
     title: 'Ventas',
-    roles: ['cajero', 'encargado'],
+    perms: ['pos.sell'],
     body: 'El historial de tickets: buscá una venta, reimprimí el ticket o anulala si hace falta.',
   },
   {
     target: 'nav-/reportes',
     title: 'Reportes',
-    roles: ['encargado'],
+    perms: ['reports.view'],
     body: 'Ventas, rentabilidad, stock y cajas, exportables a Excel.',
   },
   {

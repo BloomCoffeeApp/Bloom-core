@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.auth import AdminOnly, CurrentUser, require_role
+from app.auth import CurrentUser, Perm
 from app.db import get_db
 from app.licensing import current_status, free_limits
 from app.models import CashSession, PaymentMethod, User
@@ -27,13 +27,17 @@ from app.schemas.sales import (
     TicketOut,
 )
 from app.services import cash as cash_svc
+from app.services import roles
 from app.services import sales as sales_svc
 from app.services.timeutil import local_today
 
 router = APIRouter(prefix="/api", tags=["sales"])
 
-Seller = Depends(require_role("cajero", "encargado"))
-Manager = Depends(require_role("encargado"))
+Seller = Perm("pos.sell")
+Cashier = Perm("cash.open_close")
+CashMoves = Perm("cash.movements")
+Voider = Perm("sales.void")
+SettingsAdmin = Perm("settings.manage")
 
 
 @router.get("/payment-methods", response_model=list[PaymentMethodOut])
@@ -41,12 +45,12 @@ def payment_methods(
     include_inactive: bool = False, db: Session = Depends(get_db), user: User = CurrentUser
 ) -> list[PaymentMethod]:
     # Disabled methods are only relevant to whoever can re-enable them.
-    return sales_svc.list_payment_methods(db, include_inactive and user.role == "admin")
+    return sales_svc.list_payment_methods(db, include_inactive and roles.has(user, "settings.manage"))
 
 
 @router.patch("/payment-methods/{method_id}", response_model=PaymentMethodOut)
 def update_payment_method(
-    method_id: int, data: PaymentMethodUpdate, db: Session = Depends(get_db), user: User = AdminOnly
+    method_id: int, data: PaymentMethodUpdate, db: Session = Depends(get_db), user: User = SettingsAdmin
 ) -> PaymentMethod:
     return sales_svc.update_payment_method(db, method_id, data, user)
 
@@ -73,19 +77,19 @@ def cash_current(db: Session = Depends(get_db), _: User = CurrentUser) -> dict |
 
 
 @router.post("/cash/open", response_model=CashSessionOut)
-def cash_open(data: CashOpenIn, db: Session = Depends(get_db), user: User = Seller) -> dict:
+def cash_open(data: CashOpenIn, db: Session = Depends(get_db), user: User = Cashier) -> dict:
     s = cash_svc.open_session(db, data.opening_cents, user)
     return cash_svc.session_summary(db, s)
 
 
 @router.post("/cash/movements", response_model=CashMovementOut)
-def cash_movement(data: CashMovementIn, db: Session = Depends(get_db), user: User = Seller) -> dict:
+def cash_movement(data: CashMovementIn, db: Session = Depends(get_db), user: User = CashMoves) -> dict:
     mv = cash_svc.add_movement(db, data.type, data.amount_cents, data.reason, user)
     return {**CashMovementOut.model_validate(mv).model_dump(), "user_name": user.name}
 
 
 @router.post("/cash/close", response_model=CashSessionDetail)
-def cash_close(data: CashCloseIn, db: Session = Depends(get_db), user: User = Seller) -> dict:
+def cash_close(data: CashCloseIn, db: Session = Depends(get_db), user: User = Cashier) -> dict:
     s = cash_svc.close_session(db, [(c.payment_method, c.counted_cents) for c in data.counts], data.notes, user)
     return cash_svc.session_summary(db, s, detail=True)
 
@@ -95,13 +99,13 @@ def cash_sessions(
     limit: int = Query(60, ge=1, le=500),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
-    _: User = Seller,
+    _: User = Cashier,
 ) -> list[dict]:
     return cash_svc.list_sessions(db, limit, offset)
 
 
 @router.get("/cash/sessions/{session_id}", response_model=CashSessionDetail)
-def cash_session_detail(session_id: int, db: Session = Depends(get_db), _: User = Seller) -> dict:
+def cash_session_detail(session_id: int, db: Session = Depends(get_db), _: User = Cashier) -> dict:
     s = db.get(CashSession, session_id)
     if s is None:
         raise HTTPException(404, "Sesión de caja no encontrada")
@@ -156,7 +160,7 @@ def sale_detail(sale_id: int, db: Session = Depends(get_db), _: User = Seller) -
 
 
 @router.post("/sales/{sale_id}/void", response_model=SaleDetail)
-def void_sale(sale_id: int, data: SaleVoidIn, db: Session = Depends(get_db), user: User = Manager) -> dict:
+def void_sale(sale_id: int, data: SaleVoidIn, db: Session = Depends(get_db), user: User = Voider) -> dict:
     sales_svc.void_sale(db, sale_id, data.reason, user)
     return sales_svc.get_detail(db, sale_id)
 

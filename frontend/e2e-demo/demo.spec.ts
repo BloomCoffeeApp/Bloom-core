@@ -62,7 +62,7 @@ test('every visitor gets their own sandbox: sales never leak between browsers', 
     expect(cookieA?.value).not.toBe(cookieB?.value)
 
     // The banner is always there and explains the demo.
-    await expect(pageA.getByTestId('demo-banner')).toHaveText(/Demo: los datos se borran solos/)
+    await expect(pageA.getByTestId('demo-banner')).toHaveText(/Tu demo se borra en (1 h 5\d|2 h 00) min/)
     await pageA.getByTestId('demo-banner').click()
     await expect(pageA.getByText('PIN 1234')).toBeVisible()
     await pageA.keyboard.press('Escape')
@@ -99,6 +99,61 @@ test('features that reach outside the sandbox are off with a friendly message', 
     expect((await res.json()).detail).toContain('desactivados en la demo')
     const lic = await (await page.request.get('/api/license', { headers: auth })).json()
     expect(lic.valid).toBe(true)
+  } finally {
+    await ctx.close()
+  }
+})
+
+
+test('countdown, DEMO watermark on printed documents and the friendly end screen', async ({ browser }) => {
+  const ctx = await browser.newContext()
+  try {
+    const page = await openDemo(ctx)
+    await expect(page.getByTestId('demo-countdown')).toHaveText(/^Tu demo se borra en/)
+    await page.getByTestId('demo-banner').click()
+    await expect(page.getByText('lo que imprimas sale marcado como DEMO')).toBeVisible()
+    await page.keyboard.press('Escape')
+    await login(page)
+
+    // Printed documents go through a hidden iframe: its content carries the watermark.
+    await sellMedialuna(page)
+    const printed = page.waitForEvent('frameattached')
+    await page.getByRole('dialog').getByRole('button', { name: /Imprimir/ }).first().click()
+    const frame = await printed
+    await expect.poll(async () => (await frame.content()).includes('DEMO · datos de ejemplo')).toBe(true)
+    if (process.env.BLOOM_SHOTS) await page.screenshot({ path: `${process.env.BLOOM_SHOTS}/demo-countdown.png` })
+
+    // Time's up (the server says so): the end screen offers download / sign up / another demo.
+    await page.route('**/api/health', async (route) => {
+      const res = await route.fetch()
+      const body = await res.json()
+      body.demo = { ...body.demo, session: false, expires_in_s: null, ended: 'lifetime', signup_url: 'https://bloom.example.com/registro' }
+      await route.fulfill({ response: res, json: body })
+    })
+    await page.reload()
+    const end = page.getByRole('alertdialog', { name: 'Tu demo terminó' })
+    await expect(end).toBeVisible()
+    await expect(end.getByRole('link', { name: 'Descargá Bloom gratis' })).toHaveAttribute('href', 'https://bloom.example.com')
+    await expect(end.getByRole('link', { name: 'Crear mi cuenta' })).toBeVisible()
+    await expect(end.getByRole('link', { name: 'Empezar otra demo' })).toHaveAttribute('href', '/api/demo/new')
+    if (process.env.BLOOM_SHOTS) await page.screenshot({ path: `${process.env.BLOOM_SHOTS}/demo-end-screen.png` })
+  } finally {
+    await ctx.close()
+  }
+})
+
+test('exports carry DEMO and backups never leave the demo', async ({ browser }) => {
+  const ctx = await browser.newContext()
+  try {
+    const page = await openDemo(ctx)
+    await login(page)
+    const auth = { Authorization: `Bearer ${await page.evaluate(() => localStorage.getItem('cafe.token'))}` }
+    const csv = await page.request.get('/api/reports/sales?format=csv', { headers: auth })
+    if (csv.status() !== 404) {
+      expect(csv.headers()['content-disposition']).toContain('DEMO-reporte-')
+      expect((await csv.text()).replace(/^﻿/, '')).toMatch(/^DEMO/)
+    }
+    expect((await page.request.get('/api/system/backups/x.db/download', { headers: auth })).status()).toBe(403)
   } finally {
     await ctx.close()
   }

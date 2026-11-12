@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
-from app.auth import CurrentUser, Manager
+from app.auth import CurrentUser, Perm
 from app.db import get_db
 from app.models import Alert, Checklist, User, utcnow
 from app.schemas.alerts import (
@@ -20,20 +20,26 @@ from app.schemas.alerts import (
     RunItemPatch,
 )
 from app.schemas.common import Ok
-from app.services import alerts_engine
+from app.services import alerts_engine, roles
 from app.services import notices as nsvc
 
 router = APIRouter(prefix="/api", tags=["alerts"])
+Manager = Perm("notices.manage")
 
 # ---------------------------------------------------------------- alerts
 
 _SEVERITY_ORDER = case({"critical": 0, "warning": 1}, value=Alert.severity, else_=2)
 
 
-def _summary(db: Session) -> dict[str, int]:
+def _hidden_types(user: User | None) -> tuple[str, ...]:
+    """Alert types this user may not see (business expenses: amounts like salaries are for managers only)."""
+    return () if user is None or roles.has(user, "expenses.manage") else ("expense_due",)
+
+
+def _summary(db: Session, user: User | None = None) -> dict[str, int]:
     rows = db.execute(
         select(Alert.status, Alert.severity, func.count(Alert.id))
-        .where(Alert.status != "resolved")
+        .where(Alert.status != "resolved", Alert.type.not_in(_hidden_types(user)))
         .group_by(Alert.status, Alert.severity)
     ).all()
     out = {"open": 0, "critical": 0, "read": 0, "warning": 0, "info": 0}
@@ -59,10 +65,10 @@ def list_alerts(
     status: str = Query(default="active", pattern=r"^(open|read|resolved|active|all)$"),
     limit: int = Query(default=300, ge=1, le=1000),
     db: Session = Depends(get_db),
-    _: User = CurrentUser,
+    user: User = CurrentUser,
 ) -> list[Alert]:
     """status: open | read | resolved | active (open+read) | all."""
-    stmt = select(Alert)
+    stmt = select(Alert).where(Alert.type.not_in(_hidden_types(user)))
     if status == "active":
         stmt = stmt.where(Alert.status != "resolved")
     elif status != "all":
@@ -75,8 +81,8 @@ def list_alerts(
 
 
 @router.get("/alerts/summary", response_model=AlertSummary)
-def alerts_summary(db: Session = Depends(get_db), _: User = CurrentUser) -> dict[str, int]:
-    return _summary(db)
+def alerts_summary(db: Session = Depends(get_db), user: User = CurrentUser) -> dict[str, int]:
+    return _summary(db, user)
 
 
 @router.post("/alerts/read-all", response_model=AlertSummary)
@@ -122,7 +128,7 @@ def resolve_alert(alert_id: int, db: Session = Depends(get_db), _: User = Curren
 def list_notices(
     include_expired: bool = False, db: Session = Depends(get_db), user: User = CurrentUser
 ) -> list[dict[str, Any]]:
-    can_see_expired = user.role in ("admin", "encargado")
+    can_see_expired = roles.has(user, "notices.manage")
     return nsvc.list_notices(db, include_expired and can_see_expired)
 
 

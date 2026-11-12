@@ -6,12 +6,13 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.auth import AdminOnly, CurrentUser
+from app.auth import CurrentUser, Perm
 from app.db import get_db
 from app.models import User
 from app.services import audit
 from app.services import business_profile as svc
 
+AdminOnly = Perm("settings.manage")
 router = APIRouter(prefix="/api/business", tags=["business"])
 
 

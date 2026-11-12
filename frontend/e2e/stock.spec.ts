@@ -51,11 +51,11 @@ test('stock item: create, low-stock, adjust, waste, physical count, suggestions,
   await expect(row).toContainText('OK')
 
   // Waste
-  await action(page, row, 'Registrar merma')
-  const waste = page.getByRole('dialog', { name: 'Registrar merma' })
-  await waste.getByLabel(/Cantidad perdida/).fill('2')
-  await waste.getByRole('button', { name: 'Vencido' }).click()
-  await waste.getByRole('button', { name: 'Registrar merma' }).click()
+  await action(page, row, 'Descartar (merma)')
+  const waste = page.getByRole('dialog', { name: `Descartar ${name}` })
+  await waste.getByLabel(/Cantidad \(u\)/).fill('2')
+  await waste.getByRole('radio', { name: 'Vencido' }).click()
+  await waste.getByRole('button', { name: 'Descartar', exact: true }).click()
   await expect(waste).toBeHidden()
   await expect(row).toContainText('18 u')
 

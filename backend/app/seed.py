@@ -38,12 +38,16 @@ PAYMENT_METHODS = [
     ("qr", "QR / Billetera"),
     ("cuenta_corriente", "Cuenta corriente"),
 ]
+# Collected through the cafe's own Mercado Pago (services/collect.py): off until it's connected.
+COLLECT_METHODS = [("mp_qr", "QR Mercado Pago"), ("mp_point", "Point (posnet)")]
 
 
 def seed_base(db: Session) -> None:
     """Minimum data every install needs."""
     for i, (code, name) in enumerate(PAYMENT_METHODS):
         db.add(PaymentMethod(code=code, name=name, sort_order=i))
+    for i, (code, name) in enumerate(COLLECT_METHODS, start=len(PAYMENT_METHODS)):
+        db.add(PaymentMethod(code=code, name=name, sort_order=i, active=False))
     opening = Checklist(name="Apertura del local", kind="opening")
     opening.items = [
         ChecklistItem(text=t, sort_order=i)
@@ -187,9 +191,13 @@ def seed_demo(db: Session, admin_id: int | None = None) -> None:
     )
 
     blend = Coffee(name="Blend de la casa", roaster="Tostadores del Sur (demo)", origin="Brasil / Colombia", process="Natural / Lavado",
-                   roast_level="Medio", roast_date=today - timedelta(days=9), tasting_notes="Chocolate, avellana, caramelo", stock_item_id=cafe_blend.id)
+                   roast_level="Medio", roast_date=today - timedelta(days=9), tasting_notes="Chocolate, avellana, caramelo", stock_item_id=cafe_blend.id,
+                   flavor_notes=["chocolate", "avellana", "caramelo"], roast_point="city", menu_role="house",
+                   taste_profile={"body": 4, "aroma": 3, "sweetness": 4, "bitterness": 2, "acidity": 2})
     etiopia = Coffee(name="Etiopía Yirgacheffe", roaster="Tostadores del Sur (demo)", origin="Etiopía", variety="Heirloom", process="Lavado",
-                     altitude_m=2000, roast_level="Claro", roast_date=today - timedelta(days=14), tasting_notes="Floral, bergamota, durazno", stock_item_id=cafe_origen.id)
+                     altitude_m=2000, roast_level="Claro", roast_date=today - timedelta(days=14), tasting_notes="Floral, bergamota, durazno", stock_item_id=cafe_origen.id,
+                     flavor_notes=["jazmin", "te_negro", "durazno", "limon"], roast_point="medium",
+                     taste_profile={"body": 2, "aroma": 5, "sweetness": 3, "bitterness": 1, "acidity": 4})
     machine = Equipment(kind="machine", name="Máquina 2 grupos", brand="Genérica", model="E61", notes="Equipo de ejemplo")
     grinder = Equipment(kind="grinder", name="Molino espresso", brand="Genérico", model="64mm", grind_scale="1-40 numérico")
     grinder2 = Equipment(kind="grinder", name="Molino filtrado", brand="Genérico", model="Cónico", grind_scale="Clicks 0-50")
@@ -218,6 +226,10 @@ def seed_demo(db: Session, admin_id: int | None = None) -> None:
         ]
     )
     db.flush()
+
+    from app.services import expenses as expenses_svc  # demo rent, services, salaries… (fictional)
+
+    expenses_svc.seed_demo(db, admin_id)
 
     try:  # Pro edition: demo drink guides for these products.
         import bloom_pro

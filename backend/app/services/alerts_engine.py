@@ -19,6 +19,7 @@ from app.models import (
     Coffee,
     Customer,
     Equipment,
+    Expense,
     MaintenanceTask,
     Purchase,
     StockItem,
@@ -235,6 +236,28 @@ def rule_customer_debt(db: Session, cfg: dict[str, Any]) -> list[Spec]:
     ]
 
 
+def rule_expense_due(db: Session, cfg: dict[str, Any]) -> list[Spec]:
+    """Pending business expenses (Gastos) due soon or overdue."""
+    today = local_today()
+    limit = today + timedelta(days=int(cfg.get("expense_due_days", 3)))
+    out: list[Spec] = []
+    for e in db.scalars(select(Expense).where(Expense.status == "pending", Expense.due_date.is_not(None), Expense.due_date <= limit)):
+        days = (e.due_date - today).days
+        if days < 0:
+            sev, when = "critical", f"venció hace {_days(days)}"
+        elif days == 0:
+            sev, when = "critical", "vence hoy"
+        else:
+            sev, when = "warning", f"vence en {_days(days)}"
+        out.append(Spec(
+            key=f"expense_due:{e.id}", type="expense_due", severity=sev,
+            title=f"Gasto {when}: {e.description}",
+            message=f"{_fmt_money(e.amount_cents)} — vencimiento {e.due_date:%d/%m/%Y}. Marcalo como pagado en Gastos.",
+            link="/gastos", entity="expense", entity_id=e.id,
+        ))
+    return out
+
+
 RULES: dict[str, Callable[[Session, dict[str, Any]], list[Spec]]] = {
     "stock": rule_stock,
     "lot_expiry": rule_lot_expiry,
@@ -244,12 +267,13 @@ RULES: dict[str, Callable[[Session, dict[str, Any]], list[Spec]]] = {
     "roast": rule_roast,
     "maintenance": rule_maintenance,
     "customer_debt": rule_customer_debt,
+    "expense_due": rule_expense_due,
 }
 
 # Alert types owned by the engine (only these get auto-resolved).
 ENGINE_TYPES = {
     "stock_low", "stock_out", "lot_expiry", "purchase_due", "cash_stale",
-    "birthday", "roast_old", "maintenance", "debt_over_limit",
+    "birthday", "roast_old", "maintenance", "debt_over_limit", "expense_due",
 }
 
 

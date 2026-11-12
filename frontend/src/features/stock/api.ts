@@ -4,11 +4,16 @@ import { toast } from 'sonner'
 import { api } from '@/lib/api'
 
 import type {
+  DiscardInput,
+  DiscardReason,
   InventoryCount,
   Movement,
+  PackageInput,
+  QuickItem,
   StockCategory,
   StockItem,
   StockItemInput,
+  StockLot,
   StockSummary,
   SuggestionGroup,
 } from './types'
@@ -112,10 +117,49 @@ export function useAdjustStock() {
 export function useRegisterWaste() {
   const invalidate = useInvalidateStock()
   return useMutation({
-    mutationFn: (body: { stock_item_id: number; qty: number; reason: string }) => api.post<StockItem>('/stock/waste', body),
+    mutationFn: (body: DiscardInput) => api.post<StockItem>('/stock/waste', body),
     onSuccess: () => {
       invalidate()
-      toast.success('Merma registrada')
+      toast.success('Descarte registrado: quedó como merma')
+    },
+    onError,
+  })
+}
+
+export function useStockLots(itemId: number | null) {
+  return useQuery({
+    queryKey: ['stock', 'lots', itemId],
+    queryFn: () => api.get<StockLot[]>(`/stock/items/${itemId}/lots`),
+    enabled: itemId != null,
+  })
+}
+
+export function useSavePackages() {
+  const invalidate = useInvalidateStock()
+  return useMutation({
+    mutationFn: ({ id, packages }: { id: number; packages: PackageInput[] }) =>
+      api.put<StockItem>(`/stock/items/${id}/packages`, { packages }),
+    onSuccess: () => {
+      invalidate()
+      toast.success('Envases guardados')
+    },
+    onError,
+  })
+}
+
+/** POS / barista: small spills ("se cayeron 10 ml de leche"). */
+export function useQuickItems(enabled: boolean) {
+  return useQuery({ queryKey: ['stock', 'quick-items'], queryFn: () => api.get<QuickItem[]>('/stock/quick-items'), enabled })
+}
+
+export function useQuickDiscard() {
+  const invalidate = useInvalidateStock()
+  return useMutation({
+    mutationFn: (body: { stock_item_id: number; qty: number; reason_code: DiscardReason; note?: string | null }) =>
+      api.post('/stock/quick-discard', body),
+    onSuccess: () => {
+      invalidate()
+      toast.success('Descarte registrado')
     },
     onError,
   })

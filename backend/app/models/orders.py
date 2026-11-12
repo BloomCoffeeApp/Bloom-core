@@ -7,14 +7,21 @@ are a Pro capability (`public_menu`) built on the same tables.
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import JSON, DateTime, Float, ForeignKey, String
+from sqlalchemy import JSON, DateTime, Float, ForeignKey, String, false
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, IdMixin, TimestampMixin, utcnow
 
-# pending = sent by a customer, waiting for a waiter/cashier to confirm it (never reaches the bar before)
-ORDER_STATUSES = ("pending", "received", "preparing", "ready", "delivered", "cancelled")
-ORDER_SOURCES = ("pos", "table")
+# One order model, one path per origin (see services/orders.py FLOWS):
+#   pending = sent by a customer, waiting for a waiter/cashier (never reaches the bar before)
+#   received = confirmed (POS sale or a confirmed table order); delivered = served/picked up
+#   accepted / awaiting_pay / paid / dispatched / rejected / expired = online take away & delivery;
+#   table orders become `paid` when their tab is charged.
+ORDER_STATUSES = (
+    "pending", "received", "accepted", "awaiting_pay", "paid", "preparing", "ready", "dispatched", "delivered",
+    "cancelled", "rejected", "expired",
+)
+ORDER_SOURCES = ("pos", "table", "online")
 
 
 class OrderStation(IdMixin, TimestampMixin, Base):
@@ -55,7 +62,7 @@ class TableTab(IdMixin, Base):
 class Order(IdMixin, Base):
     __tablename__ = "orders"
     number: Mapped[int]  # per local day (#1, #2…), what the bar calls out
-    source: Mapped[str] = mapped_column(String(10), default="pos")  # pos|table
+    source: Mapped[str] = mapped_column(String(10), default="pos")  # pos|table|online
     status: Mapped[str] = mapped_column(String(12), default="received", index=True)
     channel: Mapped[str] = mapped_column(String(10), default="salon")
     table_id: Mapped[int | None] = mapped_column(ForeignKey("dining_tables.id"))
@@ -79,9 +86,31 @@ class Order(IdMixin, Base):
     # Customer orders: the phone's address (rate limits) and the secret it polls its status with.
     client_ip: Mapped[str | None] = mapped_column(String(64))
     public_key: Mapped[str | None] = mapped_column(String(32))
-    # Reserved for online payment of a customer order (Mercado Pago, later): unpaid|paid.
+    # unpaid|pending|paid|refunded. Online orders: `payment_ref` = the collection provider's charge id.
     payment_status: Mapped[str] = mapped_column(String(10), default="unpaid", server_default="unpaid")
     payment_ref: Mapped[str | None] = mapped_column(String(80))
+    # ---- online take away / delivery (migration 0009); NULL/0 for POS and table orders
+    customer_id: Mapped[int | None] = mapped_column(ForeignKey("customers.id"), index=True)
+    customer_name: Mapped[str | None] = mapped_column(String(80))
+    customer_phone: Mapped[str | None] = mapped_column(String(40))  # WhatsApp
+    address: Mapped[str | None] = mapped_column(String(200))
+    address_ref: Mapped[str | None] = mapped_column(String(200))
+    delivery_zone: Mapped[str | None] = mapped_column(String(60))
+    delivery_fee_cents: Mapped[int] = mapped_column(default=0, server_default="0")
+    total_cents: Mapped[int] = mapped_column(default=0, server_default="0")  # items + delivery fee
+    payment_method: Mapped[str | None] = mapped_column(String(10))  # online|transfer|cash
+    payment_url: Mapped[str | None] = mapped_column(String(500))
+    refunded_cents: Mapped[int] = mapped_column(default=0, server_default="0")
+    eta_minutes: Mapped[int | None]
+    accepted_at: Mapped[datetime | None] = mapped_column(DateTime)
+    paid_at: Mapped[datetime | None] = mapped_column(DateTime)
+    dispatched_at: Mapped[datetime | None] = mapped_column(DateTime)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime, index=True)  # unpaid online orders
+    refunded_at: Mapped[datetime | None] = mapped_column(DateTime)
+    online_ref: Mapped[str | None] = mapped_column(String(40), unique=True, index=True)  # server inbox id
+    tracking_url: Mapped[str | None] = mapped_column(String(300))
+    # The status changed and the server (tracking page) hasn't been told yet.
+    sync_pending: Mapped[bool] = mapped_column(default=False, server_default=false())
     items: Mapped[list["OrderItem"]] = relationship(cascade="all, delete-orphan", order_by="OrderItem.id")
 
 

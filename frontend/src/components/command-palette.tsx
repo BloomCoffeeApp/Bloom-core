@@ -33,7 +33,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
     navigate(to)
   }
   const modules = useModules()
-  const nav = NAV.filter((n) => (n.roles.length === 0 || can(...n.roles)) && (!n.module || modules.on(n.module)))
+  const nav = NAV.filter((n) => (n.perms.length === 0 || can(...n.perms)) && (!n.module || modules.on(n.module)))
   const actions = ACTIONS.filter((a) => !a.module || modules.on(a.module))
   return (
     <CommandDialog open={open} onOpenChange={onOpenChange} title="Buscar" description="Ir a una sección o acción">

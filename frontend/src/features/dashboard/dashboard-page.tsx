@@ -26,6 +26,7 @@ import {
   TopProducts,
 } from './widgets'
 import { OrdersStrip } from '../orders/dashboard-strip'
+import { ProfitCard } from '../expenses/profit-card'
 
 function greeting(d: Date) {
   const h = d.getHours()
@@ -46,12 +47,12 @@ export function DashboardPage() {
   // The Barista module must be in this build (Pro edition) and licensed.
   const modules = useModules()
   const baristaPro = useHasFeature('barista') && !!proModules.Barista && modules.on('barista')
-  const barista = useBaristaToday(can('barista', 'encargado') && !!baristaPro)
-  const cash = useCashCurrent(can('cajero', 'encargado'))
+  const barista = useBaristaToday(can('barista.use') && !!baristaPro)
+  const cash = useCashCurrent(can('cash.open_close'))
 
   const d = dash.data
   const loading = dash.isLoading
-  const showCosts = d?.show_costs ?? can('encargado')
+  const showCosts = d?.show_costs ?? can('reports.view')
   const now = useNow()
   const compareHint = d ? `vs ${d.compare_label}` : undefined
   const periodLabel =
@@ -138,11 +139,12 @@ export function DashboardPage() {
           <DailyChart data={d?.daily} loading={loading} />
         </Panel>
         <div className="grid gap-4">
-          {can('barista', 'encargado') && modules.on('barista') && (
+          {can('expenses.manage') && <ProfitCard />}
+          {can('barista.use') && modules.on('barista') && (
             <RecipeCard data={barista.data} loading={barista.isLoading} failed={barista.isError} />
           )}
-          {can('cajero', 'encargado') && (
-            <CashCard data={cash.data} loading={cash.isLoading} failed={cash.isError} canOperate={can('cajero', 'encargado')} />
+          {can('cash.open_close') && (
+            <CashCard data={cash.data} loading={cash.isLoading} failed={cash.isError} canOperate={can('cash.open_close')} />
           )}
         </div>
       </div>

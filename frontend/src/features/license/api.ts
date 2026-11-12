@@ -14,6 +14,9 @@ export type ProFeature =
   | 'orders_pro'
   | 'loyalty_pro'
   | 'promos'
+  | 'payments'
+  | 'staff'
+  | 'online_orders'
 
 /** Mirrors backend app/routers/license.py `_out`. */
 export interface LicenseInfo {
@@ -33,6 +36,8 @@ export interface LicenseInfo {
   problem: string | null
   /** The one Pro trial of this PC was used and ran out. */
   trial_ended: boolean
+  /** Plan limits signed into the license (e.g. { tables: 10 }); absent key = no limit. */
+  limits?: Record<string, number>
   pro_label: string
   app_name: string
   catalog: Record<ProFeature, string>
@@ -123,6 +128,8 @@ export interface Plan {
   devices: number
   /** Business types (profiles) this plan is recommended for; older servers don't send it. */
   profiles?: string[]
+  /** Max active dining tables (null/absent = no limit). */
+  max_tables?: number | null
 }
 
 export interface PlansInfo {

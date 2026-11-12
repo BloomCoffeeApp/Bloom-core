@@ -8,7 +8,7 @@ import { ModuleRoute } from '@/features/business/module-route'
 import { ProModule } from '@/features/license/pro-gate'
 import { proModules as pro } from '@pro'
 import { TourProvider } from '@/features/tutorial/tour'
-import { type Role, useAuth } from '@/lib/auth'
+import { type Permission, useAuth } from '@/lib/auth'
 
 // Each feature module owns its sub-routes (default export renders its own <Routes>).
 const Dashboard = lazy(() => import('@/features/dashboard'))
@@ -20,6 +20,7 @@ const Catalog = lazy(() => import('@/features/catalog'))
 const Stock = lazy(() => import('@/features/stock'))
 const Customers = lazy(() => import('@/features/customers'))
 const Alerts = lazy(() => import('@/features/alerts'))
+const Expenses = lazy(() => import('@/features/expenses'))
 const SettingsPage = lazy(() => import('@/features/settings'))
 
 function Loading() {
@@ -30,9 +31,9 @@ function Loading() {
   )
 }
 
-function Guard({ roles, children }: { roles: Role[]; children: React.ReactNode }) {
+function Guard({ perms, children }: { perms: Permission[]; children: React.ReactNode }) {
   const { can } = useAuth()
-  if (roles.length && !can(...roles))
+  if (perms.length && !can(...perms))
     return <EmptyState title="Sin acceso" description="Tu usuario no tiene permiso para ver esta sección." />
   return <>{children}</>
 }
@@ -49,16 +50,18 @@ export function AppRoutes() {
           }
         >
           <Route index element={<Dashboard />} />
-          <Route path="pos/*" element={<Guard roles={['cajero', 'encargado']}><Pos /></Guard>} />
+          <Route path="pos/*" element={<Guard perms={['pos.sell']}><Pos /></Guard>} />
           <Route path="pedidos/*" element={<ModuleRoute module="orders"><Orders /></ModuleRoute>} />
-          <Route path="caja/*" element={<Guard roles={['cajero', 'encargado']}><Cash /></Guard>} />
-          <Route path="ventas/*" element={<Guard roles={['cajero', 'encargado']}><Sales /></Guard>} />
-          <Route path="barista/*" element={<Guard roles={['barista', 'encargado']}><ModuleRoute module="barista"><ProModule feature="barista" component={pro.Barista} /></ModuleRoute></Guard>} />
-          <Route path="productos/*" element={<Guard roles={['encargado']}><Catalog /></Guard>} />
-          <Route path="stock/*" element={<Guard roles={['encargado', 'barista']}><ModuleRoute module="stock"><Stock /></ModuleRoute></Guard>} />
-          <Route path="compras/*" element={<Guard roles={['encargado']}><ModuleRoute module="purchases"><ProModule feature="purchases" component={pro.Purchases} /></ModuleRoute></Guard>} />
-          <Route path="clientes/*" element={<Guard roles={['cajero', 'encargado']}><ModuleRoute module="customers"><Customers /></ModuleRoute></Guard>} />
-          <Route path="reportes/*" element={<Guard roles={['encargado']}><ModuleRoute module="reports"><ProModule feature="reports" component={pro.Reports} /></ModuleRoute></Guard>} />
+          <Route path="caja/*" element={<Guard perms={['cash.open_close', 'cash.movements']}><Cash /></Guard>} />
+          <Route path="ventas/*" element={<Guard perms={['pos.sell']}><Sales /></Guard>} />
+          <Route path="barista/*" element={<Guard perms={['barista.use']}><ModuleRoute module="barista"><ProModule feature="barista" component={pro.Barista} /></ModuleRoute></Guard>} />
+          <Route path="productos/*" element={<Guard perms={['catalog.edit', 'prices.edit']}><Catalog /></Guard>} />
+          <Route path="stock/*" element={<Guard perms={['stock.view']}><ModuleRoute module="stock"><Stock /></ModuleRoute></Guard>} />
+          <Route path="compras/*" element={<Guard perms={['purchases.manage']}><ModuleRoute module="purchases"><ProModule feature="purchases" component={pro.Purchases} /></ModuleRoute></Guard>} />
+          <Route path="clientes/*" element={<Guard perms={['customers.edit']}><ModuleRoute module="customers"><Customers /></ModuleRoute></Guard>} />
+          <Route path="gastos/*" element={<Guard perms={['expenses.manage']}><Expenses /></Guard>} />
+          <Route path="reportes/*" element={<Guard perms={['reports.view']}><ModuleRoute module="reports"><ProModule feature="reports" component={pro.Reports} /></ModuleRoute></Guard>} />
+          <Route path="empleados/*" element={<Guard perms={['staff.manage']}><ProModule feature="staff" component={pro.Staff} /></Guard>} />
           <Route path="avisos/*" element={<Alerts />} />
           <Route path="config/*" element={<SettingsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />

@@ -34,6 +34,8 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useAuth } from '@/lib/auth'
 import { fmtDate, fmtMoney, fmtQty } from '@/lib/format'
 
+import { DiscardDialog, PackagesDialog } from './discard'
+
 import { useDeactivateStockItem, useStockCategories, useStockItems, useStockSummary } from './api'
 import {
   AdjustDialog,
@@ -41,16 +43,15 @@ import {
   MovementsSheet,
   StatusBadge,
   StockItemDialog,
-  WasteDialog,
 } from './components'
-import { bulkCost, bulkUnit } from './stock-utils'
+import { bulkCost, bulkUnit, fmtPackages } from './stock-utils'
 import type { StockItem, StockStatus } from './types'
 
 type StatusFilter = 'all' | StockStatus
 
 export function StockPage() {
   const { can } = useAuth()
-  const canEdit = can('encargado')
+  const canEdit = can('stock.edit')
   const items = useStockItems()
   const summary = useStockSummary()
   const cats = useStockCategories()
@@ -58,6 +59,8 @@ export function StockPage() {
   const [status, setStatus] = useState<StatusFilter>('all')
   const [adjusting, setAdjusting] = useState<StockItem | null>(null)
   const [wasting, setWasting] = useState<StockItem | null>(null)
+  const [packing, setPacking] = useState<StockItem | null>(null)
+  const canAdjust = can('stock.adjust')
   const [viewing, setViewing] = useState<StockItem | null>(null)
   const [editing, setEditing] = useState<StockItem | null>(null)
   const [formOpen, setFormOpen] = useState(false)
@@ -105,6 +108,11 @@ export function StockPage() {
               <span className="tabular font-medium">{fmtQty(row.original.current_qty, row.original.unit)}</span>
               <span className="tabular text-xs text-muted-foreground">mín {fmtQty(row.original.min_qty, row.original.unit)}</span>
             </div>
+            {row.original.packages.length > 0 && row.original.current_qty > 0 && (
+              <div className="tabular truncate text-xs text-muted-foreground" data-testid="stock-packages">
+                {fmtPackages(row.original.current_qty, row.original.unit, row.original.packages)}
+              </div>
+            )}
             <LevelBar item={row.original} />
           </div>
         ),
@@ -139,7 +147,12 @@ export function StockPage() {
         header: '',
         enableSorting: false,
         cell: ({ row }) => (
-          <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
+          <div className="flex justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+            {canAdjust && row.original.active && !row.original.locked && (
+              <Button variant="ghost" size="sm" className="text-destructive" onClick={() => setWasting(row.original)} aria-label={`Descartar ${row.original.name}`}>
+                <PackageX /> <span className="hidden xl:inline">Descartar</span>
+              </Button>
+            )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" aria-label="Acciones">
@@ -150,13 +163,18 @@ export function StockPage() {
                 <DropdownMenuItem onClick={() => setViewing(row.original)}>
                   <History /> Ver movimientos
                 </DropdownMenuItem>
+                {canAdjust && (
+                  <DropdownMenuItem onClick={() => setWasting(row.original)}>
+                    <PackageX /> Descartar (merma)
+                  </DropdownMenuItem>
+                )}
                 {canEdit && (
                   <>
                     <DropdownMenuItem onClick={() => setAdjusting(row.original)}>
                       <SlidersHorizontal /> Ajustar
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setWasting(row.original)}>
-                      <PackageX /> Registrar merma
+                    <DropdownMenuItem onClick={() => setPacking(row.original)}>
+                      <Boxes /> Envases
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
@@ -178,7 +196,7 @@ export function StockPage() {
         ),
       },
     ],
-    [canEdit],
+    [canEdit, canAdjust],
   )
 
   const s = summary.data
@@ -278,7 +296,8 @@ export function StockPage() {
       />
 
       <AdjustDialog item={adjusting} onOpenChange={(o) => !o && setAdjusting(null)} />
-      <WasteDialog item={wasting} onOpenChange={(o) => !o && setWasting(null)} />
+      <DiscardDialog item={wasting} onOpenChange={(o) => !o && setWasting(null)} />
+      <PackagesDialog item={packing} onOpenChange={(o) => !o && setPacking(null)} />
       <MovementsSheet item={viewing} onOpenChange={(o) => !o && setViewing(null)} />
       <StockItemDialog open={formOpen} item={editing} onOpenChange={setFormOpen} />
       <ConfirmDialog

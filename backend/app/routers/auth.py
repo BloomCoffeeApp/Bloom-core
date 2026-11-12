@@ -6,8 +6,8 @@ from app.auth import CurrentUser, create_session, hash_pin, login_throttle, veri
 from app.db import get_db
 from app.models import User, UserSession
 from app.schemas.common import Ok
-from app.schemas.users import LoginIn, LoginOut, SetupIn, UserPublic
-from app.services import audit, business_profile, free_plan, settings
+from app.schemas.users import LoginIn, LoginOut, SetupIn, UserMe, UserPublic
+from app.services import audit, business_profile, free_plan, roles, settings
 
 router = APIRouter(prefix="/api", tags=["auth"])
 
@@ -40,13 +40,15 @@ def setup(data: SetupIn, db: Session = Depends(get_db)) -> LoginOut:
     else:
         seed_base(db)
     db.commit()
-    return LoginOut(token=create_session(db, admin), user=UserPublic.model_validate(admin))
+    return LoginOut(token=create_session(db, admin), user=me_out(db, admin))
 
 
 @router.get("/auth/users", response_model=list[UserPublic])
 def login_users(db: Session = Depends(get_db)) -> list[dict]:
+    names = roles.names(db)
     return [
-        {**UserPublic.model_validate(u).model_dump(), "locked": free_plan.is_locked(db, "users", u.id)}
+        {**UserPublic.model_validate(u).model_dump(), "locked": free_plan.is_locked(db, "users", u.id),
+         "role_name": names.get(u.role, u.role)}
         for u in db.scalars(select(User).where(User.active.is_(True)).order_by(User.name))
     ]
 
@@ -65,7 +67,7 @@ def login(data: LoginIn, request: Request, db: Session = Depends(get_db)) -> Log
     free_plan.ensure_usable(db, "users", user.id, user.name)
     login_throttle.success(*keys)
     audit.log(db, user.id, "login", "user", user.id)
-    return LoginOut(token=create_session(db, user), user=UserPublic.model_validate(user))
+    return LoginOut(token=create_session(db, user), user=me_out(db, user))
 
 
 @router.post("/auth/logout", response_model=Ok)
@@ -77,6 +79,11 @@ def logout(authorization: str | None = Header(default=None), db: Session = Depen
     return Ok()
 
 
-@router.get("/auth/me", response_model=UserPublic)
-def me(user: User = CurrentUser) -> User:
-    return user
+@router.get("/auth/me", response_model=UserMe)
+def me(user: User = CurrentUser, db: Session = Depends(get_db)) -> dict:
+    return me_out(db, user)
+
+
+def me_out(db: Session, user: User) -> dict:
+    return {**UserPublic.model_validate(user).model_dump(), "role_name": roles.role_name(db, user.role),
+            "permissions": sorted(roles.permissions_of(user))}

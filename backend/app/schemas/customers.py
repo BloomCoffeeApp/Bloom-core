@@ -11,6 +11,9 @@ class CustomerBase(BaseModel):
     email: str | None = Field(default=None, max_length=120)
     birthday: date | None = None
     notes: str | None = None
+    # Delivery address (online orders fill it when staff accepts/updates).
+    address: str | None = Field(default=None, max_length=200)
+    address_ref: str | None = Field(default=None, max_length=200)
 
 
 class CustomerCreate(CustomerBase):
@@ -23,6 +26,8 @@ class CustomerUpdate(BaseModel):
     email: str | None = Field(default=None, max_length=120)
     birthday: date | None = None
     notes: str | None = None
+    address: str | None = Field(default=None, max_length=200)
+    address_ref: str | None = Field(default=None, max_length=200)
     credit_limit_cents: int | None = Field(default=None, ge=0)
     active: bool | None = None
 
@@ -36,6 +41,8 @@ class CustomerOut(ORM):
     email: str | None
     birthday: date | None
     notes: str | None
+    address: str | None = None
+    address_ref: str | None = None
     points: int
     balance_cents: int
     credit_limit_cents: int

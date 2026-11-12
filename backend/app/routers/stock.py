@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.auth import Manager, require_role
+from app.auth import Perm
 from app.db import get_db
 from app.models import User
 from app.schemas.common import Ok
@@ -11,7 +11,11 @@ from app.schemas.stock import (
     CountItemPatch,
     CountItemsPatch,
     CountOut,
+    LotOut,
     MovementOut,
+    PackagesIn,
+    QuickDiscardIn,
+    QuickItemOut,
     StockCategoryIn,
     StockCategoryOut,
     StockItemIn,
@@ -26,7 +30,9 @@ from app.services import stock_ops as svc
 
 router = APIRouter(prefix="/api", tags=["stock"])
 
-Reader = Depends(require_role("encargado", "barista"))
+Reader = Perm("stock.view")
+Manager = Perm("stock.edit")
+Adjuster = Perm("stock.adjust")
 
 
 # ---- Categories
@@ -106,13 +112,39 @@ def item_movements(
 
 # ---- Adjust / waste
 @router.post("/stock/adjust", response_model=StockItemOut)
-def adjust(data: AdjustIn, db: Session = Depends(get_db), me: User = Manager) -> StockItemOut:
+def adjust(data: AdjustIn, db: Session = Depends(get_db), me: User = Adjuster) -> StockItemOut:
     return svc.adjust(db, data, me)
 
 
 @router.post("/stock/waste", response_model=StockItemOut)
-def waste(data: WasteIn, db: Session = Depends(get_db), me: User = Manager) -> StockItemOut:
+def waste(data: WasteIn, db: Session = Depends(get_db), me: User = Adjuster) -> StockItemOut:
+    """Descartar: a quantity, N packages or everything left (optionally of one lot), with a reason."""
     return svc.waste(db, data, me)
+
+
+# Quick discard of small spills from the POS / barista (people who sell or prepare, not only stock managers).
+QuickDiscarder = Perm("pos.sell", "barista.use", "stock.adjust")
+
+
+@router.get("/stock/quick-items", response_model=list[QuickItemOut])
+def quick_items(db: Session = Depends(get_db), _: User = QuickDiscarder):
+    return svc.quick_items(db)
+
+
+@router.post("/stock/quick-discard", response_model=Ok)
+def quick_discard(data: QuickDiscardIn, db: Session = Depends(get_db), me: User = QuickDiscarder) -> Ok:
+    svc.quick_discard(db, data, me)
+    return Ok()
+
+
+@router.get("/stock/items/{item_id}/lots", response_model=list[LotOut])
+def item_lots(item_id: int, db: Session = Depends(get_db), _: User = Reader):
+    return svc.lots(db, item_id)
+
+
+@router.put("/stock/items/{item_id}/packages", response_model=StockItemOut)
+def set_packages(item_id: int, data: PackagesIn, db: Session = Depends(get_db), me: User = Manager) -> StockItemOut:
+    return svc.set_packages(db, item_id, data.packages, me)
 
 
 # ---- Physical counts
@@ -122,7 +154,7 @@ def list_counts(db: Session = Depends(get_db), _: User = Reader):
 
 
 @router.post("/stock/counts", response_model=CountOut)
-def create_count(data: CountCreate, db: Session = Depends(get_db), me: User = Manager) -> CountOut:
+def create_count(data: CountCreate, db: Session = Depends(get_db), me: User = Adjuster) -> CountOut:
     return svc.create_count(db, data, me)
 
 
@@ -132,22 +164,22 @@ def get_count(count_id: int, db: Session = Depends(get_db), _: User = Reader) ->
 
 
 @router.patch("/stock/counts/{count_id}/items", response_model=CountOut)
-def patch_count_items(count_id: int, data: CountItemsPatch, db: Session = Depends(get_db), _: User = Manager):
+def patch_count_items(count_id: int, data: CountItemsPatch, db: Session = Depends(get_db), _: User = Adjuster):
     return svc.set_counted_bulk(db, count_id, data.items)
 
 
 @router.patch("/stock/counts/{count_id}/items/{item_id}", response_model=CountOut)
 def patch_count_item(
-    count_id: int, item_id: int, data: CountItemPatch, db: Session = Depends(get_db), _: User = Manager
+    count_id: int, item_id: int, data: CountItemPatch, db: Session = Depends(get_db), _: User = Adjuster
 ):
     return svc.set_counted(db, count_id, item_id, data.counted_qty)
 
 
 @router.post("/stock/counts/{count_id}/apply", response_model=CountOut)
-def apply_count(count_id: int, db: Session = Depends(get_db), me: User = Manager) -> CountOut:
+def apply_count(count_id: int, db: Session = Depends(get_db), me: User = Adjuster) -> CountOut:
     return svc.apply_count(db, count_id, me)
 
 
 @router.post("/stock/counts/{count_id}/cancel", response_model=CountOut)
-def cancel_count(count_id: int, db: Session = Depends(get_db), me: User = Manager) -> CountOut:
+def cancel_count(count_id: int, db: Session = Depends(get_db), me: User = Adjuster) -> CountOut:
     return svc.cancel_count(db, count_id, me)

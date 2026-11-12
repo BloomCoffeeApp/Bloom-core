@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse, Response
 from sqlalchemy.orm import Session
 
-from app.auth import AdminOnly, CurrentUser
+from app.auth import CurrentUser, Perm
 from app.licensing import require_feature
 from app.db import get_db
 from app.models import User
@@ -12,6 +12,7 @@ from app.schemas.third_party import ThirdPartyNotices
 from app.services import system as svc
 from app.services import third_party
 
+AdminOnly = Perm("system.manage")
 router = APIRouter(prefix="/api", tags=["system"])
 
 
@@ -71,7 +72,7 @@ def restore(data: RestoreIn, db: Session = Depends(get_db), me: User = AdminOnly
 
 
 @router.get("/system/lan-qr", dependencies=[Depends(require_feature("lan"))])
-def lan_qr(_: User = AdminOnly) -> Response:
+def lan_qr(_: User = Perm("settings.manage")) -> Response:
     url = svc.lan_url()
     if not url:
         raise HTTPException(404, "No se encontró una red local")
@@ -79,7 +80,7 @@ def lan_qr(_: User = AdminOnly) -> Response:
 
 
 @router.get("/system/menu-qr", dependencies=[Depends(require_feature("public_menu"))])
-def menu_qr(_: User = AdminOnly) -> Response:
+def menu_qr(_: User = Perm("settings.manage")) -> Response:
     url = svc.menu_url()
     if not url:
         raise HTTPException(404, "No se encontró una red local")

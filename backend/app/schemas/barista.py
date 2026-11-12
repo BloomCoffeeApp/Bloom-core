@@ -6,6 +6,11 @@ from pydantic import BaseModel, Field
 from app.schemas.common import ORM
 
 METHOD_PATTERN = r"^(espresso|v60|chemex|aeropress|french_press|cold_brew|moka)$"
+ROAST_POINT_PATTERN = r"^(medium|high|city|full_city|french|italian)$"
+MENU_ROLE_PATTERN = r"^(house|decaf|origin)$"
+# Keys of the flavor wheel (validated against the wheel by the barista service).
+NoteKey = Annotated[str, Field(pattern=r"^[a-z0-9_]{1,40}$")]
+FlavorNotes = Annotated[list[NoteKey], Field(max_length=20)]
 
 
 # ---------- Coffees ----------
@@ -21,6 +26,10 @@ class CoffeeBase(BaseModel):
     tasting_notes: str | None = None
     stock_item_id: int | None = None
     active: bool = True
+    flavor_notes: FlavorNotes | None = None
+    roast_point: str | None = Field(default=None, pattern=ROAST_POINT_PATTERN)
+    taste_profile: dict[str, int | None] | None = None  # body/aroma/sweetness/bitterness/acidity 1..5
+    menu_role: str | None = Field(default=None, pattern=MENU_ROLE_PATTERN)
 
 
 class CoffeeCreate(CoffeeBase):
@@ -39,6 +48,10 @@ class CoffeeUpdate(BaseModel):
     tasting_notes: str | None = None
     stock_item_id: int | None = None
     active: bool | None = None
+    flavor_notes: FlavorNotes | None = None
+    roast_point: str | None = Field(default=None, pattern=ROAST_POINT_PATTERN)
+    taste_profile: dict[str, int | None] | None = None
+    menu_role: str | None = Field(default=None, pattern=MENU_ROLE_PATTERN)
 
 
 class CoffeeOut(CoffeeBase, ORM):
@@ -205,8 +218,10 @@ class DialinIn(BaseModel):
     bitterness: int | None = Field(default=None, ge=1, le=5)
     sweetness: int | None = Field(default=None, ge=1, le=5)
     body: int | None = Field(default=None, ge=1, le=5)
+    aroma: int | None = Field(default=None, ge=1, le=5)
     score: int | None = Field(default=None, ge=1, le=5)
     channeling: bool = False
+    flavor_notes: FlavorNotes | None = None
 
 
 class TargetOut(BaseModel):
@@ -241,6 +256,8 @@ class ShotCreate(DialinIn):
     preinfusion_s: float | None = Field(default=None, ge=0)
     notes: str | None = None
     is_dialed_in: bool = False
+    # Optional cupping scores 0..10: fragrance, flavor, aftertaste, acidity, body, balance, overall.
+    cupping: dict[str, float | None] | None = None
 
 
 class ShotOut(ORM):
@@ -268,7 +285,10 @@ class ShotOut(ORM):
     bitterness: int | None
     body: int | None
     sweetness: int | None
+    aroma: int | None = None
     score: int | None
+    cupping: dict[str, float] | None = None
+    flavor_notes: list[str] | None = None
     channeling: bool
     notes: str | None
     suggestions: list[Suggestion] = []
@@ -287,6 +307,87 @@ class ShotPage(BaseModel):
 class DialedInResult(BaseModel):
     shot: ShotOut
     recipe: RecipeOut | None
+
+
+# ---------- Tasting: history, best shot, compare, coffee on the menu ----------
+class HistoryPoint(BaseModel):
+    id: int
+    ts: datetime
+    grind_setting: str | None
+    grind_value: float | None
+    time_s: float | None
+    ratio: float | None
+    score: int | None
+    days_off_roast: int | None
+    is_dialed_in: bool
+    is_best: bool = False
+
+
+class CoffeeHistoryOut(BaseModel):
+    coffee_id: int
+    method: str
+    best_shot_id: int | None
+    points: list[HistoryPoint]  # oldest first (chart order)
+    shots: list[ShotOut]  # newest first (list order)
+
+
+class RoastAdjustment(BaseModel):
+    days_now: int | None
+    days_ref: int | None
+    diff_days: int | None
+    suggestion: Suggestion | None = None
+
+
+class PrefillOut(BaseModel):
+    """Start a new shot from the coffee's best (dialed-in) shot."""
+
+    coffee_id: int
+    method: str
+    reference: ShotOut | None
+    dose_g: float | None = None
+    yield_g: float | None = None
+    grind_setting: str | None = None
+    temp_c: float | None = None
+    pressure_bar: float | None = None
+    preinfusion_s: float | None = None
+    roast: RoastAdjustment
+
+
+class CompareChange(BaseModel):
+    field: str
+    label: str
+    a: float | str | None
+    b: float | str | None
+    delta: float | None = None
+    text: str
+
+
+class CompareOut(BaseModel):
+    a: ShotOut
+    b: ShotOut
+    changes: list[CompareChange]  # parameters that differ (what changed)
+    taste: list[CompareChange]  # sensory deltas (how taste moved)
+    notes_added: list[str]
+    notes_removed: list[str]
+    summary: str
+
+
+class CoffeeMenuOption(BaseModel):
+    coffee_id: int
+    coffee_name: str
+    role: str
+    modifier_id: int | None = None
+    modifier_name: str | None = None
+    swaps_stock: bool = False
+
+
+class CoffeeMenuStatus(BaseModel):
+    group_id: int | None
+    group_name: str | None
+    options: list[CoffeeMenuOption]
+    product_ids: list[int]
+    product_names: list[str]
+    warnings: list[str] = []
 
 
 # ---------- Today / stats ----------

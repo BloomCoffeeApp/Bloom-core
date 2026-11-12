@@ -9,7 +9,11 @@ How it works (see `sandboxes.py` and `middleware.py`):
   where `sid` is a random 128-bit hex id; the cookie holds only that id (HttpOnly, SameSite=Lax,
   Secure over https). Nothing else about the visitor is stored.
 - Each request uses its own sandbox (`get_db` is overridden), so visitors never see each other's data.
-- Idle sandboxes are deleted after `BLOOM_DEMO_IDLE_HOURS`; at most `BLOOM_DEMO_MAX_SANDBOXES` exist.
+- Idle sandboxes are deleted after `BLOOM_DEMO_IDLE_HOURS`, and every sandbox after
+  `BLOOM_DEMO_MAX_LIFETIME_HOURS` even if in use (countdown in the banner); at most
+  `BLOOM_DEMO_MAX_SANDBOXES` exist. New sandboxes per IP: per hour, per day and a temporary block for bursts.
+- Everything printed or exported says DEMO; backups can't be downloaded and a backup made from a demo
+  database is refused by restore, so demo data never reaches a real install.
 - Every Pro feature is on, and everything that would reach outside the sandbox (license server,
   account linking, updates, backups/restore, LAN mode, photo uploads) answers a friendly 403.
 """
@@ -51,8 +55,15 @@ def _float(name: str, default: float) -> float:
 class DemoSettings:
     root: Path
     idle_hours: float = 2.0
+    # Absolute lifetime of a sandbox, even if it's still in use: nobody keeps the demo as a free system.
+    max_lifetime_hours: float = 2.0
     max_sandboxes: int = 30
     new_per_ip_per_hour: int = 10
+    new_per_ip_per_day: int = 5  # rolling 24 h
+    # Burst: more than `burst_count` new sandboxes within `burst_minutes` blocks the IP for `block_minutes`.
+    burst_count: int = 3
+    burst_minutes: float = 10.0
+    block_minutes: float = 60.0
     requests_per_minute: int = 300
     # Proxies in front of the server that append to X-Forwarded-For (0 = trust no header).
     # Render alone: 1. Cloudflare Worker -> Render: 2.
@@ -61,6 +72,7 @@ class DemoSettings:
     # that reached the server another way (e.g. the public onrender.com URL) trusts one hop at most.
     proxy_secret: str = ""
     site_url: str = ""
+    signup_url: str = ""
     cleanup_every_s: int = 60
     users: tuple[dict, ...] = field(default_factory=tuple)
 
@@ -68,17 +80,27 @@ class DemoSettings:
     def idle_seconds(self) -> float:
         return self.idle_hours * 3600
 
+    @property
+    def lifetime_seconds(self) -> float:
+        return self.max_lifetime_hours * 3600
+
     @classmethod
     def from_env(cls) -> DemoSettings:
         return cls(
             root=Path(os.environ.get("BLOOM_DEMO_DIR") or (config.DATA_DIR / "demo-sandboxes")),
             idle_hours=_float("BLOOM_DEMO_IDLE_HOURS", 2.0),
+            max_lifetime_hours=_float("BLOOM_DEMO_MAX_LIFETIME_HOURS", 2.0),
             max_sandboxes=_int("BLOOM_DEMO_MAX_SANDBOXES", 30),
             new_per_ip_per_hour=_int("BLOOM_DEMO_NEW_PER_IP_HOUR", 10),
+            new_per_ip_per_day=_int("BLOOM_DEMO_NEW_PER_IP_DAY", 5),
+            burst_count=_int("BLOOM_DEMO_BURST_COUNT", 3),
+            burst_minutes=_float("BLOOM_DEMO_BURST_MINUTES", 10.0),
+            block_minutes=_float("BLOOM_DEMO_BLOCK_MINUTES", 60.0),
             requests_per_minute=_int("BLOOM_DEMO_REQUESTS_PER_MIN", 300),
             proxy_hops=_int("BLOOM_DEMO_PROXY_HOPS", 0, minimum=0),
             proxy_secret=os.environ.get("BLOOM_DEMO_PROXY_SECRET", "").strip(),
             site_url=os.environ.get("BLOOM_DEMO_SITE_URL", "").strip(),
+            signup_url=os.environ.get("BLOOM_DEMO_SIGNUP_URL", "").strip(),
             cleanup_every_s=_int("BLOOM_DEMO_CLEANUP_EVERY_S", 60),
             users=DEMO_USERS,
         )
@@ -109,9 +131,15 @@ def public_info(request=None) -> dict | None:
     state = getattr(request, "state", None)
     return {
         "session": bool(getattr(state, "demo_session", False)),
+        # Seconds until this sandbox is deleted no matter what (countdown in the banner); None = no sandbox.
+        "expires_in_s": getattr(state, "demo_expires_in", None),
+        # Why the previous sandbox of this browser is gone: "lifetime" | "idle" | None (unknown/never had one).
+        "ended": getattr(state, "demo_ended", None),
         "start_url": "/api/demo/new",
         "idle_hours": s.idle_hours,
+        "max_lifetime_hours": s.max_lifetime_hours,
         "site_url": s.site_url or None,
+        "signup_url": s.signup_url or None,
         "users": [{"name": u["name"], "pin": u["pin"], "role": u["role"]} for u in s.users],
     }
 

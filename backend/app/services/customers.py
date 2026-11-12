@@ -20,7 +20,7 @@ from app.models import (
     User,
     utcnow,
 )
-from app.services import audit, free_plan
+from app.services import audit, free_plan, roles
 from app.services.timeutil import day_bounds_utc, local_today, to_local
 
 SEGMENTS = ("frecuentes", "inactivos", "cumpleanos_mes", "deudores")
@@ -169,7 +169,7 @@ def _clean(data: dict[str, Any]) -> dict[str, Any]:
 
 def create(db: Session, data: dict[str, Any], user: User) -> Customer:
     data = _clean(data)
-    if data.get("credit_limit_cents") and user.role not in ("admin", "encargado"):
+    if data.get("credit_limit_cents") and not roles.has(user, "customers.manage"):
         data["credit_limit_cents"] = 0
     if data.get("phone"):
         dup = db.scalar(select(Customer).where(Customer.phone == data["phone"], Customer.active.is_(True)))
@@ -187,7 +187,7 @@ def create(db: Session, data: dict[str, Any], user: User) -> Customer:
 
 def update(db: Session, c: Customer, data: dict[str, Any], user: User) -> Customer:
     data = _clean(data)
-    is_manager = user.role in ("admin", "encargado")
+    is_manager = roles.has(user, "customers.manage")
     if "credit_limit_cents" in data and data["credit_limit_cents"] != c.credit_limit_cents and not is_manager:
         raise HTTPException(403, "Solo un encargado puede cambiar el límite de cuenta corriente")
     if "active" in data and data["active"] is False and not is_manager:

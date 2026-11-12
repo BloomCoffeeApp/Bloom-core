@@ -9,6 +9,9 @@ export const API_URL = `http://127.0.0.1:${API_PORT}`
 /** Local server for the in-app update manifest (updates.spec.ts starts it; the backend points at it). */
 export const MANIFEST_PORT = Number(process.env.E2E_MANIFEST_PORT ?? API_PORT + 2)
 
+/** Local stand-in of the Bloom server's online-order inbox (Pro online-orders specs start it). */
+export const INBOX_PORT = Number(process.env.E2E_INBOX_PORT ?? API_PORT + 3)
+
 /** Logged-in admin session saved by global.setup.ts. */
 export const ADMIN_STATE = path.join(import.meta.dirname, '.tmp', `admin-${API_PORT}.json`)
 

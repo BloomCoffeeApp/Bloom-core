@@ -7,6 +7,7 @@ import {
   Coffee,
   CreditCard,
   Mail,
+  MapPin,
   MessageSquareQuote,
   Pencil,
   Phone,
@@ -145,6 +146,12 @@ function Detail({ c }: { c: CustomerDetail }) {
                   <Mail className="size-4" /> {c.email}
                 </a>
               )}
+              {c.address && (
+                <span className="inline-flex items-center gap-1.5">
+                  <MapPin className="size-4" /> {c.address}
+                  {c.address_ref ? ` · ${c.address_ref}` : ''}
+                </span>
+              )}
               {c.birthday && (
                 <span className="inline-flex items-center gap-1.5">
                   <Cake className="size-4" /> {fmtDate(c.birthday)} · {age(c.birthday)} años
@@ -159,7 +166,7 @@ function Detail({ c }: { c: CustomerDetail }) {
             <Button variant="outline" onClick={() => setEditOpen(true)}>
               <Pencil /> Editar
             </Button>
-            {can('encargado') &&
+            {can('customers.manage') &&
               (c.active ? (
                 <Button variant="ghost" className="text-destructive" onClick={() => setConfirmOff(true)}>
                   <UserX /> Desactivar
@@ -216,7 +223,7 @@ function Detail({ c }: { c: CustomerDetail }) {
         <div className="space-y-6">
           <FavoriteCard c={c} />
           <AccountCard c={c} onPay={() => setPayOpen(true)} />
-          <PointsCard c={c} onAdjust={can('encargado') ? () => setPointsOpen(true) : undefined} />
+          <PointsCard c={c} onAdjust={can('customers.manage') ? () => setPointsOpen(true) : undefined} />
         </div>
       </div>
 

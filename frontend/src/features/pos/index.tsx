@@ -17,7 +17,10 @@ import { useCreateSale, usePaymentMethods } from '../sales/api'
 import { afterSale } from '../printing/direct'
 import { usePrintingStatus } from '../printing/api'
 import { printTicket, printTicketDialog } from '../sales/print'
-import type { Channel, SaleDetail } from '../sales/types'
+import type { Channel, SaleDetail, SaleIn } from '../sales/types'
+import { useCollectStatus } from '../collect/api'
+import { CollectChargeDialog } from '../collect/charge-dialog'
+import type { CollectMethod } from '../collect/types'
 import { useOpenTabs } from '../orders/api'
 import { usePosCatalog, usePosConfig, usePosQuote } from './api'
 import { TabsDialog } from './tabs-dialog'
@@ -88,6 +91,8 @@ function PosPage() {
   const [done, setDone] = useState<SaleDetail | null>(null)
   const [openCash, setOpenCash] = useState(false)
   const [tabsOpen, setTabsOpen] = useState(false)
+  const [collectReq, setCollectReq] = useState<{ sale: SaleIn; method: CollectMethod } | null>(null)
+  const collect = useCollectStatus()
   const tabs = useOpenTabs()
 
   // Business type: only the channels/sections this kind of business uses.
@@ -179,41 +184,46 @@ function PosPage() {
 
   const confirm: CheckoutConfirm = (payments, courtesy) => {
     const { cart } = cartApi
-    createSale.mutate(
-      {
-        items: cart.lines.map((l) => ({
-          product_id: l.product_id,
-          size_id: l.size?.size_id ?? null,
-          qty: l.qty,
-          modifier_ids: l.modifiers.map((m) => m.id),
-          notes: l.notes || null,
-          // A courtesy gives the whole cart away: no discounts, points or payments.
-          discount_cents: courtesy ? 0 : l.discount_cents,
-          to_bar: l.to_bar !== false,
-          reward_program_id: courtesy ? null : (l.reward?.program_id ?? null),
-        })),
-        customer_id: cart.customer?.id ?? null,
-        channel: cart.channel,
-        table_label: cart.channel === 'salon' ? cart.table_label.trim() || null : null,
-        discount_cents: courtesy ? 0 : totals.discount,
-        points_to_redeem: courtesy ? 0 : cart.points_to_redeem,
-        payments: courtesy ? [] : payments,
-        is_courtesy: !!courtesy,
-        courtesy_reason: courtesy?.reason || null,
-        tab_id: cart.tab?.id ?? null,
-        reward_program_id: courtesy ? null : (cart.reward?.program_id ?? null),
-      },
-      {
-        onSuccess: (sale) => {
-          setCheckout(false)
-          cartApi.clear()
-          setDone(sale)
-          // Thermal printer: automatic ticket and/or cash drawer (falls back to the print dialog).
-          void afterSale(sale, () => printTicketDialog(sale.id))
-        },
-        onError: (e) => toast.error(e.message),
-      },
-    )
+    const body: SaleIn = {
+      items: cart.lines.map((l) => ({
+        product_id: l.product_id,
+        size_id: l.size?.size_id ?? null,
+        qty: l.qty,
+        modifier_ids: l.modifiers.map((m) => m.id),
+        notes: l.notes || null,
+        // A courtesy gives the whole cart away: no discounts, points or payments.
+        discount_cents: courtesy ? 0 : l.discount_cents,
+        to_bar: l.to_bar !== false,
+        reward_program_id: courtesy ? null : (l.reward?.program_id ?? null),
+      })),
+      customer_id: cart.customer?.id ?? null,
+      channel: cart.channel,
+      table_label: cart.channel === 'salon' ? cart.table_label.trim() || null : null,
+      discount_cents: courtesy ? 0 : totals.discount,
+      points_to_redeem: courtesy ? 0 : cart.points_to_redeem,
+      payments: courtesy ? [] : payments,
+      is_courtesy: !!courtesy,
+      courtesy_reason: courtesy?.reason || null,
+      tab_id: cart.tab?.id ?? null,
+      reward_program_id: courtesy ? null : (cart.reward?.program_id ?? null),
+    }
+    // QR / Point / transfer shown to the customer (Pro `payments`): the sale is registered on approval.
+    const collectPay = courtesy ? undefined : payments.find((p) => collect.data?.methods.includes(p.method as CollectMethod))
+    if (collectPay) {
+      setCheckout(false)
+      setCollectReq({ sale: body, method: collectPay.method as CollectMethod })
+      return
+    }
+    createSale.mutate(body, { onSuccess: onSold, onError: (e) => toast.error(e.message) })
+  }
+
+  const onSold = (sale: SaleDetail) => {
+    setCheckout(false)
+    setCollectReq(null)
+    cartApi.clear()
+    setDone(sale)
+    // Thermal printer: automatic ticket and/or cash drawer (falls back to the print dialog).
+    void afterSale(sale, () => printTicketDialog(sale.id))
   }
 
   return (
@@ -277,6 +287,15 @@ function PosPage() {
         customer={cartApi.cart.customer}
         submitting={createSale.isPending}
         onConfirm={confirm}
+      />
+      <CollectChargeDialog
+        request={collectReq}
+        total={totals.total}
+        onApproved={onSold}
+        onClose={() => {
+          setCollectReq(null)
+          setCheckout(true)
+        }}
       />
       <SuccessDialog
         sale={done}

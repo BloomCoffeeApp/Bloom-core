@@ -1,5 +1,6 @@
 import { toast } from 'sonner'
 
+import { DEMO_PRINT_CSS, DEMO_PRINT_HTML, isDemoMode } from '@/lib/demo'
 import { fmtDateTime, fmtMoney, fmtNumber } from '@/lib/format'
 
 import { printDirect } from '../printing/direct'
@@ -39,7 +40,12 @@ export function printHtml(title: string, body: string, css = RECEIPT_CSS) {
     return
   }
   doc.open()
-  doc.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>${esc(title)}</title><style>${css}</style></head><body>${body}</body></html>`)
+  // Online demo: every printed document (ticket, Z report, comanda, QR sheet…) carries a DEMO watermark.
+  const demo = isDemoMode()
+  doc.write(
+    `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>${demo ? 'DEMO · ' : ''}${esc(title)}</title>` +
+      `<style>${css}${demo ? DEMO_PRINT_CSS : ''}</style></head><body>${demo ? DEMO_PRINT_HTML : ''}${body}</body></html>`,
+  )
   doc.close()
   const run = () => {
     try {

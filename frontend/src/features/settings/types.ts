@@ -1,4 +1,4 @@
-import type { Role } from '@/lib/auth'
+import type { Permission, Role } from '@/lib/auth'
 
 export interface BusinessSettings {
   name: string
@@ -53,6 +53,7 @@ export interface UserRow {
   id: number
   name: string
   role: Role
+  role_name?: string | null
   color: string
   active: boolean
   last_login_at: string | null
@@ -117,4 +118,29 @@ export interface AuditRow {
   entity: string
   entity_id: number | null
   payload: Record<string, unknown> | null
+}
+
+/** Mirrors backend services/roles.py `catalog()`. */
+export interface PermissionInfo {
+  key: Permission
+  group: string
+  label: string
+  description: string
+  /** Permission this one needs (added automatically). */
+  requires: Permission | null
+}
+
+/** Mirrors backend services/roles.py `list_roles()`. */
+export interface RoleRow {
+  key: string
+  name: string
+  hint: string | null
+  builtin: boolean
+  /** False only for the admin role (always full access). */
+  editable: boolean
+  /** Built-in role whose permissions differ from the defaults. */
+  customized: boolean
+  permissions: Permission[]
+  /** Active users with this role. */
+  users: number
 }

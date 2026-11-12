@@ -29,7 +29,9 @@ def make_demo(template, tmp_path, monkeypatch):
     def _make(**overrides):
         from app.main import create_app
 
-        settings = DemoSettings(root=tmp_path / "demo", users=demo.DEMO_USERS, **overrides)
+        # Generous per-IP caps by default: every TestClient comes from the same address.
+        caps = {"burst_count": 100, "new_per_ip_per_day": 100}
+        settings = DemoSettings(root=tmp_path / "demo", users=demo.DEMO_USERS, **(caps | overrides))
         monkeypatch.setattr(DemoSettings, "from_env", classmethod(lambda cls: settings))
         app = create_app(run_lifespan=False)
         demo.manager().use_template(template)
@@ -345,3 +347,124 @@ def test_lifespan_builds_the_template_and_never_touches_the_shared_db(template, 
             assert "bloom_demo" in c.cookies
     finally:
         demo.uninstall()
+
+
+# ---------------------------------------------------------------- anti-abuse
+
+
+def test_absolute_lifetime_even_while_in_use(make_demo):
+    app = make_demo(max_lifetime_hours=2, idle_hours=5)
+    c = visitor(app)
+    mgr = demo.manager()
+    sid = c.cookies["bloom_demo"]
+    info = c.get("/api/health").json()["demo"]
+    assert info["session"] is True and 7100 < info["expires_in_s"] <= 7200 and info["max_lifetime_hours"] == 2
+    box = mgr.get(sid)
+    box.created -= 2 * 3600 + 1  # two hours later, still active (last_seen is now)
+    # Gone for the visitor at once: the API answers 409 with the reason and the banner shows the end screen.
+    r = c.get("/api/setup/status")
+    assert r.status_code == 409 and r.json()["demo_ended"] == "lifetime" and "terminó" in r.json()["detail"]
+    health = c.get("/api/health").json()["demo"]
+    assert health["session"] is False and health["ended"] == "lifetime" and health["expires_in_s"] is None
+    # Reloading the page shows the end screen instead of silently creating another sandbox…
+    c.get("/")
+    assert c.cookies["bloom_demo"] == sid
+    # …and the cleanup deletes it even though it was used a second ago.
+    assert mgr.cleanup() == 1 and not (mgr.sandbox_dir / f"{sid}.db").exists()
+    assert c.get("/api/health").json()["demo"]["ended"] == "lifetime"
+    # "Empezar otra demo" is an explicit choice.
+    assert c.get("/api/demo/new", follow_redirects=False).status_code == 303
+    assert c.cookies["bloom_demo"] != sid
+
+
+def test_idle_deletion_reason_is_remembered(make_demo):
+    app = make_demo(idle_hours=1)
+    c = visitor(app)
+    demo.manager().cleanup(now=time.time() + 3601)
+    assert c.get("/api/health").json()["demo"]["ended"] == "idle"
+
+
+def test_daily_cap_of_new_sandboxes_per_ip(make_demo):
+    app = make_demo(new_per_ip_per_day=3, new_per_ip_per_hour=100)
+    mgr = demo.manager()
+    t0 = time.time()
+    for i in range(3):  # spread out: no burst
+        assert mgr.check_new("1.1.1.1", t0 + i * 3600) is None
+        mgr.record_new("1.1.1.1", t0 + i * 3600)
+    assert mgr.check_new("1.1.1.1", t0 + 4 * 3600) == "day"
+    assert mgr.check_new("2.2.2.2", t0 + 4 * 3600) is None  # other visitors aren't affected
+    assert mgr.check_new("1.1.1.1", t0 + 24 * 3600 + 1) is None  # rolling 24 h
+    visitor_app = make_demo(new_per_ip_per_day=1)
+    visitor(visitor_app)
+    r = TestClient(visitor_app).get("/")
+    assert r.status_code == 429 and "máximo de demos de hoy" in r.text and "Descargá Bloom" not in r.text  # no site_url
+
+
+def test_burst_blocks_the_ip_temporarily(make_demo):
+    make_demo(burst_count=3, burst_minutes=10, block_minutes=60, site_url="https://bloom.example.com")
+    mgr = demo.manager()
+    t0 = time.time()
+    for i in range(3):
+        assert mgr.check_new("3.3.3.3", t0 + i * 60) is None
+        mgr.record_new("3.3.3.3", t0 + i * 60)
+    assert mgr.check_new("3.3.3.3", t0 + 200) == "burst"
+    assert mgr.check_new("3.3.3.3", t0 + 30 * 60) == "blocked"  # still blocked after the burst window
+    assert mgr.check_new("3.3.3.3", t0 + 200 + 3601) is None  # block over
+    mgr.cleanup(now=t0 + 200 + 3601)
+    assert "3.3.3.3" not in mgr._blocked
+
+
+def test_burst_page_links_to_the_download(make_demo):
+    app = make_demo(burst_count=1, site_url="https://bloom.example.com")
+    visitor(app)
+    r = TestClient(app).get("/")
+    assert r.status_code == 429 and "Pausamos las demos" in r.text and 'href="https://bloom.example.com"' in r.text
+    api = TestClient(app).get("/api/demo/new", follow_redirects=False)
+    assert api.status_code == 429
+
+
+def test_health_tells_the_banner_the_links(make_demo):
+    app = make_demo(site_url="https://bloom.example.com", signup_url="https://bloom.example.com/registro")
+    info = visitor(app).get("/api/health").json()["demo"]
+    assert info["site_url"] == "https://bloom.example.com" and info["signup_url"] == "https://bloom.example.com/registro"
+
+
+def test_demo_data_cannot_be_restored_into_a_real_install(template, tmp_path):
+    """Backups can't be downloaded in the demo (403) and, even with the file, restore refuses demo data."""
+    import shutil
+
+    from app.services import system
+
+    copy = tmp_path / "demo-copy.db"
+    shutil.copyfile(template, copy)
+    with pytest.raises(ValueError, match="demo online"):
+        system._validate_sqlite(copy)
+
+
+def test_backup_download_and_exports_in_the_demo(make_demo):
+    app = make_demo()
+    c = visitor(app)
+    h = login(c)
+    assert c.get("/api/system/backups/x.db/download", headers=h).status_code == 403
+    assert c.post("/api/system/restore", json={"name": "x.db"}, headers=h).status_code == 403
+    assert c.post("/api/account/data/export", headers=h).status_code == 403
+    from app.main import bloom_pro
+
+    if bloom_pro:  # Pro exports carry the DEMO watermark (file name, sheet and first row)
+        r = c.get("/api/reports/sales", params={"format": "csv"}, headers=h)
+        assert r.status_code == 200 and 'filename="DEMO-reporte-' in r.headers["content-disposition"]
+        assert r.content.decode("utf-8-sig").startswith("DEMO")
+        import io
+
+        from openpyxl import load_workbook
+
+        x = c.get("/api/reports/sales", params={"format": "xlsx"}, headers=h)
+        ws = load_workbook(io.BytesIO(x.content)).active
+        assert ws.title.startswith("DEMO") and str(ws["A1"].value).startswith("DEMO")
+
+
+def test_receipt_upload_is_off_in_the_demo(make_demo):
+    c = visitor(make_demo())
+    h = login(c)
+    r = c.put("/api/expenses/1/receipt", content=b"x", headers={**h, "Content-Type": "image/png"})
+    assert r.status_code == 403 and "demo" in r.json()["detail"]

@@ -11,7 +11,7 @@ export const ABOUT_TAB = '/config?tab=acerca'
 /** Subtle header hint for admins when a newer version is published. */
 export function UpdateBadge() {
   const { can } = useAuth()
-  const { data } = useUpdateStatus(can())
+  const { data } = useUpdateStatus(can('system.manage'))
   if (!data?.required && (!data?.available || !data.latest)) return null
   const label = data.required ? 'Actualización obligatoria' : 'Nueva versión'
   return (

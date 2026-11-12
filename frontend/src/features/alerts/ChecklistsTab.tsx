@@ -57,7 +57,7 @@ export function ChecklistsTab() {
         <p className="text-sm text-muted-foreground">
           Tildá cada tarea al hacerla: queda registrado quién y a qué hora.
         </p>
-        {can('encargado') && (
+        {can('notices.manage') && (
           <Button variant="outline" onClick={() => setAdminOpen((o) => !o)}>
             <Settings2 /> {adminOpen ? 'Cerrar administración' : 'Administrar checklists'}
           </Button>

@@ -47,7 +47,7 @@ const TILT = ['-rotate-[0.6deg]', 'rotate-[0.5deg]', 'rotate-0', 'rotate-[0.8deg
 
 export function NoticesTab() {
   const { can } = useAuth()
-  const manager = can('encargado')
+  const manager = can('notices.manage')
   const [showExpired, setShowExpired] = useState(false)
   const { data, isLoading } = useNotices(manager && showExpired)
   const [editing, setEditing] = useState<Notice | null>(null)

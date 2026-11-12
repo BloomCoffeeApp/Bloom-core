@@ -4,7 +4,7 @@ from typing import Any
 from sqlalchemy import JSON, DateTime, Float, ForeignKey, Index, String, Text, false
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.models.base import Base, IdMixin, TimestampMixin, utcnow
+from app.models.base import Base, IdMixin, utcnow
 
 CHANNELS = ("salon", "llevar", "delivery")
 
@@ -119,14 +119,3 @@ class SalePayment(IdMixin, Base):
     amount_cents: Mapped[int]
     tendered_cents: Mapped[int | None]
     change_cents: Mapped[int] = mapped_column(default=0)
-
-
-class Expense(IdMixin, TimestampMixin, Base):
-    """General business expenses (rent, utilities) for reports."""
-
-    __tablename__ = "expenses"
-    category: Mapped[str] = mapped_column(String(60))
-    description: Mapped[str | None] = mapped_column(String(200))
-    amount_cents: Mapped[int]
-    date: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
-    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))

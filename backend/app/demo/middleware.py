@@ -4,6 +4,7 @@ rate limits and the list of features that are off in the demo."""
 from __future__ import annotations
 
 import hmac
+import html
 import json
 import re
 from contextvars import ContextVar
@@ -16,6 +17,7 @@ from app.demo.sandboxes import SandboxesFull, SandboxManager, TemplateNotReady, 
 COOKIE = "bloom_demo"
 START_PATH = "/api/demo/new"  # GET: creates a sandbox (if the cookie has none) and redirects to /
 EXPIRED = "Tu demo se borró por inactividad. Recargá la página para empezar otra."
+LIFETIME_OVER = "Tu demo terminó: cada demo dura un tiempo limitado. Recargá la página para ver cómo seguir."
 current_sandbox_id: ContextVar[str | None] = ContextVar("bloom_demo_sandbox", default=None)
 
 _DOWNLOAD = "Descargá Bloom gratis para usarlo en tu local."
@@ -31,8 +33,10 @@ DISABLED: list[tuple[frozenset[str] | None, re.Pattern[str], str]] = [
     (None, re.compile(r"^/api/system/lan-qr$"), f"El modo red local está desactivado en la demo. {_DOWNLOAD}"),
     (frozenset({"PUT"}), re.compile(r"^/api/settings/network$"), f"El modo red local está desactivado en la demo. {_DOWNLOAD}"),
     (frozenset({"PUT"}), re.compile(r"^/api/products/[^/]+/photo$"), f"Subir fotos está desactivado en la demo. {_DOWNLOAD}"),
+    (frozenset({"PUT"}), re.compile(r"^/api/expenses/[^/]+/receipt$"), f"Subir comprobantes está desactivado en la demo. {_DOWNLOAD}"),
     (None, re.compile(r"^/api/public-menu/online/.+"), f"El menú online está desactivado en la demo. {_DOWNLOAD}"),
     (None, re.compile(r"^/api/setup$"), "La demo ya está configurada."),
+    (frozenset({"POST", "PUT", "DELETE"}), re.compile(r"^/api/collect/mp(/.*)?$"), f"En la demo los cobros son simulados: no se conecta ninguna cuenta de Mercado Pago. {_DOWNLOAD}"),
     (frozenset({"POST", "PUT"}), re.compile(r"^/api/printing/.+"), "La impresión directa está desactivada en la demo: se usa el diálogo de impresión."),
 ]
 
@@ -40,9 +44,22 @@ _FULL_HTML = """<!doctype html><html lang="es"><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>Demo de Bloom</title>
 <meta http-equiv="refresh" content="{refresh}">
 <style>body{{margin:0;min-height:100svh;display:grid;place-items:center;font-family:system-ui,sans-serif;
-background:#FAF7F2;color:#3b2a1d;text-align:center;padding:1.5rem}}h1{{font-family:Georgia,serif;color:#8B5A2B}}
-@media (prefers-color-scheme:dark){{body{{background:#1f1913;color:#efe7dc}}h1{{color:#C8874A}}}}</style>
+background:#FAF7F2;color:#3b2a1d;text-align:center;padding:1.5rem}}h1{{font-family:Georgia,serif;color:#8B5A2B}}a{{color:#8B5A2B;font-weight:600}}
+@media (prefers-color-scheme:dark){{body{{background:#1f1913;color:#efe7dc}}h1,a{{color:#C8874A}}}}</style>
 <main><h1>{title}</h1><p>{body}</p></main></html>"""
+
+
+# check_new() refusal -> (title, body, retry-after seconds)
+NEW_REFUSED: dict[str, tuple[str, str, int]] = {
+    "hour": ("Ya abriste varias demos", "Abriste muchas demos seguidas desde esta conexión. Probá de nuevo en un rato.", 600),
+    "day": ("Llegaste al máximo de demos de hoy",
+            "Desde esta conexión ya se abrieron todas las demos de hoy. Si te gustó Bloom, descargalo gratis: "
+            "es la app completa, con tus datos y sin límite de tiempo.", 3600),
+    "burst": ("Pausamos las demos un rato", "Se abrieron muchas demos en pocos minutos desde esta conexión. "
+              "Probá de nuevo más tarde.", 3600),
+    "blocked": ("Pausamos las demos un rato", "Se abrieron muchas demos en pocos minutos desde esta conexión. "
+                "Probá de nuevo más tarde.", 3600),
+}
 
 
 def disabled_reason(method: str, path: str) -> str | None:
@@ -117,7 +134,12 @@ class DemoMiddleware:
             return
         headers = _headers(scope)
         if path == "/api/health":  # never creates a sandbox; tells the banner whether ours is alive
-            scope.setdefault("state", {})["demo_session"] = self.manager.peek(_cookie_sid(headers))
+            sid = _cookie_sid(headers)
+            left = self.manager.expires_in(sid)
+            state = scope.setdefault("state", {})
+            state["demo_session"] = left is not None
+            state["demo_expires_in"] = left
+            state["demo_ended"] = None if left is not None else self.manager.ended_reason(sid)
             await self.app(scope, receive, send)
             return
         ip = self.client_ip(scope, headers)
@@ -132,21 +154,29 @@ class DemoMiddleware:
             await self._json(send, 403, {"detail": reason, "demo": True})
             return
 
-        box = self.manager.get(_cookie_sid(headers))
+        sid = _cookie_sid(headers)
+        box = self.manager.get(sid)
         new = False
         if box is None:
+            ended = self.manager.ended_reason(sid)
             if api:
                 # Only a page load creates a sandbox: the app fires several API calls at once and
                 # each would otherwise get its own. A missing/expired one = start over (banner).
                 # 409, not 401: a 401 would log the app out and wipe its cache under the banner.
-                await self._json(send, 409, {"detail": EXPIRED, "demo": True, "demo_expired": True})
+                await self._json(send, 409, {"detail": LIFETIME_OVER if ended == "lifetime" else EXPIRED, "demo": True,
+                                             "demo_expired": True, "demo_ended": ended})
                 return
             if not document:
                 await self.app(scope, receive, send)  # favicon, robots.txt…: no sandbox needed
                 return
-            if not self.manager.allow_new(ip):
-                await self._reply(send, document, 429, "Ya abriste varias demos",
-                                  "Abriste muchas demos seguidas desde esta conexión. Probá de nuevo en un rato.", retry=600)
+            if ended == "lifetime" and not start:
+                # The SPA shows the friendly end screen (download / sign up / start another): no new sandbox
+                # just because the visitor reloaded the page.
+                await self.app(scope, receive, send)
+                return
+            if refusal := self.manager.check_new(ip):
+                title, body, retry = NEW_REFUSED[refusal]
+                await self._reply(send, document, 429, title, body + (self._links() if document else ""), retry=retry)
                 return
             try:
                 box = await anyio.to_thread.run_sync(self.manager.create)
@@ -158,6 +188,7 @@ class DemoMiddleware:
                 await self._reply(send, document, 503, "Preparando la demo…",
                                   "Estamos cargando los datos de ejemplo. La página se recarga sola.", retry=5)
                 return
+            self.manager.record_new(ip)
             new = True
 
         if start:  # "Empezar de nuevo" (and dev servers that serve the page themselves)
@@ -187,6 +218,12 @@ class DemoMiddleware:
         finally:
             self.manager.release(box)
             current_sandbox_id.reset(token)
+
+    def _links(self) -> str:
+        s = self.manager.settings
+        if not s.site_url:
+            return ""
+        return f' <a href="{html.escape(s.site_url)}">Descargá Bloom gratis</a>'
 
     @staticmethod
     def _cookie(sid: str, secure: bool) -> str:

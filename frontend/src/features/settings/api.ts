@@ -5,11 +5,15 @@ import { api, tokenStore } from '@/lib/api'
 
 import { salesKeys } from '../sales/api'
 
+import type { Permission } from '@/lib/permissions'
+
 import type {
   AllSettings,
   AuditRow,
   BackupRow,
   PaymentMethod,
+  PermissionInfo,
+  RoleRow,
   RestoreResult,
   SystemInfo,
   UserCreate,
@@ -153,5 +157,46 @@ export function useMenuQr(enabled: boolean) {
       if (!res.ok) throw new Error('No se pudo generar el código QR')
       return URL.createObjectURL(await res.blob())
     },
+  })
+}
+
+export const rolesKey = ['settings', 'roles'] as const
+
+export function useRoles(enabled = true) {
+  return useQuery({ queryKey: rolesKey, queryFn: () => api.get<RoleRow[]>('/roles'), enabled })
+}
+
+export function usePermissionCatalog() {
+  return useQuery({ queryKey: ['settings', 'permissions'], queryFn: () => api.get<PermissionInfo[]>('/roles/catalog'), staleTime: Infinity })
+}
+
+export function useSaveRole() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ key, data }: { key?: string; data: { name?: string; permissions?: Permission[] } }) =>
+      key ? api.patch<RoleRow>(`/roles/${key}`, data) : api.post<RoleRow>('/roles', data),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: rolesKey })
+      void qc.invalidateQueries({ queryKey: ['settings', 'users'] })
+    },
+    onError,
+  })
+}
+
+export function useResetRole() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (key: string) => api.post<RoleRow>(`/roles/${key}/reset`),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: rolesKey }),
+    onError,
+  })
+}
+
+export function useDeleteRole() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (key: string) => api.delete(`/roles/${key}`),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: rolesKey }),
+    onError,
   })
 }

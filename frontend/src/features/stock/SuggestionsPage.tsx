@@ -67,7 +67,7 @@ export function SuggestionsPage() {
                   {g.items.length} {g.items.length === 1 ? 'insumo' : 'insumos'} · estimado{' '}
                   <span className="tabular">{fmtMoney(g.total_est_cents)}</span>
                 </CardDescription>
-                {can('encargado') && purchasesPro && (
+                {can('purchases.manage') && purchasesPro && (
                   <CardAction>
                     <Button
                       disabled={!g.supplier_id || createOrder.isPending}

@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils'
 import { useProductCategories, useSaveCategory } from './api'
 import { CATEGORY_ICONS, palette } from './catalog-utils'
 import { ColorSwatches } from './shared'
+import { ChannelSuppliesEditor } from './ChannelSuppliesEditor'
 import type { CategoryInput, ProductCategory } from './types'
 
 const EMPTY: CategoryInput = { name: '', color: 'amber', icon: 'coffee', sort_order: 0, active: true, send_to_orders: true }
@@ -38,7 +39,7 @@ function CategoryDialog({
   const Preview = CATEGORY_ICONS[form.icon] ?? CATEGORY_ICONS.package
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="max-h-[90svh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{category ? 'Editar categoría' : 'Nueva categoría'}</DialogTitle>
         </DialogHeader>
@@ -111,6 +112,13 @@ function CategoryDialog({
               aria-label="Va a la pantalla de pedidos"
             />
           </label>
+          {category && (
+            <section className="space-y-2 rounded-xl border p-3">
+              <p className="text-sm font-medium">Insumos según el canal (para todos sus productos)</p>
+              <p className="text-xs text-muted-foreground">Cada producto puede tener los suyos; si no, usa estos.</p>
+              <ChannelSuppliesEditor owner="category" id={category.id} />
+            </section>
+          )}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar

@@ -1,13 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.auth import AdminOnly
+from app.auth import Perm
 from app.db import get_db
 from app.models import User
 from app.schemas.updates import UpdateStatus
 from app.services import audit
 from app.services import updates as svc
 
+AdminOnly = Perm("system.manage")
 router = APIRouter(prefix="/api/updates", tags=["updates"])
 
 

@@ -14,8 +14,11 @@ from app.models.catalog import (
     RecipeItem,
     Size,
 )
+from app.models.expenses import Expense, ExpenseCategory, RecurringExpense
+from app.models.collect import CollectCharge, CollectRefund, CustomerScreen
 from app.models.customers import Customer, CustomerAccountMovement, LoyaltyTransaction
 from app.models.promos import LoyaltyProgram, LoyaltyStamp, Promo
+from app.models.channel_supplies import ChannelSupply
 from app.models.orders import DiningTable, Order, OrderItem, OrderStation, TableTab, WaiterCall
 from app.models.purchases import (
     Purchase,
@@ -29,13 +32,21 @@ from app.models.sales import (
     CashMovement,
     CashSession,
     CashSessionCount,
-    Expense,
     PaymentMethod,
     Sale,
     SaleItem,
     SalePayment,
 )
-from app.models.stock import InventoryCount, InventoryCountItem, StockCategory, StockItem, StockLot, StockMovement
-from app.models.users import AuditLog, Setting, User, UserSession
+from app.models.staff import Employee, StaffAdvance, TimeEntry
+from app.models.stock import (
+    InventoryCount,
+    InventoryCountItem,
+    StockCategory,
+    StockItem,
+    StockLot,
+    StockMovement,
+    StockPackage,
+)
+from app.models.users import AuditLog, Role, Setting, User, UserSession
 
 __all__ = [n for n in dir() if not n.startswith("_")]

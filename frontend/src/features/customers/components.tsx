@@ -89,7 +89,7 @@ export function CustomerFormDialog({
       email: email.trim() || null,
       birthday: birthday || null,
       notes: notes.trim() || null,
-      ...(can('encargado') ? { credit_limit_cents: limit ?? 0 } : {}),
+      ...(can('customers.manage') ? { credit_limit_cents: limit ?? 0 } : {}),
     }
     save.mutate(
       { id: customer?.id, data },
@@ -129,7 +129,7 @@ export function CustomerFormDialog({
               <Label htmlFor="c-bday">Cumpleaños</Label>
               <Input id="c-bday" type="date" value={birthday} onChange={(e) => setBirthday(e.target.value)} />
             </div>
-            {can('encargado') && (
+            {can('customers.manage') && (
               <div className="grid gap-2">
                 <Label htmlFor="c-limit">Límite cuenta corriente</Label>
                 <MoneyInput id="c-limit" value={limit} onChange={setLimit} />

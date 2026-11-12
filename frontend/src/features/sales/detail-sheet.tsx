@@ -14,6 +14,7 @@ import { useAuth } from '@/lib/auth'
 import { fmtDateTime, fmtMoney, fmtNumber, PAYMENT_LABEL } from '@/lib/format'
 
 import { usePaymentMethods, useSale, useVoidSale } from './api'
+import { SaleRefundPanel } from '../collect/refund-panel'
 import { CourtesyBadge } from './courtesy-badge'
 import { printTicket } from './print'
 import { CHANNEL_LABEL } from './types'
@@ -144,7 +145,7 @@ export function SaleDetailSheet({ id, onOpenChange }: { id: number | null; onOpe
                   <span>Total</span>
                   <span className="tabular">{fmtMoney(s.total_cents)}</span>
                 </div>
-                {can('encargado') && (
+                {can('reports.view') && (
                   <div className="flex justify-between text-xs text-muted-foreground">
                     <span>Costo estimado</span>
                     <span className="tabular">
@@ -176,6 +177,7 @@ export function SaleDetailSheet({ id, onOpenChange }: { id: number | null; onOpe
                   </p>
                 )}
               </div>
+              <SaleRefundPanel sale={s} />
               {s.notes && <p className="rounded-xl bg-muted/50 p-3 text-sm">{s.notes}</p>}
             </div>
           )}
@@ -185,7 +187,7 @@ export function SaleDetailSheet({ id, onOpenChange }: { id: number | null; onOpe
             <Button variant="outline" size="lg" className="flex-1" onClick={() => printTicket(s.id)}>
               <Printer /> Reimprimir
             </Button>
-            {s.status === 'completed' && can('encargado') && (
+            {s.status === 'completed' && can('sales.void') && (
               <Button variant="destructive" size="lg" className="flex-1" onClick={() => setConfirm(true)}>
                 <Ban /> Anular
               </Button>

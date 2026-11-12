@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft, Delete, Lock } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { Suspense, useCallback, useEffect, useState } from 'react'
 
 import { AVATAR_COLORS, initials } from '@/components/avatar-utils'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -12,6 +12,7 @@ import { ROLE_LABEL } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { Logo } from '@/components/logo'
 import { BRAND } from '@/lib/brand'
+import { proModules } from '@pro'
 
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del']
 
@@ -106,7 +107,7 @@ export function LoginPage({ businessName }: { businessName?: string }) {
                   </Avatar>
                   <div className="text-center leading-tight">
                     <p className="text-sm font-medium">{u.name}</p>
-                    <p className="text-xs text-muted-foreground">{ROLE_LABEL[u.role]}</p>
+                    <p className="text-xs text-muted-foreground">{u.role_name ?? ROLE_LABEL[u.role] ?? u.role}</p>
                   </div>
                 </button>
               ))}
@@ -158,6 +159,11 @@ export function LoginPage({ businessName }: { businessName?: string }) {
             </div>
           )}
         </div>
+        {proModules.TimeClockButton && !selected && (
+          <Suspense fallback={null}>
+            <proModules.TimeClockButton />
+          </Suspense>
+        )}
         <p className="mt-6 text-center text-xs text-muted-foreground">{BRAND.name} · {BRAND.tagline}</p>
       </div>
     </div>

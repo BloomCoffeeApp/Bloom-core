@@ -21,6 +21,7 @@ import { useStockItems } from '../stock/api'
 import { StockItemPicker } from '../stock/components'
 import { useDeactivateProduct, useModifierGroups, usePriceHistory, useProductCategories, useSaveProduct, useSizes } from './api'
 import { marginOf, marginTextClass } from './catalog-utils'
+import { ChannelSuppliesEditor } from './ChannelSuppliesEditor'
 import { MenuDetailsEditor } from './MenuDetailsEditor'
 import { ColorSwatches } from './shared'
 import { draftsFor, type SizeDraft, toInput } from './size-utils'
@@ -435,6 +436,18 @@ export function ProductEditor({
                 <p className="text-sm text-muted-foreground">No hay grupos de modificadores. Crealos en la pestaña Modificadores.</p>
               )}
             </Section>
+
+            {product && (
+              <>
+                <Separator />
+                <Section
+                  title="Insumos según el canal"
+                  description="Lo que se descuenta del stock según cómo se sirve: en el local, para llevar o delivery (además de la receta)."
+                >
+                  <ChannelSuppliesEditor owner="product" id={product.id} />
+                </Section>
+              </>
+            )}
 
             {product && (
               <>

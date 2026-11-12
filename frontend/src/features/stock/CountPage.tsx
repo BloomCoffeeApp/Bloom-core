@@ -18,8 +18,9 @@ import { useDepsChanged } from '@/hooks/use-deps-changed'
 import { fmtDateTime, fmtMoney, fmtNumber, fmtQty } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
-import { useCount, useCountAction, useCounts, useCreateCount, useSetCounted, useStockCategories } from './api'
-import type { CountItem, InventoryCount } from './types'
+import { useCount, useCountAction, useCounts, useCreateCount, useSetCounted, useStockCategories, useStockItems } from './api'
+import { defaultPackage, fmtPackages, fromPackages } from './stock-utils'
+import type { CountItem, InventoryCount, StockPackage } from './types'
 
 const COUNT_STATUS: Record<InventoryCount['status'], { label: string; cls: string }> = {
   open: { label: 'Abierto', cls: 'bg-info/15 text-info' },
@@ -163,7 +164,60 @@ export function CountListPage() {
   )
 }
 
-function CountRow({ item, editable, onSave }: { item: CountItem; editable: boolean; onSave: (v: number | null) => void }) {
+/** Count in packages + loose ("4 × Sachet 1 L + 730 ml"): fills the counted quantity in the base unit. */
+function PackageCount({ item, pkg, editable, onSave }: { item: CountItem; pkg: StockPackage; editable: boolean; onSave: (v: number) => void }) {
+  const [whole, setWhole] = useState('')
+  const [loose, setLoose] = useState('')
+  const n = (s: string) => {
+    const v = Number(s.replace(',', '.'))
+    return Number.isFinite(v) && v >= 0 ? v : null
+  }
+  const commit = () => {
+    const w = whole.trim() === '' ? 0 : n(whole)
+    const l = loose.trim() === '' ? 0 : n(loose)
+    if (w == null || l == null || (whole.trim() === '' && loose.trim() === '')) return
+    onSave(fromPackages(w, pkg, l))
+  }
+  return (
+    <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+      <Input
+        aria-label={`Envases de ${item.name}`}
+        inputMode="decimal"
+        disabled={!editable}
+        className="tabular h-9 w-16 text-right"
+        placeholder="0"
+        value={whole}
+        onChange={(e) => setWhole(e.target.value)}
+        onBlur={commit}
+      />
+      <span>× {pkg.name} +</span>
+      <Input
+        aria-label={`Suelto de ${item.name}`}
+        inputMode="decimal"
+        disabled={!editable}
+        className="tabular h-9 w-20 text-right"
+        placeholder="0"
+        value={loose}
+        onChange={(e) => setLoose(e.target.value)}
+        onBlur={commit}
+      />
+      <span>{item.unit} sueltos</span>
+    </div>
+  )
+}
+
+function CountRow({
+  item,
+  editable,
+  onSave,
+  packages,
+}: {
+  item: CountItem
+  editable: boolean
+  onSave: (v: number | null) => void
+  packages?: StockPackage[]
+}) {
+  const pkg = defaultPackage(packages)
   const [text, setText] = useState(item.counted_qty == null ? '' : String(item.counted_qty))
   // Follow server-side changes to the counted quantity.
   if (useDepsChanged([item.counted_qty], false)) setText(item.counted_qty == null ? '' : String(item.counted_qty))
@@ -184,6 +238,12 @@ function CountRow({ item, editable, onSave }: { item: CountItem; editable: boole
       <div className="min-w-0">
         <p className="truncate font-medium">{item.name}</p>
         <p className="text-xs text-muted-foreground sm:hidden">Sistema: {fmtQty(item.expected_qty, item.unit)}</p>
+        {pkg && (
+          <>
+            <p className="text-xs text-muted-foreground">Sistema: {fmtPackages(item.expected_qty, item.unit, packages)}</p>
+            <PackageCount item={item} pkg={pkg} editable={editable} onSave={onSave} />
+          </>
+        )}
       </div>
       <div className="tabular hidden text-right text-sm text-muted-foreground sm:block">{fmtQty(item.expected_qty, item.unit)}</div>
       <div className="relative">
@@ -223,6 +283,8 @@ export function CountDetailPage() {
   const { data, isLoading } = useCount(Number.isFinite(id) ? id : null)
   const setCounted = useSetCounted(id)
   const action = useCountAction(id)
+  const stockItems = useStockItems()
+  const packagesOf = useMemo(() => new Map(stockItems.data?.map((i) => [i.id, i.packages])), [stockItems.data])
   const [confirm, setConfirm] = useState<'apply' | 'cancel' | null>(null)
 
   const groups = useMemo(() => {
@@ -323,6 +385,7 @@ export function CountDetailPage() {
                   key={it.id}
                   item={it}
                   editable={editable}
+                  packages={packagesOf.get(it.stock_item_id)}
                   onSave={(v) => setCounted.mutate([{ id: it.id, counted_qty: v }])}
                 />
               ))}

@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { fmtMoney } from '@/lib/format'
 import { cn } from '@/lib/utils'
+import { QuickDiscardButton } from '@/features/stock/quick-discard-button'
 
 import { colorClasses } from './colors'
 import type { PosCatalog, PosProduct } from './types'
@@ -54,26 +55,29 @@ export function ProductGrid({
 
   return (
     <div className="flex min-h-0 flex-col gap-3 p-4">
-      <div className="relative">
-        <Search className="absolute top-1/2 left-4 size-5 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          ref={searchRef}
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          onKeyDown={onSearchKey}
-          placeholder="Buscá un producto… (F2)"
-          className="h-14 rounded-2xl pr-12 pl-12 text-lg"
-          aria-label="Buscar producto"
-        />
-        {q && (
-          <button
-            onClick={() => setQ('')}
-            className="absolute top-1/2 right-3 flex size-9 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:bg-muted"
-            aria-label="Limpiar búsqueda"
-          >
-            <X className="size-5" />
-          </button>
-        )}
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute top-1/2 left-4 size-5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            ref={searchRef}
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            onKeyDown={onSearchKey}
+            placeholder="Buscá un producto… (F2)"
+            className="h-14 rounded-2xl pr-12 pl-12 text-lg"
+            aria-label="Buscar producto"
+          />
+          {q && (
+            <button
+              onClick={() => setQ('')}
+              className="absolute top-1/2 right-3 flex size-9 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:bg-muted"
+              aria-label="Limpiar búsqueda"
+            >
+              <X className="size-5" />
+            </button>
+          )}
+        </div>
+        <QuickDiscardButton className="h-14 rounded-2xl" label={false} />
       </div>
 
       <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">

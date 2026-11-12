@@ -118,8 +118,34 @@ def get_current_user(
     return user
 
 
+def require_permission(*perms: str) -> Callable[..., User]:
+    """Dependency: admin always passes; otherwise the user's role needs ANY of `perms`
+    (catalog in `app/permissions.py`, roles in `services/roles.py`)."""
+    from app.permissions import PERMISSIONS
+
+    unknown = [p for p in perms if p not in PERMISSIONS]
+    if unknown or not perms:
+        raise ValueError(f"Unknown permission(s): {unknown or perms}")
+
+    def _dep(user: User = Depends(get_current_user)) -> User:
+        from app.services import roles
+
+        if not roles.has(user, *perms):
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "No tenés permiso para esta acción")
+        return user
+
+    return _dep
+
+
+def require_admin(user: User = Depends(get_current_user)) -> User:
+    """Owner-only actions (license, Bloom account, roles editor): never delegable."""
+    if user.role != "admin":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Solo un administrador puede hacer esto")
+    return user
+
+
 def require_role(*roles: str) -> Callable[..., User]:
-    """Dependency: admin always passes; otherwise the user's role must be listed."""
+    """Legacy (fixed role names; custom roles never pass). Use `require_permission` instead."""
 
     def _dep(user: User = Depends(get_current_user)) -> User:
         if user.role != "admin" and user.role not in roles:
@@ -130,5 +156,10 @@ def require_role(*roles: str) -> Callable[..., User]:
 
 
 CurrentUser = Depends(get_current_user)
-Manager = Depends(require_role("encargado"))
-AdminOnly = Depends(require_role())
+AdminOnly = Depends(require_admin)
+Manager = Depends(require_role("encargado"))  # legacy: prefer require_permission(...)
+
+
+def Perm(*perms: str):  # noqa: N802 - reads like the other dependency constants
+    """`user: User = Perm("pos.sell")`"""
+    return Depends(require_permission(*perms))

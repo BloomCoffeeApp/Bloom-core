@@ -39,7 +39,7 @@ function HiddenModule({ module }: { module: ModuleKey }) {
             {profile ? ` en «${profile.label}»` : ''}. Tus datos siguen guardados: si lo activás, vuelve todo como estaba.
           </p>
         </div>
-        {can() ? (
+        {can('settings.manage') ? (
           <div className="flex flex-wrap justify-center gap-2">
             <Button className="h-11" onClick={() => set.mutate({ key: module, enabled: true })} disabled={set.isPending}>
               {set.isPending && <Loader2 className="animate-spin" />} Activarlo

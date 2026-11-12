@@ -67,6 +67,13 @@ def _validate_sqlite(path: Path) -> None:
         has_users = con.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='users'").fetchone()
         if not has_users:
             raise ValueError("El archivo no parece un respaldo de la app")
+        # Online demo databases carry a marker (app/demo/sandboxes.py): demo data never reaches a real install.
+        try:
+            demo = con.execute("SELECT 1 FROM settings WHERE key = 'demo_sandbox'").fetchone()
+        except sqlite3.DatabaseError:
+            demo = None
+        if demo:
+            raise ValueError("Ese respaldo es de la demo online: sus datos son de ejemplo y no se pueden restaurar.")
     except sqlite3.DatabaseError as e:
         raise ValueError("El archivo no es una base de datos válida") from e
     finally:

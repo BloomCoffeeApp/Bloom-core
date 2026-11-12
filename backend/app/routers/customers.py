@@ -3,7 +3,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from app.auth import Manager, require_role
+from app.auth import Perm
 from app.db import get_db
 from app.models import Customer, CustomerAccountMovement, LoyaltyTransaction, User
 from app.schemas.common import Ok
@@ -25,7 +25,8 @@ from app.services import free_plan
 
 router = APIRouter(prefix="/api", tags=["customers"])
 
-Staff = Depends(require_role("cajero", "encargado"))
+Staff = Perm("customers.edit")
+Manager = Perm("customers.manage")
 
 
 @router.get("/customers", response_model=list[CustomerListItem])

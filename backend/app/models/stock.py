@@ -26,6 +26,23 @@ class StockItem(IdMixin, TimestampMixin, Base):
     default_supplier_id: Mapped[int | None] = mapped_column(ForeignKey("suppliers.id"))
     track_expiry: Mapped[bool] = mapped_column(default=False)
     active: Mapped[bool] = mapped_column(default=True)
+    # How it's bought/stored ("Sachet 1 L", "Caja x 6 × 250 ml"): stock stays in the base unit.
+    packages: Mapped[list["StockPackage"]] = relationship(
+        cascade="all, delete-orphan", lazy="selectin", order_by="(StockPackage.sort_order, StockPackage.id)"
+    )
+
+
+class StockPackage(IdMixin, Base):
+    """A package type of a stock item: `content_qty` base units (g/ml/u) per package."""
+
+    __tablename__ = "stock_packages"
+    stock_item_id: Mapped[int] = mapped_column(ForeignKey("stock_items.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(60))
+    content_qty: Mapped[float] = mapped_column(Float)
+    barcode: Mapped[str | None] = mapped_column(String(40), index=True)
+    cost_cents: Mapped[int | None]  # last price paid per package (optional)
+    is_default: Mapped[bool] = mapped_column(default=False)  # the one used to show "4 envases + 730 ml"
+    sort_order: Mapped[int] = mapped_column(default=0)
 
 
 class StockLot(IdMixin, Base):

@@ -35,8 +35,8 @@ test('toggling a payment method hides it from the POS checkout', async ({ page }
     await expect(page.getByRole('row').filter({ has: sw }).getByText('Oculto en el cobro')).toBeVisible()
     expect(await checkoutOffers(page)).toBe(false)
 
-    await setMethod(page, true)
-    await expect(page.getByText('Oculto en el cobro')).toBeHidden()
+    const on = await setMethod(page, true)
+    await expect(page.getByRole('row').filter({ has: on }).getByText('Oculto en el cobro')).toBeHidden()
     expect(await checkoutOffers(page)).toBe(true)
   } finally {
     await setMethod(page, true)

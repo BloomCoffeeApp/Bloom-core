@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
-import { Bell, CircleHelp, GraduationCap, Lock, LogOut, Monitor, Moon, Search, Sparkles, Sun } from 'lucide-react'
-import { Fragment, useEffect, useState } from 'react'
+import { Bell, CircleHelp, Clock, GraduationCap, Lock, LogOut, Monitor, Moon, Search, Sparkles, Sun } from 'lucide-react'
+import { Fragment, Suspense, useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 
 import { CommandPalette } from '@/components/command-palette'
@@ -54,6 +54,7 @@ import { useTheme } from '@/lib/theme'
 import { cn } from '@/lib/utils'
 import { Logo } from '@/components/logo'
 import { BRAND } from '@/lib/brand'
+import { proModules } from '@pro'
 
 interface AlertSummary {
   open: number
@@ -74,6 +75,7 @@ export function AppShell() {
   const { user, can, logout } = useAuth()
   const { theme, setTheme } = useTheme()
   const [paletteOpen, setPaletteOpen] = useState(false)
+  const [clockOpen, setClockOpen] = useState(false)
   const tour = useTour()
   const license = useLicense()
   const desktop = useDesktop()
@@ -97,7 +99,7 @@ export function AppShell() {
         e.preventDefault()
         setPaletteOpen((o) => !o)
       }
-      if (e.key === 'F1' && can('cajero', 'encargado')) {
+      if (e.key === 'F1' && can('pos.sell')) {
         e.preventDefault()
         navigate('/pos')
       }
@@ -107,7 +109,7 @@ export function AppShell() {
   }, [can, navigate])
 
   if (!user) return null
-  const items = NAV.filter((n) => (n.roles.length === 0 || can(...n.roles)) && (!n.module || modules.on(n.module)))
+  const items = NAV.filter((n) => (n.perms.length === 0 || can(...n.perms)) && (!n.module || modules.on(n.module)))
   const groups = Object.entries(NAV_GROUPS)
     .map(([key, label]) => ({ key, label, items: items.filter((i) => i.group === key) }))
     .filter((g) => g.items.length)
@@ -178,7 +180,7 @@ export function AppShell() {
                 <div className="grid text-left leading-tight group-data-[collapsible=icon]:hidden">
                   <span className="truncate text-sm font-medium">{user.name}</span>
                   <span className="flex items-center gap-1.5 truncate text-xs text-muted-foreground">
-                    {ROLE_LABEL[user.role]}
+                    {user.role_name ?? ROLE_LABEL[user.role] ?? user.role}
                     {license.data?.valid && <ProBadge />}
                   </span>
                 </div>
@@ -219,6 +221,11 @@ export function AppShell() {
                 <Monitor /> Sistema {theme === 'system' && '✓'}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
+              {proModules.TimeClockDialog && license.data && hasFeature(license.data, 'staff') && (
+                <DropdownMenuItem onClick={() => setClockOpen(true)}>
+                  <Clock /> Fichar
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem onClick={tour.start}>
                 <GraduationCap /> Ver tutorial
               </DropdownMenuItem>
@@ -229,6 +236,11 @@ export function AppShell() {
           </DropdownMenu>
         </SidebarFooter>
         <SidebarRail />
+        {proModules.TimeClockDialog && clockOpen && (
+          <Suspense fallback={null}>
+            <proModules.TimeClockDialog open={clockOpen} onOpenChange={setClockOpen} userId={user.id} />
+          </Suspense>
+        )}
       </Sidebar>
       <SidebarInset className="min-w-0">
         <header

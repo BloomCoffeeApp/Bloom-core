@@ -16,17 +16,10 @@ import { type Role, useAuth } from '@/lib/auth'
 import { fmtRelative, ROLE_LABEL } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
-import { useCreateUser, useUpdateUser, useUsers } from './api'
+import { useCreateUser, useRoles, useUpdateUser, useUsers } from './api'
 import { Field, SettingsCard } from './form'
 import type { UserRow } from './types'
 
-const ROLES: Role[] = ['admin', 'encargado', 'cajero', 'barista']
-const ROLE_HINT: Record<Role, string> = {
-  admin: 'Acceso total, configuración y respaldos',
-  encargado: 'Gestión: stock, compras, reportes, productos',
-  cajero: 'Punto de venta, caja y clientes',
-  barista: 'Módulo barista y stock',
-}
 const COLORS = Object.keys(AVATAR_COLORS)
 const PIN_RE = /^\d{4,6}$/
 
@@ -45,6 +38,14 @@ function UserDialog({ state, onClose }: { state: Exclude<DialogState, null>; onC
   const [name, setName] = useState(editing?.name ?? '')
   const [role, setRole] = useState<Role>(editing?.role ?? 'cajero')
   const [color, setColor] = useState(editing?.color ?? 'amber')
+  const roles = useRoles()
+  const { can, user: me } = useAuth()
+  const current = roles.data?.find((r) => r.key === role)
+  const mine = new Set(me?.permissions ?? [])
+  // Non-admins with "Usuarios" can only hand out roles that don't exceed their own permissions.
+  const assignable = (roles.data ?? []).filter(
+    (r) => can() || (r.key !== 'admin' && r.permissions.every((p) => mine.has(p))),
+  )
   const [pin, setPin] = useState('')
   const [pin2, setPin2] = useState('')
   const create = useCreateUser()
@@ -93,15 +94,18 @@ function UserDialog({ state, onClose }: { state: Exclude<DialogState, null>; onC
                   <Input id="u-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={80} autoFocus placeholder="Ej.: Caja mañana" />
                 </Field>
               </div>
-              <Field label="Rol" hint={ROLE_HINT[role]}>
+              <Field
+                label="Rol"
+                hint={current?.hint ?? (current ? `${current.permissions.length} permisos · se editan en «Roles y permisos»` : undefined)}
+              >
                 <Select value={role} onValueChange={(v) => setRole(v as Role)}>
                   <SelectTrigger className="w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {ROLES.map((r) => (
-                      <SelectItem key={r} value={r}>
-                        {ROLE_LABEL[r]}
+                    {assignable.map((r) => (
+                      <SelectItem key={r.key} value={r.key}>
+                        {r.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -204,9 +208,9 @@ export function UsersSection() {
       {
         accessorKey: 'role',
         header: 'Rol',
-        cell: ({ getValue }) => {
-          const r = getValue<Role>()
-          return <Badge variant={r === 'admin' ? 'default' : 'secondary'}>{ROLE_LABEL[r] ?? r}</Badge>
+        cell: ({ row }) => {
+          const r = row.original.role
+          return <Badge variant={r === 'admin' ? 'default' : 'secondary'}>{row.original.role_name ?? ROLE_LABEL[r] ?? r}</Badge>
         },
       },
       {

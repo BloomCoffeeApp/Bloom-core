@@ -22,6 +22,14 @@ def run_once() -> None:
     from app.services import settings as settings_svc
 
     with SessionLocal() as db:
+        try:  # this month's fixed expenses first, so their due-date alerts show up right away
+            from app.services import expenses
+
+            if expenses.generate_recurring(db):
+                db.commit()
+        except Exception:
+            db.rollback()
+            log.exception("recurring expenses failed")
         try:
             alerts_engine.evaluate(db)
             db.commit()
@@ -86,6 +94,9 @@ def _remote_config_loop() -> None:
 
 def start_jobs() -> None:
     _stop.clear()
+    from app.services import collect
+
+    collect.start_background()  # polls open QR/Point/link charges (no webhooks reach the cafe PC)
     threading.Thread(target=_loop, name="cafe-jobs", daemon=True).start()
     threading.Thread(target=_remote_config_loop, name="cafe-remote-config", daemon=True).start()
     threading.Thread(target=_updates_loop, name="cafe-updates", daemon=True).start()
@@ -93,3 +104,6 @@ def start_jobs() -> None:
 
 def stop_jobs() -> None:
     _stop.set()
+    from app.services import collect
+
+    collect.stop_background()
