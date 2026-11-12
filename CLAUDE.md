@@ -2,6 +2,7 @@
 
 App de gestión para cafetería (POS, caja, stock, compras, clientes, alertas, reportes) + módulo de asistencia al barista.
 **El plan completo y las fases están en `PLAN.md`. Leerlo antes de trabajar y tildar checkboxes al avanzar.**
+**Para ubicar código, empezá por `CODEMAP.md` (mapa por dominio) antes de recorrer el árbol; actualizalo si movés algo grande.**
 
 ## Stack
 - Backend: Python 3.13, FastAPI, SQLAlchemy 2.0, Alembic, Pydantic v2, SQLite (WAL). Carpeta `backend/`.
