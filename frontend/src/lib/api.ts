@@ -56,8 +56,11 @@ function errorMessage(body: unknown, fallback: string): string {
   return fallback
 }
 
-async function request<T>(method: string, path: string, body?: unknown, query?: Query): Promise<T> {
-  const headers: Record<string, string> = {}
+/** Extra headers for public (not logged-in) calls, e.g. a table diner's token. A 401 there is not a staff logout. */
+export type RequestOpts = { headers?: Record<string, string> }
+
+async function request<T>(method: string, path: string, body?: unknown, query?: Query, opts?: RequestOpts): Promise<T> {
+  const headers: Record<string, string> = { ...opts?.headers }
   const token = tokenStore.get()
   if (token) headers.Authorization = `Bearer ${token}`
   let payload: BodyInit | undefined
@@ -76,7 +79,7 @@ async function request<T>(method: string, path: string, body?: unknown, query?: 
   } catch {
     throw new ApiError(0, 'No se pudo conectar con el servidor')
   }
-  if (res.status === 401 && !path.includes('/auth/login')) onUnauthorized?.()
+  if (res.status === 401 && !path.includes('/auth/login') && !opts?.headers) onUnauthorized?.()
   const isJson = res.headers.get('content-type')?.includes('application/json')
   const data = isJson ? await res.json() : await res.text()
   if (!res.ok) throw new ApiError(res.status, errorMessage(data, `Error ${res.status}`))
@@ -84,8 +87,8 @@ async function request<T>(method: string, path: string, body?: unknown, query?: 
 }
 
 export const api = {
-  get: <T>(path: string, query?: Query) => request<T>('GET', path, undefined, query),
-  post: <T>(path: string, body?: unknown) => request<T>('POST', path, body),
+  get: <T>(path: string, query?: Query, opts?: RequestOpts) => request<T>('GET', path, undefined, query, opts),
+  post: <T>(path: string, body?: unknown, opts?: RequestOpts) => request<T>('POST', path, body, undefined, opts),
   put: <T>(path: string, body?: unknown) => request<T>('PUT', path, body),
   patch: <T>(path: string, body?: unknown) => request<T>('PATCH', path, body),
   delete: <T>(path: string) => request<T>('DELETE', path),

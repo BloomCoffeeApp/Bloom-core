@@ -17,6 +17,8 @@ export interface ProModules {
   PublicMenuSettings?: Lazy<{ initial: PublicMenuSettings }>
   /** Configuración → Mesas: tables, QR sheet and ordering-from-the-table limits (public_menu). */
   TablesSettings?: Lazy
+  /** Orders screen: phones connected to each open table, approvals, «Liberar mesa» (public_menu). */
+  TableSessionsPanel?: Lazy
   /** Configuración → Pedidos: stations and pickup screen (orders_pro). */
   OrdersStationsSettings?: Lazy
   /** Configuración → Pedidos online: take away / delivery from the online menu (online_orders). */

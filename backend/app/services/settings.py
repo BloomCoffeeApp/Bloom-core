@@ -27,6 +27,13 @@ DEFAULTS: dict[str, Any] = {
         "orders_per_10min": 3,
         "max_pending": 3,
         "call_minutes": 10,
+        # Table session: who may join an open account ("free" | "code" | "approve"), whether a phone whose first
+        # order a waiter confirmed may then order up to a cap without confirmation, and idle expiry of a phone.
+        "join_mode": "free",
+        "trust_mode": "always_confirm",
+        "trust_max_cents": 2000000,
+        "trust_max_items": 8,
+        "diner_idle_hours": 4,
     },
     # Free plan "Elegí tus activos" (services/free_plan.py); only changed through /api/free-plan.
     "free_actives": {},

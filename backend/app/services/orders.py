@@ -29,6 +29,7 @@ from app.models import (
     Product,
     ProductCategory,
     Sale,
+    TableDiner,
     TableTab,
     User,
     WaiterCall,
@@ -337,6 +338,10 @@ def _enter_queue(db: Session, o: Order, actor: User | None) -> None:
 def _fx_confirm_table(o: Order, c: order_flows.Ctx) -> None:
     if o.table_id is not None:
         o.tab_id = open_tab(c.db, o.table_id).id
+    if o.diner_id is not None and c.actor is not None:  # a waiter vouched for this phone (table session trust)
+        diner = c.db.get(TableDiner, o.diner_id)
+        if diner is not None:
+            diner.trusted = True
 
 
 def _fx_back_to_queue(o: Order, c: order_flows.Ctx) -> None:

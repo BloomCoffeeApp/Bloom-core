@@ -1,5 +1,5 @@
 import { BellRing, ClipboardList, Expand, Globe, MessageCircle, Minimize, MonitorPlay, Receipt, Volume2 } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Route, Routes } from 'react-router'
 import { toast } from 'sonner'
 
@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
+import { proModules } from '@pro'
 import { useNow } from '@/hooks/use-now'
 import { fmtMoney } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -326,6 +327,12 @@ function OrdersPage() {
             </div>
           ))}
         </section>
+      )}
+
+      {proModules.TableSessionsPanel && (
+        <Suspense fallback={null}>
+          <proModules.TableSessionsPanel />
+        </Suspense>
       )}
 
       {board.isLoading ? (

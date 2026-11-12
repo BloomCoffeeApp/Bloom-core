@@ -57,6 +57,26 @@ class TableTab(IdMixin, Base):
     closed_at: Mapped[datetime | None] = mapped_column(DateTime)
     sale_id: Mapped[int | None] = mapped_column(ForeignKey("sales.id"))
     payment_ref: Mapped[str | None] = mapped_column(String(80))
+    # Table session (Pro `public_menu`): the code a phone needs to join / reconnect, and the last activity
+    # (an empty account nobody touches for a while is released by itself).
+    join_code: Mapped[str | None] = mapped_column(String(4))
+    last_activity_at: Mapped[datetime | None] = mapped_column(DateTime)
+
+
+class TableDiner(IdMixin, Base):
+    """A phone at a table's open account (Pro `public_menu`). The secret token only lives on the phone: here
+    just its hash. It stops working when the account closes. No personal data."""
+
+    __tablename__ = "table_diners"
+    tab_id: Mapped[int] = mapped_column(ForeignKey("table_tabs.id"), index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    number: Mapped[int]  # "Comensal 2"
+    approved: Mapped[bool] = mapped_column(default=True, server_default="1")
+    trusted: Mapped[bool] = mapped_column(default=False, server_default="0")  # a waiter confirmed one of its orders
+    blocked: Mapped[bool] = mapped_column(default=False, server_default="0")
+    client_ip: Mapped[str | None] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 
 class Order(IdMixin, Base):
@@ -86,6 +106,7 @@ class Order(IdMixin, Base):
     # Customer orders: the phone's address (rate limits) and the secret it polls its status with.
     client_ip: Mapped[str | None] = mapped_column(String(64))
     public_key: Mapped[str | None] = mapped_column(String(32))
+    diner_id: Mapped[int | None] = mapped_column(ForeignKey("table_diners.id"), index=True)  # table session phone
     # unpaid|pending|paid|refunded. Online orders: `payment_ref` = the collection provider's charge id.
     payment_status: Mapped[str] = mapped_column(String(10), default="unpaid", server_default="unpaid")
     payment_ref: Mapped[str | None] = mapped_column(String(80))

@@ -19,7 +19,7 @@ from app.models.collect import CollectCharge, CollectRefund, CustomerScreen
 from app.models.customers import Customer, CustomerAccountMovement, LoyaltyTransaction
 from app.models.promos import LoyaltyProgram, LoyaltyStamp, Promo
 from app.models.channel_supplies import ChannelSupply
-from app.models.orders import DiningTable, Order, OrderItem, OrderStation, TableTab, WaiterCall
+from app.models.orders import DiningTable, Order, OrderItem, OrderStation, TableDiner, TableTab, WaiterCall
 from app.models.purchases import (
     Purchase,
     PurchaseItem,
