@@ -56,7 +56,7 @@ App de gestión para cafetería (POS, caja, stock, compras, clientes, alertas, r
 4. Commit.
 
 ## Commits (varias sesiones trabajan en esta misma carpeta)
-- Identidad: **ControlApp <controlapp@users.noreply.github.com>** (ya configurada en el repo con `git config`; no la
+- Identidad: **Bloom <bloom@bloom.invalid>** (ya configurada en el repo con `git config`; no la
   cambies ni uses otra). Sin líneas de atribución (Co-Authored-By, "Generated with…").
 - Antes de commitear mirá `git status` y agregá **solo tus archivos** por nombre (nunca `git add -A` / `git add .`):
   puede haber cambios sin commitear de otra sesión.
