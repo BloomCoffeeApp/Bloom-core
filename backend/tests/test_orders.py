@@ -415,3 +415,27 @@ def test_free_edition_uses_channel_targets_only(seeded, db, clock):
     _sale(client, admin, [{"product_id": tostado}], 520000, channel="llevar")
     board = client.get("/api/orders/board", headers=admin).json()
     assert board["orders"][0]["target_minutes"] == 5 and board["pro"] is False and board["stations"] == []
+
+
+def test_summary_sql_matches_the_python_aggregation(seeded, db, clock):
+    """`summary` aggregates in SQL; it must give exactly what the object-by-object `_agg` gives."""
+    import random
+
+    rnd = random.Random(7)
+    day = to_utc_naive(datetime(2026, 11, 2, 9, 0))
+    for i in range(300):
+        received = day + timedelta(minutes=rnd.randint(0, 600))
+        kind = rnd.choice(["ok", "ok", "ok", "late", "cancelled", "open", "negative", "exact", "subsecond"])
+        target = rnd.choice([3, 5, 8, 10])
+        status = "cancelled" if kind == "cancelled" else ("received" if kind == "open" else "delivered")
+        prep = {"ok": rnd.uniform(0.2, target - 0.5), "late": target + rnd.uniform(0.5, 9), "negative": -2, "exact": target,
+                "subsecond": target + 0.5 / 60, "cancelled": 2, "open": 0}[kind]
+        o = Order(number=i, source="pos", status=status, channel="salon", target_minutes=target, created_at=received,
+                  received_at=received, ready_at=None if kind == "open" else received + timedelta(minutes=prep))
+        db.add(o)
+    db.commit()
+    a, b = svc.range_bounds_utc(date(2026, 11, 2), date(2026, 11, 2))
+    expected = svc._agg([svc._prep(o) for o in svc._finished(db, a, b)])
+    got = svc._finished_stats(db, a, b)
+    assert got == expected and got["orders"] > 150 and got["late"] > 20
+    assert svc._finished_stats(db, *svc.range_bounds_utc(date(2025, 1, 1), date(2025, 1, 1)))["orders"] == 0

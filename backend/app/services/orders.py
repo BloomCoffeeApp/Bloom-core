@@ -16,7 +16,7 @@ from datetime import date, datetime, timedelta
 from typing import Any
 
 from fastapi import HTTPException
-from sqlalchemy import func, select
+from sqlalchemy import Integer, case, cast, func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.licensing import has_feature
@@ -804,15 +804,39 @@ def _finished(db: Session, a: datetime, b: datetime) -> list[Order]:
     )
 
 
-def _agg(rows: list[tuple[int, bool]]) -> dict[str, Any]:
-    n = len(rows)
-    late = sum(1 for _, is_late in rows if is_late)
+def _agg_totals(n: int, total_secs: int, late: int) -> dict[str, Any]:
     return {
         "orders": n,
-        "avg_prep_s": int(round(sum(s for s, _ in rows) / n)) if n else None,
+        "avg_prep_s": int(round(total_secs / n)) if n else None,
         "late": late,
         "late_pct": round(late * 100 / n, 1) if n else None,
     }
+
+
+def _agg(rows: list[tuple[int, bool]]) -> dict[str, Any]:
+    return _agg_totals(len(rows), sum(s for s, _ in rows), sum(1 for _, is_late in rows if is_late))
+
+
+def _secs_between(start, end):
+    """Whole seconds from `start` to `end` (SQLite DATETIME text), never negative: the SQL twin of `_prep`'s
+    `max(int((ready - received).total_seconds()), 0)`. `julianday` is a float, so half a millisecond is added
+    before truncating to absorb its rounding error (sub-millisecond differences are irrelevant here)."""
+    whole = cast((func.julianday(end) - func.julianday(start)) * 86400.0 + 0.0005, Integer)
+    return case((whole > 0, whole), else_=0)
+
+
+def _finished_stats(db: Session, a: datetime, b: datetime) -> dict[str, Any]:
+    """Same numbers as `_agg(_prep(o) for o in _finished(...))` in one aggregate query (no ORM objects, no items)."""
+    inner = (
+        select(_secs_between(Order.received_at, Order.ready_at).label("secs"), (Order.target_minutes * 60).label("limit"))
+        .where(Order.received_at >= a, Order.received_at < b, Order.ready_at.is_not(None), Order.status != "cancelled")
+        .subquery()  # the seconds are computed once per row, not once per aggregate
+    )
+    n, total, late = db.execute(
+        select(func.count(), func.coalesce(func.sum(inner.c.secs), 0),
+               func.coalesce(func.sum(case((inner.c.secs > inner.c.limit, 1), else_=0)), 0))
+    ).one()
+    return _agg_totals(int(n), int(total), int(late))
 
 
 def _prep(o: Order) -> tuple[int, bool]:
@@ -868,7 +892,7 @@ def metrics(db: Session, start: date, end: date) -> dict[str, Any]:
 def summary(db: Session, start: date, end: date) -> dict[str, Any] | None:
     """Dashboard line: finished orders, average prep, late ones (finished late + still open and late)."""
     a, b = range_bounds_utc(start, end)
-    finished = [_prep(o) for o in _finished(db, a, b)]
+    agg = _finished_stats(db, a, b)
     t = now()
     c = cfg(db)
     open_rows = list(
@@ -879,9 +903,8 @@ def summary(db: Session, start: date, end: date) -> dict[str, Any] | None:
         )
     )
     open_late = sum(1 for o in open_rows if timing(o, t, c["warn_pct"])["late"])
-    if not finished and not open_rows:
+    if not agg["orders"] and not open_rows:
         return None
-    agg = _agg(finished)
     return {**agg, "late": agg["late"] + open_late, "open": len(open_rows), "open_late": open_late}
 
 
