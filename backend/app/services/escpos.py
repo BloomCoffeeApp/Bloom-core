@@ -259,6 +259,8 @@ def ticket(data: dict[str, Any], layout: Layout, *, open_drawer: bool = False, d
         d.row(f"Canje {sale['points_redeemed']} pts", money(-points))
     if reward > 0:
         d.row("Premio fidelidad", money(-reward))
+    if (sale.get("delivery_fee_cents") or 0) > 0:
+        d.row("Envío", money(sale["delivery_fee_cents"]))
     if sale.get("is_courtesy") and sale.get("courtesy_cents"):
         d.row("Valor de la cortesía", money(sale["courtesy_cents"]))
     d.row("TOTAL", money(sale["total_cents"]), bold=True, h=2)

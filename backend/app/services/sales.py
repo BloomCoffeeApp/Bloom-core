@@ -228,6 +228,15 @@ def _create_sale(db: Session, data: SaleIn, user: User) -> Sale:
 
     total = subtotal - discount - points_disc - reward_disc
 
+    # --- Delivery fee (added after discounts: they apply to the items only) ---
+    fee = data.delivery_fee_cents
+    if fee:
+        if data.channel != "delivery":
+            raise HTTPException(400, "El envío solo aplica a ventas de delivery")
+        if courtesy:
+            raise HTTPException(400, "Una cortesía no lleva costo de envío")
+    total += fee
+
     # --- Payments ---
     active_methods = set(db.scalars(select(PaymentMethod.code).where(PaymentMethod.active.is_(True))))
     payments: list[SalePayment] = []
@@ -262,7 +271,7 @@ def _create_sale(db: Session, data: SaleIn, user: User) -> Sale:
             raise HTTPException(400, f"Supera el límite de cuenta corriente (disponible ${available / 100:,.2f})")
 
     # --- Persist ---
-    points_earned = points_for(total, cfg) if customer and not courtesy else 0
+    points_earned = points_for(total - fee, cfg) if customer and not courtesy else 0
     sale = Sale(
         number=next_number(db),
         cash_session_id=session.id,
@@ -272,6 +281,7 @@ def _create_sale(db: Session, data: SaleIn, user: User) -> Sale:
         table_label=(data.table_label or "").strip() or None,
         subtotal_cents=subtotal,
         discount_cents=discount + points_disc + reward_disc,
+        delivery_fee_cents=fee,
         total_cents=total,
         reward_program_id=data.reward_program_id,
         reward_discount_cents=reward_disc,
@@ -524,6 +534,7 @@ def serialize(sale: Sale, unames: dict[int, str], cnames: dict[int, str], cfg: d
         "customer_name": cnames.get(sale.customer_id) if sale.customer_id else None,
         "subtotal_cents": sale.subtotal_cents,
         "discount_cents": sale.discount_cents,
+        "delivery_fee_cents": sale.delivery_fee_cents or 0,
         "points_discount_cents": _points_disc(sale, cfg),
         "total_cents": sale.total_cents,
         "cost_cents": sale.cost_cents,

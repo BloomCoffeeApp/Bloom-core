@@ -141,6 +141,12 @@ export function SaleDetailSheet({ id, onOpenChange }: { id: number | null; onOpe
                     <span className="tabular">−{fmtMoney(s.points_discount_cents)}</span>
                   </div>
                 )}
+                {s.delivery_fee_cents > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Envío</span>
+                    <span className="tabular">{fmtMoney(s.delivery_fee_cents)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between pt-1 text-lg font-semibold">
                   <span>Total</span>
                   <span className="tabular">{fmtMoney(s.total_cents)}</span>

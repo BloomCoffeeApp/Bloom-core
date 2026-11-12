@@ -70,6 +70,7 @@ export interface Sale {
   customer_id: number | null
   customer_name: string | null
   subtotal_cents: number
+  delivery_fee_cents: number
   discount_cents: number
   points_discount_cents: number
   total_cents: number

@@ -147,6 +147,8 @@ class SaleIn(BaseModel):
     table_label: str | None = Field(default=None, max_length=20)
     discount_cents: int = Field(default=0, ge=0)
     discount_pct: float | None = Field(default=None, ge=0, le=100)
+    # Delivery charge (only `delivery` channel): adds to the total; discounts and points ignore it.
+    delivery_fee_cents: int = Field(default=0, ge=0, le=10**9)
     points_to_redeem: int = Field(default=0, ge=0)
     payments: list[PaymentIn] = []
     notes: str | None = None
@@ -231,6 +233,7 @@ class SaleOut(BaseModel):
     customer_name: str | None
     subtotal_cents: int
     discount_cents: int
+    delivery_fee_cents: int = 0
     points_discount_cents: int
     total_cents: int
     cost_cents: int

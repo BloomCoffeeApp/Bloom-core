@@ -96,6 +96,7 @@ export function ticketHtml({ business, sale, payment_names }: TicketData) {
     <div class="row"><span>Subtotal</span><span>${esc(fmtMoney(sale.subtotal_cents))}</span></div>
     ${manualDisc > 0 ? `<div class="row"><span>Descuento</span><span>-${esc(fmtMoney(manualDisc))}</span></div>` : ''}
     ${sale.points_discount_cents > 0 ? `<div class="row"><span>Canje ${esc(sale.points_redeemed)} pts</span><span>-${esc(fmtMoney(sale.points_discount_cents))}</span></div>` : ''}
+    ${sale.delivery_fee_cents > 0 ? `<div class="row"><span>Envío</span><span>${esc(fmtMoney(sale.delivery_fee_cents))}</span></div>` : ''}
     <div class="row big"><span>TOTAL</span><span>${esc(fmtMoney(sale.total_cents))}</span></div>
     <hr/>
     ${pays}

@@ -262,3 +262,45 @@ def test_payment_methods_toggle(seeded):
 
     hc = login(client, "Caja Demo", "1111")
     assert client.patch(f"/api/payment-methods/{target['id']}", json={"active": True}, headers=hc).status_code == 403
+
+
+def test_delivery_fee_adds_to_total_and_payments(seeded, db):
+    client, admin = seeded
+    fee = 50000
+    body = _sale_body(db, channel="delivery", delivery_fee_cents=fee, payments=[{"method": "debito", "amount_cents": LATTE + fee}])
+    r = client.post("/api/sales", json=body, headers=admin)
+    assert r.status_code == 200, r.text
+    s = r.json()
+    assert s["delivery_fee_cents"] == fee and s["total_cents"] == LATTE + fee and s["subtotal_cents"] == LATTE
+    assert client.get(f"/api/sales/{s['id']}", headers=admin).json()["delivery_fee_cents"] == fee
+    # Paying only the items is not enough.
+    short = _sale_body(db, channel="delivery", delivery_fee_cents=fee, payments=[{"method": "debito", "amount_cents": LATTE}])
+    assert client.post("/api/sales", json=short, headers=admin).status_code == 400
+
+
+def test_delivery_fee_only_on_delivery_and_not_courtesy(seeded, db):
+    client, admin = seeded
+    for channel in ("salon", "llevar"):
+        body = _sale_body(db, channel=channel, delivery_fee_cents=50000, payments=[{"method": "debito", "amount_cents": LATTE + 50000}])
+        r = client.post("/api/sales", json=body, headers=admin)
+        assert r.status_code == 400 and "delivery" in r.json()["detail"]
+    courtesy = _sale_body(db, channel="delivery", delivery_fee_cents=50000, is_courtesy=True, payments=[])
+    assert client.post("/api/sales", json=courtesy, headers=admin).status_code == 400
+
+
+def test_delivery_fee_is_excluded_from_points_and_discounts(seeded, db):
+    client, admin = seeded
+    cust = _customer(db, "Estudiante")
+    base = client.post("/api/sales", json=_sale_body(db, channel="delivery", customer_id=cust.id,
+                                                      payments=[{"method": "debito", "amount_cents": LATTE}]), headers=admin)
+    assert base.status_code == 200, base.text
+    fee = 1_000_000
+    r = client.post("/api/sales", json=_sale_body(db, channel="delivery", customer_id=cust.id, delivery_fee_cents=fee,
+                                                   payments=[{"method": "debito", "amount_cents": LATTE + fee}]), headers=admin)
+    assert r.status_code == 200, r.text
+    assert r.json()["points_earned"] == base.json()["points_earned"]
+    # discount_pct applies to the items only.
+    d = client.post("/api/sales", json=_sale_body(db, channel="delivery", delivery_fee_cents=fee, discount_pct=10,
+                                                   payments=[{"method": "debito", "amount_cents": LATTE - round(LATTE * 0.1) + fee}]), headers=admin)
+    assert d.status_code == 200, d.text
+    assert d.json()["discount_cents"] == round(LATTE * 0.1) and d.json()["total_cents"] == LATTE - round(LATTE * 0.1) + fee

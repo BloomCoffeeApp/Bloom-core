@@ -66,6 +66,8 @@ class Sale(IdMixin, Base):
     table_label: Mapped[str | None] = mapped_column(String(20))
     subtotal_cents: Mapped[int] = mapped_column(default=0)
     discount_cents: Mapped[int] = mapped_column(default=0)
+    # Delivery charge (only `delivery` channel): added to total_cents and payments, not to discounts or points.
+    delivery_fee_cents: Mapped[int] = mapped_column(default=0, server_default="0")
     total_cents: Mapped[int] = mapped_column(default=0)
     cost_cents: Mapped[int] = mapped_column(default=0)
     points_earned: Mapped[int] = mapped_column(default=0)
