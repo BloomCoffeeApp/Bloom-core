@@ -146,10 +146,10 @@ export function DataTable<T>({
           <span>
             Página {table.getState().pagination.pageIndex + 1} de {table.getPageCount()}
           </span>
-          <Button variant="outline" size="icon" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}>
+          <Button variant="outline" size="icon" aria-label="Página anterior" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}>
             <ChevronLeft />
           </Button>
-          <Button variant="outline" size="icon" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}>
+          <Button variant="outline" size="icon" aria-label="Página siguiente" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}>
             <ChevronRight />
           </Button>
         </div>

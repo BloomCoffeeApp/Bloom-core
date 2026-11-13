@@ -110,3 +110,72 @@ def test_points_discount_is_never_negative_and_monotonic(points, per, value):
     assert sales_service.points_discount_cents(points + 1, cfg) >= d
     if per > 0:
         assert d == (points // per) * value
+
+
+# ----------------------------------------------------------------------------------- cash close
+
+
+@settings(max_examples=25, deadline=None, suppress_health_check=[HealthCheck.function_scoped_fixture])
+@given(
+    opening=st.integers(0, 5_000_000),
+    ops=st.lists(
+        st.one_of(
+            st.tuples(st.just("sale"), st.integers(1, 4), st.sampled_from(["efectivo", "debito", "qr", "transferencia"])),
+            st.tuples(st.just("in"), st.integers(1, 800_000), st.just("")),
+            st.tuples(st.just("out"), st.integers(1, 800_000), st.just("")),
+            st.tuples(st.just("void"), st.integers(0, 50), st.just("")),
+        ),
+        min_size=1,
+        max_size=12,
+    ),
+    miss=st.integers(-50_000, 50_000),
+)
+def test_cash_close_always_adds_up(seeded, db, opening, ops, miss):
+    """Whatever mix of sales, movements and voids happens in a shift: expected cash = opening + cash sales + money in
+    - money out, the per-method totals add up to the total sold, and counting exactly that closes with no difference."""
+    client, admin = seeded
+    assert client.post("/api/cash/close", json={"counts": []}, headers=admin).status_code in (200, 409)
+    assert client.post("/api/cash/open", json={"opening_cents": opening}, headers=admin).status_code == 200
+    pid, price = _latte(db)
+
+    sales: list[dict] = []  # {"id", "method", "total", "voided"}
+    cash_in = cash_out = 0
+    for kind, a, method in ops:
+        if kind == "sale":
+            total = a * price
+            r = client.post("/api/sales", json={"items": [{"product_id": pid, "qty": a}], "channel": "salon",
+                                                "payments": [{"method": method, "amount_cents": total}]}, headers=admin)
+            assert r.status_code == 200, r.text
+            sales.append({"id": r.json()["id"], "method": method, "total": total, "voided": False})
+        elif kind == "in":
+            assert client.post("/api/cash/movements", json={"type": "in", "amount_cents": a, "reason": "p"}, headers=admin).status_code == 200
+            cash_in += a
+        elif kind == "out":
+            assert client.post("/api/cash/movements", json={"type": "out", "amount_cents": a, "reason": "p"}, headers=admin).status_code == 200
+            cash_out += a
+        elif sales:  # void one of the sales still standing
+            live = [s for s in sales if not s["voided"]]
+            if live:
+                s = live[a % len(live)]
+                assert client.post(f"/api/sales/{s['id']}/void", json={"reason": "prueba"}, headers=admin).status_code == 200
+                s["voided"] = True
+
+    live = [s for s in sales if not s["voided"]]
+    cur = client.get("/api/cash/current", headers=admin).json()
+    cash_sales = sum(s["total"] for s in live if s["method"] == "efectivo")
+    assert cur["expected_cash_cents"] == opening + cash_sales + cash_in - cash_out
+    assert cur["sales_total_cents"] == sum(s["total"] for s in live)
+    assert cur["tickets"] == len(live) and cur["voided_count"] == len(sales) - len(live)
+    assert sum(m["sales_cents"] for m in cur["by_method"]) == cur["sales_total_cents"]
+
+    cash_row = next((m for m in cur["by_method"] if m["method"] == "efectivo"), None)
+    counted_cash = max(0, cash_row["expected_cents"] + miss) if cash_row else 0  # a count can't be negative
+    counts = [{"payment_method": m["method"], "counted_cents": counted_cash if m["method"] == "efectivo" else m["expected_cents"]} for m in cur["by_method"]]
+    closed = client.post("/api/cash/close", json={"counts": counts}, headers=admin)
+    assert closed.status_code == 200, closed.text
+    z = closed.json()
+    assert z["status"] == "closed"
+    if cash_row:
+        assert z["difference_cents"] == counted_cash - cash_row["expected_cents"], "the difference must be exactly what was miscounted"
+    else:
+        assert z["difference_cents"] in (0, None)

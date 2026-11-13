@@ -37,6 +37,31 @@ for (const theme of THEMES) {
       })
     }
 
+    test('pos (tablet)', async ({ page }) => {
+      await page.setViewportSize({ width: 820, height: 1180 })
+      await page.addInitScript((t) => localStorage.setItem('cafe.theme', t), theme)
+      await page.goto('/pos')
+      await ensureCashOpen(page)
+      await page.waitForLoadState('networkidle')
+      await expect(page).toHaveScreenshot(`pos-${theme}-tablet.png`, { maxDiffPixelRatio: 0.002, threshold: 0.1, animations: 'disabled', caret: 'hide' })
+    })
+
+    test('config (phone)', async ({ page }) => {
+      await page.setViewportSize({ width: 390, height: 844 })
+      await page.addInitScript((t) => localStorage.setItem('cafe.theme', t), theme)
+      await page.goto('/config')
+      await expect(page.getByRole('heading', { level: 1, name: 'Configuración' })).toBeVisible()
+      await page.waitForLoadState('networkidle')
+      await expect(page).toHaveScreenshot(`config-${theme}-phone.png`, { maxDiffPixelRatio: 0.002, threshold: 0.1, animations: 'disabled', caret: 'hide' })
+    })
+
+    test('customer menu (phone)', async ({ page }) => {
+      await page.setViewportSize({ width: 390, height: 844 })
+      await page.goto('/menu')
+      await page.waitForLoadState('networkidle')
+      await expect(page).toHaveScreenshot(`menu-${theme}-phone.png`, { maxDiffPixelRatio: 0.002, threshold: 0.1, animations: 'disabled', caret: 'hide' })
+    })
+
     test('pos (phone)', async ({ page }) => {
       await page.setViewportSize({ width: 390, height: 844 })
       await page.addInitScript((t) => localStorage.setItem('cafe.theme', t), theme)

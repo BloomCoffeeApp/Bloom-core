@@ -81,16 +81,20 @@ def classify(route, inherited) -> dict:
     return info
 
 
+def _ok(have, info: dict, role: str = "") -> bool:
+    """Would a user holding exactly the permissions `have` (and role key `role`) pass this endpoint?"""
+    if info["admin"]:
+        return False
+    if info["roles"] and not all(role in names for names in info["roles"]):
+        return False
+    return all(any(p in have for p in group) for group in info["perms"])
+
+
 def _allowed(role: str, info: dict) -> bool:
     """Expected outcome from the permission catalog (admin passes everything)."""
     if role == permissions.ADMIN:
         return True
-    if info["admin"]:
-        return False
-    have = permissions.BUILTIN_ROLES[role]["permissions"]
-    if info["roles"] and not all(role in names for names in info["roles"]):
-        return False
-    return all(any(p in have for p in group) for group in info["perms"])
+    return _ok(permissions.BUILTIN_ROLES[role]["permissions"], info, role)
 
 
 def _public(path: str) -> bool:
@@ -220,3 +224,76 @@ def test_access_rules_match_the_approved_snapshot():
         "the access rules changed. If intended, approve with BLOOM_UPDATE_ACCESS=1 and review the diff of "
         f"access_rules.snapshot.json.\n  new: {added[:10]}\n  removed: {removed[:10]}\n  changed: {changed[:10]}"
     )
+
+
+# ----------------------------------------------------------------------- custom roles and personal exceptions
+
+
+def _closure(perm: str) -> set[str]:
+    out = {perm}
+    while perm in permissions.REQUIRES:
+        perm = permissions.REQUIRES[perm]
+        out.add(perm)
+    return out
+
+
+def _check_user(client, headers, have, role_key: str = "") -> list[str]:
+    """Every endpoint must refuse (403) what `have` does not allow and not refuse what it allows (safe GETs)."""
+    wrong = []
+    for method, path, info in ENDPOINTS:
+        if not info["auth"]:
+            continue
+        allowed = _ok(have, info, role_key)
+        if not allowed:
+            r = client.request(method, _fill(path), headers=headers, json=_body(method))
+            if r.status_code != 403:
+                wrong.append(f"{method} {path} -> {r.status_code} (should be 403)")
+        elif method == "GET":
+            r = client.get(_fill(path), headers=headers)
+            if r.status_code in (401, 403):
+                wrong.append(f"GET {path} -> {r.status_code} (should be allowed)")
+    return wrong
+
+
+def test_a_custom_role_with_one_permission_gets_exactly_that_access(seeded):
+    """For EVERY permission in the catalog: a custom role holding only it (plus what it requires) opens exactly the
+    endpoints that need it and nothing else. This is what the owner builds in Configuración → Roles."""
+    client, admin = seeded
+    wrong = []
+    for perm in permissions.PERMISSIONS:
+        r = client.post("/api/roles", json={"name": f"Solo {perm}"[:40], "permissions": [perm]}, headers=admin)
+        assert r.status_code == 200, (perm, r.text)
+        key = r.json()["key"]
+        have = set(r.json()["permissions"])
+        assert have == _closure(perm), f"role for {perm} got {sorted(have)}, expected {sorted(_closure(perm))}"
+        name = f"Usuario {perm}"[:40]
+        u = client.post("/api/users", json={"name": name, "pin": "5555", "role": key}, headers=admin)
+        assert u.status_code == 200, u.text
+        wrong += [f"[{perm}] {w}" for w in _check_user(client, login(client, name, "5555"), have, key)]
+    assert not wrong, f"{len(wrong)} mismatches, e.g. {wrong[:10]}"
+
+
+def test_personal_exceptions_change_exactly_the_endpoints_they_should(seeded):
+    client, admin = seeded
+    users = client.get("/api/users", headers=admin).json()
+    cashier = next(u for u in users if u["name"] == "Caja Demo")
+    base = set(permissions.BUILTIN_ROLES["cajero"]["permissions"])
+
+    # 1) take pos.sell away from a cashier: everything that depends on selling closes with it
+    r = client.put(f"/api/users/{cashier['id']}/permissions", json={"grants": [], "revokes": ["pos.sell"]}, headers=admin)
+    assert r.status_code == 200, r.text
+    have = set(r.json()["effective_permissions"])
+    assert "pos.sell" not in have and "pos.discount" not in have, "dependants of a revoked permission must go too"
+    assert not _check_user(client, login(client, "Caja Demo", "1111"), have, "cajero")
+
+    # 2) give the same cashier stock adjustments (it needs stock.view, which the editor adds)
+    r = client.put(f"/api/users/{cashier['id']}/permissions", json={"grants": ["stock.adjust"], "revokes": []}, headers=admin)
+    assert r.status_code == 200, r.text
+    have = set(r.json()["effective_permissions"])
+    assert {"stock.adjust", "stock.view"} <= have and base <= have
+    assert not _check_user(client, login(client, "Caja Demo", "1111"), have, "cajero")
+
+    # 3) administrators accept no exceptions
+    admin_user = next(u for u in users if u["role"] == "admin")
+    r = client.put(f"/api/users/{admin_user['id']}/permissions", json={"grants": [], "revokes": ["pos.sell"]}, headers=admin)
+    assert r.status_code in (400, 403, 409, 422), "an administrator must not lose permissions"

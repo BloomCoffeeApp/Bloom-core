@@ -338,7 +338,7 @@ def test_customer_screen_shows_cart_qr_and_approval(fake, db):
 
 
 def test_credentials_are_encrypted_at_rest(seeded, db):
-    secret = "APP_USR-1234567890-abcdef-secret"
+    secret = "APP_USR-1234567890-abcdef-fake-token"
     collect.store_credentials(db, "mercadopago", {"access_token": secret, "user_id": 99})
     db.commit()
     db.expire_all()
