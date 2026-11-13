@@ -39,6 +39,7 @@ PERMISSIONS: dict[str, tuple[str, str, str]] = {
     # Gestión
     "reports.view": ("Gestión", "Reportes y costos", "Reportes, márgenes y costos en el inicio"),
     "expenses.manage": ("Gestión", "Gastos", "Cargar y pagar gastos (alquiler, servicios, sueldos…) y ver la ganancia real"),
+    "tips.manage": ("Gestión", "Reparto de propinas", "Configurar la regla de reparto y liquidar propinas"),
     "staff.manage": ("Gestión", "Empleados", "Fichas, fichajes, horas, sueldos y adelantos"),
     "settings.manage": ("Administración", "Configuración del negocio", "Datos del negocio, medios de pago, impresoras, red y menú"),
     "users.manage": ("Administración", "Usuarios", "Crear usuarios y cambiar PIN (solo con roles que no superen los propios)"),
@@ -51,7 +52,7 @@ _SELL = {"pos.sell", "pos.courtesy", "cash.open_close", "cash.movements", "custo
 _MANAGE = {
     "pos.discount", "sales.void", "catalog.edit", "prices.edit", "stock.view", "stock.edit", "stock.adjust",
     "purchases.manage", "customers.manage", "promos.manage", "orders.manage", "notices.manage",
-    "barista.use", "barista.manage", "reports.view", "expenses.manage",
+    "barista.use", "barista.manage", "reports.view", "expenses.manage", "tips.manage",
 }
 
 # Built-in roles: name, short description and default permissions (= behavior before roles were editable).

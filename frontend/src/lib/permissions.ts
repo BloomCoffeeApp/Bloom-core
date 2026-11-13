@@ -22,6 +22,7 @@ export type Permission =
   | 'reports.view'
   | 'expenses.manage'
   | 'staff.manage'
+  | 'tips.manage'
   | 'settings.manage'
   | 'users.manage'
   | 'system.manage'
