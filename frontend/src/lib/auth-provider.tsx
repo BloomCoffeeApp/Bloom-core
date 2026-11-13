@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 
-import { api, setUnauthorizedHandler, tokenStore } from '@/lib/api'
+import { api, ApiError, setUnauthorizedHandler, tokenStore } from '@/lib/api'
 import { AuthContext, type AuthUser, type LoginResponse, type Permission } from '@/lib/auth'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -22,7 +22,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     api
       .get<AuthUser>('/auth/me')
       .then(setUser)
-      .catch(() => tokenStore.set(null))
+      .catch((e) => {
+        // Only a 401 means the session is gone. A network error, a request cut by navigating away or reloading, or a
+        // 5xx must NOT log the person out: the token stays and the next load tries again.
+        if (e instanceof ApiError && e.status === 401) tokenStore.set(null)
+      })
       .finally(() => setLoading(false))
   }, [clear])
 

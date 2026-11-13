@@ -13,6 +13,18 @@ test('the lock button returns to the user picker', async ({ page }) => {
   await expect(page.getByText('¿Quién está trabajando?')).toBeVisible()
 })
 
+test('a failed request at startup does not throw the session away (only a 401 does)', async ({ page }) => {
+  await freshLogin(page, USERS.caja.name, USERS.caja.pin)
+  await page.route('**/api/auth/me', (r) => r.abort())
+  await page.reload()
+  // The app could not check the session this time, but the token is still there…
+  expect(await page.evaluate(() => localStorage.getItem('cafe.token'))).toBeTruthy()
+  // …so as soon as the server answers again the person is back in without typing the PIN.
+  await page.unroute('**/api/auth/me')
+  await page.reload()
+  await expect(page.getByRole('button', { name: 'Bloquear' })).toBeVisible()
+})
+
 test('idle lock after the configured minutes without activity', async ({ page }) => {
   await page.clock.install()
   await freshLogin(page, USERS.encargado.name, USERS.encargado.pin)
