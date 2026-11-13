@@ -132,12 +132,14 @@ interface PayRow {
 
 function CheckoutBody({
   total,
+  prepaid,
   methods,
   customer,
   submitting,
   onConfirm,
 }: {
   total: number
+  prepaid: number
   methods: PaymentMethod[]
   customer: PosCustomer | null
   submitting: boolean
@@ -256,7 +258,16 @@ function CheckoutBody({
       <div className="flex flex-col gap-4">
         <div className="space-y-2">
           {rows.length === 0 && total > 0 && <p className="text-sm text-muted-foreground">Elegí un medio de pago.</p>}
-          {total === 0 && <p className="rounded-xl bg-success/15 p-3 text-sm">El total está cubierto con puntos. No hace falta cobrar.</p>}
+          {total === 0 && (
+            <p className="rounded-xl bg-success/15 p-3 text-sm">
+              {prepaid > 0 ? 'La mesa ya se pagó entera desde los celulares. No hace falta cobrar.' : 'El total está cubierto con puntos. No hace falta cobrar.'}
+            </p>
+          )}
+          {prepaid > 0 && (
+            <p className="rounded-xl bg-info/10 p-3 text-sm" data-testid="prepaid-note">
+              Ya pagado desde la mesa (Mercado Pago): <span className="tabular font-semibold">{fmtMoney(prepaid)}</span>. Cobrá solo lo que falta.
+            </p>
+          )}
           {rows.map((r, i) => {
             const m = methods.find((x) => x.code === r.method)
             const Icon = ICONS[r.method] ?? Wallet
@@ -344,6 +355,7 @@ function CheckoutBody({
 
 function CheckoutContent({
   total,
+  prepaid,
   listTotal,
   methods,
   customer,
@@ -351,6 +363,7 @@ function CheckoutContent({
   onConfirm,
 }: {
   total: number
+  prepaid: number
   listTotal: number
   methods: PaymentMethod[]
   customer: PosCustomer | null
@@ -373,6 +386,7 @@ function CheckoutContent({
         <CheckoutBody
           key={total}
           total={total}
+          prepaid={prepaid}
           methods={methods}
           customer={customer}
           submitting={submitting}
@@ -387,6 +401,7 @@ export function CheckoutDialog({
   open,
   onOpenChange,
   total,
+  prepaid = 0,
   listTotal,
   methods,
   customer,
@@ -396,6 +411,8 @@ export function CheckoutDialog({
   open: boolean
   onOpenChange: (o: boolean) => void
   total: number
+  /** Already paid from the table's phones: `total` is what is left to collect. */
+  prepaid?: number
   /** Menu value of the cart (no discounts/points): what a courtesy gives away. */
   listTotal: number
   methods: PaymentMethod[]
@@ -410,6 +427,7 @@ export function CheckoutDialog({
         {open && (
           <CheckoutContent
             total={total}
+            prepaid={prepaid}
             listTotal={listTotal}
             methods={methods}
             customer={customer}

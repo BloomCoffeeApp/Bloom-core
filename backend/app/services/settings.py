@@ -34,6 +34,8 @@ DEFAULTS: dict[str, Any] = {
         "trust_max_cents": 2000000,
         "trust_max_items": 8,
         "diner_idle_hours": 4,
+        # Phones may pay the table's account with Mercado Pago (needs payments connected; Pro `table_payments`).
+        "pay_enabled": False,
     },
     # Free plan "Elegí tus activos" (services/free_plan.py); only changed through /api/free-plan.
     "free_actives": {},

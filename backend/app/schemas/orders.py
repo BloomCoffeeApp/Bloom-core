@@ -118,7 +118,7 @@ class WaiterCallOut(BaseModel):
     id: int
     table_id: int
     table_label: str
-    kind: Literal["waiter", "bill"]
+    kind: Literal["waiter", "bill", "invoice"]
     created_at: datetime
     elapsed_s: int
 
@@ -173,6 +173,8 @@ class TabOut(BaseModel):
     unfinished: int
     lines: list[TabLineOut]
     total_cents: int
+    prepaid_cents: int = 0  # already paid from the phones (Mercado Pago): the cashier collects total − this
+    paying_cents: int = 0  # a payment from a phone is in progress: charging the table waits for it
 
 
 class OrdersSummary(BaseModel):

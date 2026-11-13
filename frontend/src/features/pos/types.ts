@@ -96,7 +96,8 @@ export interface CartState {
   discount: { mode: 'amount' | 'pct'; value: number }
   points_to_redeem: number
   /** Charging a table's open tab ("mesa abierta"). */
-  tab?: { id: number; label: string } | null
+  /** `prepaid_cents`: already paid from the table's phones (Mercado Pago); the cashier collects the rest. */
+  tab?: { id: number; label: string; prepaid_cents?: number } | null
   /** Stamp-card discount reward on the whole sale (Pro loyalty). */
   reward?: { program_id: number; label: string; kind: 'pct' | 'fixed'; value: number } | null
 }

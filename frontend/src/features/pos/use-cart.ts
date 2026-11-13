@@ -207,7 +207,7 @@ export function useCart() {
         to_bar: false,
       })
     }
-    setCart({ ...EMPTY, lines, channel: 'salon', table_label: tab.table_label, tab: { id: tab.id, label: tab.table_label } })
+    setCart({ ...EMPTY, lines, channel: 'salon', table_label: tab.table_label, tab: { id: tab.id, label: tab.table_label, prepaid_cents: tab.prepaid_cents ?? 0 } })
     return missing
   }, [])
 

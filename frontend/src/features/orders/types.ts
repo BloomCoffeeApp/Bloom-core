@@ -121,7 +121,7 @@ export interface WaiterCall {
   id: number
   table_id: number
   table_label: string
-  kind: 'waiter' | 'bill'
+  kind: 'waiter' | 'bill' | 'invoice'
   created_at: string
   elapsed_s: number
 }
@@ -169,6 +169,10 @@ export interface Tab {
   unfinished: number
   lines: TabLine[]
   total_cents: number
+  /** Already paid from the phones (Mercado Pago): the cashier collects total − this. */
+  prepaid_cents: number
+  /** A payment from a phone is in progress: charging the table waits for it. */
+  paying_cents: number
 }
 
 export interface OrdersSummary {

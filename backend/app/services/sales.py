@@ -26,6 +26,7 @@ from app.models import (
     User,
     utcnow,
 )
+from app.models.collect import CollectCharge
 from app.schemas.sales import PaymentMethodUpdate, SaleIn
 from app.services import audit, channel_supplies, free_plan, orders, recipes, sale_hooks, settings, stock
 from app.services.orders import close_tab, tab_label
@@ -33,6 +34,7 @@ from app.services.cash import CASH, method_names, require_open_session, user_nam
 from app.services.timeutil import range_bounds_utc
 
 CC = "cuenta_corriente"
+TABLE_REF_TYPE = "table_tab"  # collect charges made from the table's phones (Pro `table_payments`)
 REWARD_REASON = "Premio fidelidad"
 
 
@@ -260,6 +262,17 @@ def _create_sale(db: Session, data: SaleIn, user: User) -> Sale:
             cc_amount += pay.amount_cents
         paid += pay.amount_cents
         payments.append(SalePayment(method=pay.method, amount_cents=pay.amount_cents, tendered_cents=tendered, change_cents=change))
+    # A table that already paid part (or all) of its bill from the phones (Mercado Pago): those payments count.
+    prepaid_charges = table_prepaid_charges(db, tab) if tab is not None else []
+    prepaid = sum(c.amount_cents for c in prepaid_charges)
+    if prepaid:
+        method = next((m for m in ("mp_qr", "qr") if m in active_methods), None)
+        if method is None:
+            raise HTTPException(400, "Falta un medio de pago «QR Mercado Pago» activo para registrar lo que se pagó desde la mesa")
+        if prepaid > total:
+            raise HTTPException(409, "Lo pagado desde la mesa supera el total de la cuenta: revisalo antes de cobrar")
+        payments.append(SalePayment(method=method, amount_cents=prepaid, tendered_cents=None, change_cents=0))
+        paid += prepaid
     if paid != total:
         raise HTTPException(400, f"Los pagos ({paid / 100:.2f}) no coinciden con el total ({total / 100:.2f})")
     if cc_amount:
@@ -303,6 +316,8 @@ def _create_sale(db: Session, data: SaleIn, user: User) -> Sale:
 
     if tab is not None:
         close_tab(db, tab, sale)
+        for ch in prepaid_charges:
+            ch.sale_id = sale.id
     # Lines charged from a table's tab already went to the bar as that table's orders.
     orders.create_from_sale(db, sale, [it.to_bar for it in data.items], user)
 
@@ -422,6 +437,17 @@ def unit_price(p: Product, size: ProductSize | None, mods: list[Modifier]) -> in
     return (size.price_cents if size else p.price_cents) + sum(m.price_delta_cents for m in mods)
 
 
+def table_prepaid_charges(db: Session, tab: TableTab) -> list[CollectCharge]:
+    """Approved payments the table's phones made (Pro «Pagar desde la mesa») that no sale has absorbed yet.
+    A payment still in progress blocks charging the table: it could be paid twice."""
+    rows = list(db.scalars(select(CollectCharge).where(
+        CollectCharge.ref_type == TABLE_REF_TYPE, CollectCharge.ref_id == tab.id, CollectCharge.sale_id.is_(None),
+        CollectCharge.status.in_(("pending", "approved")))))
+    if any(c.status == "pending" for c in rows):
+        raise HTTPException(409, "Hay un pago en curso desde la mesa. Esperá a que termine o cancelalo antes de cobrar.")
+    return rows
+
+
 def _open_tab(db: Session, tab_id: int) -> TableTab:
     tab = db.get(TableTab, tab_id)
     if tab is None or tab.status != "open":
@@ -491,6 +517,8 @@ def void_sale(db: Session, sale_id: int, reason: str, user: User) -> Sale:
                     db.add(CustomerAccountMovement(customer_id=customer.id, amount_cents=-cc, type="void", method=CC, sale_id=sale.id, user_id=user.id))
 
         sale_hooks.after_void(db, sale, user)  # e.g. remove loyalty stamps (Pro)
+        for ch in db.scalars(select(CollectCharge).where(CollectCharge.sale_id == sale.id, CollectCharge.ref_type == TABLE_REF_TYPE)):
+            ch.sale_id = None  # what the phones paid counts again when the reopened table is charged
         reopened = orders.reopen_tab(db, sale, user)  # a table's charged tab gets its bill back
         sale.status = "voided"
         sale.void_reason = reason.strip()

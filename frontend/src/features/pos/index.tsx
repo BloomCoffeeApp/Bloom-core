@@ -119,6 +119,9 @@ function PosPage() {
     () => computeTotals(cartApi.cart, config.data, quoteLines),
     [cartApi.cart, config.data, quoteLines],
   )
+  // A table the phones already (partly) paid: the cashier collects only what is left.
+  const prepaid = Math.min(cartApi.cart.tab?.prepaid_cents ?? 0, totals.total)
+  const payTotal = Math.max(totals.total - prepaid, 0)
   const stampsOn = useHasFeature('loyalty_pro') === true && !!proModules.PosStampCards
 
   const redeem = useCallback(
@@ -281,7 +284,8 @@ function PosPage() {
       <CheckoutDialog
         open={checkout}
         onOpenChange={setCheckout}
-        total={totals.total}
+        total={payTotal}
+        prepaid={prepaid}
         listTotal={listTotal}
         methods={methods ?? []}
         customer={cartApi.cart.customer}
@@ -290,7 +294,7 @@ function PosPage() {
       />
       <CollectChargeDialog
         request={collectReq}
-        total={totals.total}
+        total={payTotal}
         onApproved={onSold}
         onClose={() => {
           setCollectReq(null)
@@ -310,6 +314,7 @@ function PosPage() {
         onOpenChange={setTabsOpen}
         tabs={tabs.data ?? []}
         onPick={(tab) => {
+          if (tab.paying_cents > 0) toast.warning('Hay un pago en curso desde la mesa: esperá a que termine para cobrarla.')
           const missing = cartApi.loadTab(tab, catalog.data?.products ?? [])
           if (missing.length) toast.warning(`No están en el catálogo: ${missing.join(', ')}`)
           setTabsOpen(false)

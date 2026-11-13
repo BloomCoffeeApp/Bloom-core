@@ -63,7 +63,8 @@ const waKind = (o: Order) =>
   o.status === 'awaiting_pay' || o.status === 'accepted' ? 'accepted' : o.status === 'ready' ? 'ready' : o.status === 'dispatched' ? 'dispatched' : 'generic'
 
 const describe = (o: Order) => `${o.table_label || ''}${o.table_label ? ' · ' : ''}${o.items.reduce((a, i) => a + i.qty, 0)} productos`
-const callText = (c: WaiterCall) => (c.kind === 'bill' ? `Mesa ${c.table_label} pide la cuenta` : `Mesa ${c.table_label} llama al mozo`)
+const callText = (c: WaiterCall) =>
+  c.kind === 'bill' ? `Mesa ${c.table_label} pide la cuenta` : c.kind === 'invoice' ? `Mesa ${c.table_label} pide factura` : `Mesa ${c.table_label} llama al mozo`
 
 function OrdersPage() {
   const [station, setStationState] = useState<number | null>(loadStation)
