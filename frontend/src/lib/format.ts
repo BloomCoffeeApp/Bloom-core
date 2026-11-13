@@ -57,6 +57,9 @@ export const ROLE_LABEL: Record<string, string> = {
   encargado: 'Encargado',
   cajero: 'Cajero',
   barista: 'Barista',
+  mozo: 'Mozo',
+  cocina: 'Cocina',
+  deposito: 'Depósito',
 }
 
 export const PAYMENT_LABEL: Record<string, string> = {

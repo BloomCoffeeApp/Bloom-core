@@ -19,10 +19,15 @@ def _user(client, h, name: str, role: str, pin: str = "4321") -> dict[str, str]:
 
 
 def test_builtin_roles_keep_their_historical_permissions():
-    sell = {"pos.sell", "pos.courtesy", "cash.open_close", "cash.movements", "customers.edit"}
+    # tables.serve / kitchen.use are the old "any logged user may move orders" made explicit.
+    sell = {"pos.sell", "pos.courtesy", "cash.open_close", "cash.movements", "customers.edit",
+            "tables.serve", "kitchen.use"}
     assert BUILTIN_ROLES["admin"]["permissions"] == ALL
     assert BUILTIN_ROLES["cajero"]["permissions"] == sell
-    assert BUILTIN_ROLES["barista"]["permissions"] == {"barista.use", "stock.view"}
+    assert BUILTIN_ROLES["barista"]["permissions"] == {"barista.use", "stock.view", "kitchen.use"}
+    assert BUILTIN_ROLES["mozo"]["permissions"] == {"tables.serve"}
+    assert BUILTIN_ROLES["cocina"]["permissions"] == {"kitchen.use"}
+    assert BUILTIN_ROLES["deposito"]["permissions"] == {"stock.view", "stock.receive"}
     enc = BUILTIN_ROLES["encargado"]["permissions"]
     assert sell <= enc and {"pos.discount", "sales.void", "catalog.edit", "reports.view", "stock.adjust"} <= enc
     # Admin-level things stay out of the manager's default set.
@@ -69,20 +74,20 @@ def test_me_exposes_permissions_and_role_name(api):
 
 def test_custom_role_is_enforced(api):
     client, admin = api
-    r = client.post("/api/roles", json={"name": "Mozo", "permissions": ["pos.sell", "notices.manage"]}, headers=admin)
+    r = client.post("/api/roles", json={"name": "Runner", "permissions": ["pos.sell", "notices.manage"]}, headers=admin)
     assert r.status_code == 200, r.text
     role = r.json()
-    assert role["key"] == "mozo" and not role["builtin"] and role["permissions"] == ["notices.manage", "pos.sell"]
-    mozo = _user(client, admin, "Juan Mozo", "mozo")
+    assert role["key"] == "runner" and not role["builtin"] and role["permissions"] == ["notices.manage", "pos.sell"]
+    mozo = _user(client, admin, "Juan Mozo", "runner")
     me = client.get("/api/auth/me", headers=mozo).json()
-    assert me["role"] == "mozo" and me["role_name"] == "Mozo"
+    assert me["role"] == "runner" and me["role_name"] == "Runner"
     assert client.get("/api/sales", headers=mozo).status_code == 200
     assert client.post("/api/notices", json={"title": "Hola", "body": ""}, headers=mozo).status_code != 403
     assert client.get("/api/cash/sessions", headers=mozo).status_code == 403  # no cash.open_close
     assert client.get("/api/stock/items", headers=mozo).status_code == 403
     assert client.get("/api/customers", headers=mozo).status_code == 403
     # Editing the role applies on the next request (no re-login).
-    client.patch("/api/roles/mozo", json={"permissions": ["pos.sell", "customers.manage"]}, headers=admin)
+    client.patch("/api/roles/runner", json={"permissions": ["pos.sell", "customers.manage"]}, headers=admin)
     assert client.get("/api/customers", headers=mozo).status_code == 200  # customers.manage brings customers.edit
     assert client.post("/api/notices", json={"title": "Hola", "body": ""}, headers=mozo).status_code == 403
 

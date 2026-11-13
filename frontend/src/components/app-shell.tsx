@@ -76,6 +76,7 @@ export function AppShell() {
   const { theme, setTheme } = useTheme()
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [clockOpen, setClockOpen] = useState(false)
+  const [logoutAsked, setLogoutAsked] = useState(false)
   const tour = useTour()
   const license = useLicense()
   const desktop = useDesktop()
@@ -85,6 +86,9 @@ export function AppShell() {
   const navigate = useNavigate()
   const modules = useModules()
   useIdleLock()
+  // With staff + the prompt on, logging out first asks «¿Fichar la salida?» (ClockPrompts); otherwise straight out.
+  const clockPrompts = !!proModules.ClockPrompts && !!license.data && hasFeature(license.data, 'staff')
+  const requestLogout = () => (clockPrompts ? setLogoutAsked(true) : logout())
 
   const { data: alertSummary } = useQuery({
     queryKey: ['alerts', 'summary'],
@@ -229,13 +233,26 @@ export function AppShell() {
               <DropdownMenuItem onClick={tour.start}>
                 <GraduationCap /> Ver tutorial
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => logout()}>
+              <DropdownMenuItem onClick={requestLogout}>
                 <LogOut /> Cerrar sesión
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </SidebarFooter>
         <SidebarRail />
+        {proModules.ClockPrompts && clockPrompts && user && (
+          <Suspense fallback={null}>
+            <proModules.ClockPrompts
+              userId={user.id}
+              logoutRequested={logoutAsked}
+              onLogoutProceed={() => {
+                setLogoutAsked(false)
+                logout()
+              }}
+              onLogoutCancel={() => setLogoutAsked(false)}
+            />
+          </Suspense>
+        )}
         {proModules.TimeClockDialog && clockOpen && (
           <Suspense fallback={null}>
             <proModules.TimeClockDialog open={clockOpen} onOpenChange={setClockOpen} userId={user.id} />
@@ -280,7 +297,7 @@ export function AppShell() {
                 )}
               </Link>
             </Button>
-            <Button variant="ghost" size="icon" onClick={() => logout()} aria-label="Bloquear" data-tour="lock">
+            <Button variant="ghost" size="icon" onClick={requestLogout} aria-label="Bloquear" data-tour="lock">
               <Lock />
             </Button>
             {desktop.api && <div className="mx-1 h-6 w-px bg-border" />}

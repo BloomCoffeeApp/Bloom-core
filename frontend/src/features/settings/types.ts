@@ -69,6 +69,10 @@ export interface UserRow {
   last_login_at: string | null
   /** Free plan: this user can't log in. */
   locked?: boolean
+  /** Personal exceptions over the role (extra / removed permissions) and the resulting set. */
+  perm_grants?: Permission[]
+  perm_revokes?: Permission[]
+  effective_permissions?: Permission[]
 }
 
 export interface UserCreate {
@@ -153,4 +157,6 @@ export interface RoleRow {
   permissions: Permission[]
   /** Active users with this role. */
   users: number
+  /** Of those, how many have personal exceptions. */
+  users_with_overrides?: number
 }

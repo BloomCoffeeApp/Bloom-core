@@ -62,3 +62,36 @@ test('a custom role sees only what it is allowed to', async ({ page, browser, re
   await shot(p, 'roles-restricted-user')
   await ctx.close()
 })
+
+test('a person gets personal exceptions on top of their role', async ({ page, request }) => {
+  const headers = await authHeaders(page)
+  const userName = `Ana ${uid()}`
+  const created = await request.post('/api/users', { headers, data: { name: userName, pin: '5678', role: 'cajero', color: 'sky' } })
+  expect(created.ok(), await created.text()).toBeTruthy()
+  const { id } = await created.json()
+
+  await page.goto('/config?tab=usuarios')
+  const row = page.getByRole('row', { name: new RegExp(userName) })
+  await row.getByRole('button', { name: /Permisos/ }).click()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.getByRole('checkbox', { name: 'Aplicar descuentos' })).not.toBeChecked() // not in the role
+  await expect(dialog.getByRole('checkbox', { name: 'Vender en el POS' })).toBeChecked() // from the role
+  await dialog.getByRole('checkbox', { name: 'Aplicar descuentos' }).check()
+  await dialog.getByRole('checkbox', { name: 'Vender en el POS' }).uncheck() // takes the discount away with it
+  await expect(dialog.getByRole('checkbox', { name: 'Aplicar descuentos' })).not.toBeChecked()
+  await dialog.getByRole('checkbox', { name: 'Vender en el POS' }).check()
+  await dialog.getByRole('checkbox', { name: 'Aplicar descuentos' }).check()
+  await dialog.getByRole('checkbox', { name: 'Anular ventas' }).uncheck() // not in the role: nothing to remove
+  await page.getByTestId('user-permissions-save').click()
+  await expect(row).toContainText('1 excepción')
+
+  const users: { id: number; perm_grants: string[]; perm_revokes: string[] }[] = await (await request.get('/api/users', { headers })).json()
+  const mine = users.find((u) => u.id === id)!
+  expect(mine.perm_grants).toEqual(['pos.discount'])
+  expect(mine.perm_revokes).toEqual([])
+
+  // The role editor warns how many people it affects, and how many have exceptions.
+  await page.goto('/config?tab=roles')
+  await page.getByRole('option', { name: /Cajero/ }).click()
+  await expect(page.getByTestId('role-impact')).toContainText('1 con excepciones propias')
+})

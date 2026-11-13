@@ -10,7 +10,7 @@ from app.db import get_db
 from app.licensing import has_feature
 from app.licensing.features import PRO_LABEL
 from app.models import User
-from app.schemas.users import UserCreate, UserOut, UserUpdate
+from app.schemas.users import UserCreate, UserOut, UserPermissionsIn, UserUpdate
 from app.services import audit, business_profile, free_plan, roles
 from app.services import settings as settings_svc
 
@@ -21,7 +21,8 @@ SettingsAdmin = Perm("settings.manage")
 
 def user_out(db: Session, u: User) -> dict[str, Any]:
     return {**UserOut.model_validate(u).model_dump(), "locked": u.active and free_plan.is_locked(db, "users", u.id),
-            "role_name": roles.role_name(db, u.role)}
+            "role_name": roles.role_name(db, u.role),
+            "effective_permissions": sorted(roles.permissions_of(u))}
 
 
 @router.get("/users", response_model=list[UserOut])
@@ -66,13 +67,30 @@ def update_user(user_id: int, data: UserUpdate, db: Session = Depends(get_db), m
     security_change = bool(pin) or changes.get("active") is False or (
         "role" in changes and changes["role"] != user.role
     )
+    role_changed = "role" in changes and changes["role"] != user.role
     for k, v in changes.items():
         setattr(user, k, v)
+    if role_changed:
+        before = (list(user.perm_grants or []), list(user.perm_revokes or []))
+        roles.prune_overrides(db, user)
+        if before != (user.perm_grants, user.perm_revokes):
+            changes["permission_exceptions"] = {"grants": user.perm_grants, "revokes": user.perm_revokes}
     if security_change and user.id != me.id:
         revoke_sessions(db, user.id)
     audit.log(db, me.id, "update", "user", user.id, changes)
     db.commit()
     free_plan.invalidate()
+    return user_out(db, user)
+
+
+@router.put("/users/{user_id}/permissions", response_model=UserOut)
+def set_user_permissions(
+    user_id: int, data: UserPermissionsIn, db: Session = Depends(get_db), me: User = UsersAdmin
+) -> dict[str, Any]:
+    user = db.get(User, user_id)
+    if not user:
+        raise HTTPException(404, "Usuario no encontrado")
+    roles.set_overrides(db, me, user, data.grants, data.revokes)
     return user_out(db, user)
 
 

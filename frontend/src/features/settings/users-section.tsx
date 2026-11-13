@@ -1,4 +1,4 @@
-import { KeyRound, Loader2, Pencil, Plus, UserPlus } from 'lucide-react'
+import { KeyRound, Loader2, Pencil, Plus, ShieldCheck, UserPlus } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
 
@@ -19,6 +19,7 @@ import { cn } from '@/lib/utils'
 import { useCreateUser, useRoles, useUpdateUser, useUsers } from './api'
 import { Field, SettingsCard } from './form'
 import type { UserRow } from './types'
+import { UserPermissionsDialog } from './user-permissions-dialog'
 
 const COLORS = Object.keys(AVATAR_COLORS)
 const PIN_RE = /^\d{4,6}$/
@@ -31,9 +32,14 @@ function UserAvatar({ name, color, className }: { name: string; color: string; c
   )
 }
 
-type DialogState = { mode: 'create' } | { mode: 'edit'; user: UserRow } | { mode: 'pin'; user: UserRow } | null
+type DialogState =
+  | { mode: 'create' }
+  | { mode: 'edit'; user: UserRow }
+  | { mode: 'pin'; user: UserRow }
+  | { mode: 'permissions'; user: UserRow }
+  | null
 
-function UserDialog({ state, onClose }: { state: Exclude<DialogState, null>; onClose: () => void }) {
+function UserDialog({ state, onClose }: { state: Exclude<DialogState, { mode: 'permissions' } | null>; onClose: () => void }) {
   const editing = state.mode !== 'create' ? state.user : null
   const [name, setName] = useState(editing?.name ?? '')
   const [role, setRole] = useState<Role>(editing?.role ?? 'cajero')
@@ -210,7 +216,13 @@ export function UsersSection() {
         header: 'Rol',
         cell: ({ row }) => {
           const r = row.original.role
-          return <Badge variant={r === 'admin' ? 'default' : 'secondary'}>{row.original.role_name ?? ROLE_LABEL[r] ?? r}</Badge>
+          const extra = (row.original.perm_grants?.length ?? 0) + (row.original.perm_revokes?.length ?? 0)
+          return (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <Badge variant={r === 'admin' ? 'default' : 'secondary'}>{row.original.role_name ?? ROLE_LABEL[r] ?? r}</Badge>
+              {extra > 0 && <Badge variant="outline">{extra} excepci{extra === 1 ? 'ón' : 'ones'}</Badge>}
+            </div>
+          )
         },
       },
       {
@@ -239,6 +251,11 @@ export function UsersSection() {
             <Button variant="ghost" size="sm" onClick={() => setDialog({ mode: 'pin', user: row.original })}>
               <KeyRound /> PIN
             </Button>
+            {row.original.role !== 'admin' && (
+              <Button variant="ghost" size="sm" onClick={() => setDialog({ mode: 'permissions', user: row.original })}>
+                <ShieldCheck /> Permisos
+              </Button>
+            )}
             <Button variant="ghost" size="sm" onClick={() => setDialog({ mode: 'edit', user: row.original })}>
               <Pencil /> Editar
             </Button>
@@ -274,7 +291,10 @@ export function UsersSection() {
           )
         }
       />
-      {dialog && <UserDialog key={dialog.mode + ('user' in dialog ? dialog.user.id : '')} state={dialog} onClose={() => setDialog(null)} />}
+      {dialog?.mode === 'permissions' && <UserPermissionsDialog key={dialog.user.id} user={dialog.user} onClose={() => setDialog(null)} />}
+      {dialog && dialog.mode !== 'permissions' && (
+        <UserDialog key={dialog.mode + ('user' in dialog ? dialog.user.id : '')} state={dialog} onClose={() => setDialog(null)} />
+      )}
     </SettingsCard>
   )
 }

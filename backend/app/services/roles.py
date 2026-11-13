@@ -17,7 +17,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session, object_session
 
 from app.models import Role, User
-from app.permissions import ADMIN, ALL, BUILTIN_ROLES, PERMISSIONS, REQUIRES, normalize
+from app.permissions import ADMIN, ALL, BUILTIN_ROLES, PERMISSIONS, REQUIRES, drop_unsatisfied, normalize
 from app.services import audit
 
 _CACHE_ATTR = "_bloom_permissions"
@@ -37,11 +37,23 @@ def permissions_for_role(db: Session | None, key: str) -> frozenset[str]:
     return builtin["permissions"] if builtin else frozenset()
 
 
+def apply_overrides(base: frozenset[str], grants: list[str] | None, revokes: list[str] | None) -> frozenset[str]:
+    """Role permissions + the person's exceptions. Grants pull in what they require; revokes take away what
+    depended on the removed permission (no discounts without selling)."""
+    eff = set(normalize(set(base) | set(grants or [])))
+    eff -= set(revokes or [])
+    return drop_unsatisfied(eff)
+
+
 def permissions_of(user: User) -> frozenset[str]:
-    """The user's permissions, computed once per loaded instance (= once per request)."""
+    """The user's permissions (role + personal exceptions), computed once per loaded instance (= once per request)."""
     cached = user.__dict__.get(_CACHE_ATTR)
     if cached is None:
-        cached = permissions_for_role(object_session(user), user.role)
+        base = permissions_for_role(object_session(user), user.role)
+        if user.role == ADMIN or not (user.perm_grants or user.perm_revokes):
+            cached = base
+        else:
+            cached = apply_overrides(base, user.perm_grants, user.perm_revokes)
         user.__dict__[_CACHE_ATTR] = cached
     return cached
 
@@ -85,6 +97,12 @@ def list_roles(db: Session) -> list[dict[str, Any]]:
     counts = dict(
         db.execute(select(User.role, func.count(User.id)).where(User.active.is_(True)).group_by(User.role)).all()
     )
+    with_overrides: dict[str, int] = {}
+    for role, grants, revokes in db.execute(
+        select(User.role, User.perm_grants, User.perm_revokes).where(User.active.is_(True))
+    ):
+        if grants or revokes:
+            with_overrides[role] = with_overrides.get(role, 0) + 1
     rows = {r.key: r for r in db.scalars(select(Role).order_by(Role.id))}
     out = []
     for key, b in BUILTIN_ROLES.items():
@@ -94,11 +112,13 @@ def list_roles(db: Session) -> list[dict[str, Any]]:
             "key": key, "name": row.name if row else b["name"], "hint": b["hint"], "builtin": True,
             "editable": key != ADMIN, "customized": row is not None and perms != b["permissions"],
             "permissions": sorted(perms), "users": counts.get(key, 0),
+            "users_with_overrides": with_overrides.get(key, 0),
         })
     for key, row in rows.items():
         out.append({
             "key": key, "name": row.name, "hint": None, "builtin": False, "editable": True, "customized": False,
             "permissions": sorted(normalize(row.permissions or [])), "users": counts.get(key, 0),
+            "users_with_overrides": with_overrides.get(key, 0),
         })
     return out
 
@@ -214,3 +234,52 @@ def check_can_assign(db: Session, me: User, role_key: str, target: User | None =
         raise HTTPException(403, "No podés asignar un rol con más permisos que el tuyo")
     if target is not None and not permissions_for_role(db, target.role) <= permissions_of(me):
         raise HTTPException(403, "No podés editar a un usuario con más permisos que vos")
+
+
+# ---------------------------------------------------------------- per-person exceptions
+
+
+def clean_overrides(base: frozenset[str], grants: list[str], revokes: list[str]) -> tuple[list[str], list[str]]:
+    """Keeps only exceptions that change something: grants the role lacks, revokes of what the role has."""
+    return sorted(g for g in set(grants) if g not in base), sorted(r for r in set(revokes) if r in base)
+
+
+def prune_overrides(db: Session, user: User) -> None:
+    """After a role change: drop the exceptions the new role already covers."""
+    base = permissions_for_role(db, user.role)
+    user.perm_grants, user.perm_revokes = clean_overrides(base, user.perm_grants or [], user.perm_revokes or [])
+    user.__dict__.pop(_CACHE_ATTR, None)
+
+
+def check_can_grant(db: Session, me: User, target: User, grants: list[str]) -> None:
+    """A non-admin may only hand out permissions they have, and never edit an admin."""
+    if me.role == ADMIN:
+        return
+    if target.role == ADMIN:
+        raise HTTPException(403, "Solo un administrador puede gestionar administradores")
+    if not set(grants) <= permissions_of(me):
+        raise HTTPException(403, "No podés dar permisos que vos no tenés")
+    if not permissions_of(target) <= permissions_of(me):
+        raise HTTPException(403, "No podés editar a un usuario con más permisos que vos")
+
+
+def set_overrides(db: Session, me: User, target: User, grants: list[str], revokes: list[str]) -> User:
+    if target.role == ADMIN:
+        raise HTTPException(400, "El administrador siempre tiene acceso total: no admite excepciones")
+    unknown = [p for p in [*grants, *revokes] if p not in PERMISSIONS]
+    if unknown:
+        raise HTTPException(400, f"Permiso desconocido: {', '.join(unknown)}")
+    if set(grants) & set(revokes):
+        raise HTTPException(400, "Un permiso no puede estar agregado y quitado a la vez")
+    check_can_grant(db, me, target, grants)
+    base = permissions_for_role(db, target.role)
+    new_grants, new_revokes = clean_overrides(base, grants, revokes)
+    before = {"grants": list(target.perm_grants or []), "revokes": list(target.perm_revokes or [])}
+    target.perm_grants, target.perm_revokes = new_grants, new_revokes
+    target.__dict__.pop(_CACHE_ATTR, None)
+    audit.log(db, me.id, "update_permissions", "user", target.id, {
+        "name": target.name, "before": before, "after": {"grants": new_grants, "revokes": new_revokes},
+    })
+    db.commit()
+    return target
+

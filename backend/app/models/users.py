@@ -6,7 +6,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, IdMixin, TimestampMixin, utcnow
 
-ROLES = ("admin", "encargado", "cajero", "barista")
+ROLES = ("admin", "encargado", "cajero", "barista", "mozo", "cocina", "deposito")
 
 
 class User(IdMixin, TimestampMixin, Base):
@@ -16,6 +16,9 @@ class User(IdMixin, TimestampMixin, Base):
     role: Mapped[str] = mapped_column(String(20), default="cajero")
     color: Mapped[str] = mapped_column(String(20), default="amber")
     active: Mapped[bool] = mapped_column(default=True)
+    # Exceptions on top of the role's permissions (services/roles.py::permissions_of): extra / removed keys.
+    perm_grants: Mapped[list[str]] = mapped_column(JSON, default=list, server_default="[]")
+    perm_revokes: Mapped[list[str]] = mapped_column(JSON, default=list, server_default="[]")
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime)
 
 

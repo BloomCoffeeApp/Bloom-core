@@ -15,6 +15,8 @@ router = APIRouter(prefix="/api", tags=["orders"])
 
 Manager = Perm("orders.manage")
 Seller = Perm("pos.sell")
+# Moving orders along / answering waiter calls: the floor, the kitchen/bar and the register (as before).
+Floor = Perm("tables.serve", "kitchen.use", "orders.manage", "pos.sell")
 
 
 @router.get("/orders/board", response_model=BoardOut)
@@ -24,7 +26,7 @@ def board(station_id: int | None = None, db: Session = Depends(get_db), _: User 
 
 
 @router.post("/orders/{order_id}/status", response_model=OrderOut)
-def set_status(order_id: int, data: OrderStatusIn, db: Session = Depends(get_db), user: User = CurrentUser) -> dict:
+def set_status(order_id: int, data: OrderStatusIn, db: Session = Depends(get_db), user: User = Floor) -> dict:
     params = {"eta_minutes": data.eta_minutes} if data.eta_minutes is not None else None
     svc.set_status(db, order_id, data.status, user, data.reason, params)
     row = next((o for o in svc.board(db)["orders"] if o["id"] == order_id), None)
@@ -41,7 +43,7 @@ def flows(_: User = CurrentUser) -> list[dict]:
 
 
 @router.post("/waiter-calls/{call_id}/resolve", response_model=Ok)
-def resolve_call(call_id: int, db: Session = Depends(get_db), user: User = CurrentUser) -> Ok:
+def resolve_call(call_id: int, db: Session = Depends(get_db), user: User = Floor) -> Ok:
     svc.resolve_call(db, call_id, user)
     return Ok()
 

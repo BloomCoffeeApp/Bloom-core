@@ -64,6 +64,19 @@ export function useUpdateUser() {
   })
 }
 
+export function useSetUserPermissions() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, grants, revokes }: { id: number; grants: Permission[]; revokes: Permission[] }) =>
+      api.put<UserRow>(`/users/${id}/permissions`, { grants, revokes }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['settings', 'users'] })
+      void qc.invalidateQueries({ queryKey: rolesKey })
+    },
+    onError,
+  })
+}
+
 /** Optional endpoint from the POS/cash module; the tab hides itself if it fails. */
 export function usePaymentMethods(enabled: boolean) {
   return useQuery({

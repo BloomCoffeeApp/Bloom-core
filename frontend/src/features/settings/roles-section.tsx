@@ -97,6 +97,13 @@ function RoleEditor({ role, catalog, onDone }: { role: RoleRow | null; catalog: 
       }
     >
       <div className="space-y-5">
+        {role && !readOnly && role.users > 0 && (
+          <p className="rounded-lg border bg-muted/40 p-3 text-sm text-muted-foreground" data-testid="role-impact">
+            Este rol lo usan {role.users} persona{role.users === 1 ? '' : 's'}
+            {role.users_with_overrides ? `, ${role.users_with_overrides} con excepciones propias (esas se mantienen)` : ''}. Los cambios les valen
+            desde su próxima acción.
+          </p>
+        )}
         {!readOnly && (
           <Field label="Nombre del rol" htmlFor="role-name">
             <Input id="role-name" className="h-11" value={name} maxLength={40} onChange={(e) => setName(e.target.value)} placeholder="Ej.: Mozo, Cajero de la tarde" />

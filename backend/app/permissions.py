@@ -27,12 +27,15 @@ PERMISSIONS: dict[str, tuple[str, str, str]] = {
     "stock.edit": ("Productos y stock", "Editar insumos", "Alta, baja y edición de insumos y sus categorías"),
     "stock.adjust": ("Productos y stock", "Ajustes, mermas y conteos", "Corregir existencias (queda registrado)"),
     "purchases.manage": ("Productos y stock", "Compras y proveedores", "Órdenes, recepciones, proveedores y pagos"),
+    "stock.receive": ("Productos y stock", "Recibir mercadería", "Ver las órdenes de compra y anotar lo que llega al depósito"),
     # Clientes
     "customers.edit": ("Clientes", "Clientes", "Ver, crear y editar clientes; cobrar cuenta corriente"),
     "customers.manage": ("Clientes", "Gestión de clientes", "Archivar, límite de cuenta corriente y ajuste de puntos"),
     "promos.manage": ("Clientes", "Promos y fidelidad", "Combos, descuentos programados y tarjetas de sellos"),
     # Operación
     "orders.manage": ("Operación", "Configurar pedidos", "Pantalla de pedidos, estaciones y mesas"),
+    "tables.serve": ("Operación", "Atender mesas", "Ver mesas y cuentas, aprobar comensales, resolver llamados y avanzar pedidos"),
+    "kitchen.use": ("Operación", "Cocina y barra", "Pantalla de pedidos: avanzar comandas y resolver llamados"),
     "notices.manage": ("Operación", "Avisos y checklists", "Crear y editar avisos y checklists"),
     "barista.use": ("Operación", "Módulo barista", "Cafés, recetas, extracciones, mantenimiento y guías"),
     "barista.manage": ("Operación", "Gestión del barista", "Editar guías de bebidas y registros de otros"),
@@ -48,7 +51,7 @@ PERMISSIONS: dict[str, tuple[str, str, str]] = {
 
 ALL = frozenset(PERMISSIONS)
 
-_SELL = {"pos.sell", "pos.courtesy", "cash.open_close", "cash.movements", "customers.edit"}
+_SELL = {"pos.sell", "pos.courtesy", "cash.open_close", "cash.movements", "customers.edit", "tables.serve", "kitchen.use"}
 _MANAGE = {
     "pos.discount", "sales.void", "catalog.edit", "prices.edit", "stock.view", "stock.edit", "stock.adjust",
     "purchases.manage", "customers.manage", "promos.manage", "orders.manage", "notices.manage",
@@ -61,7 +64,12 @@ BUILTIN_ROLES: dict[str, dict] = {
     "encargado": {"name": "Encargado", "hint": "Gestión: stock, compras, reportes, productos",
                   "permissions": frozenset(_SELL | _MANAGE)},
     "cajero": {"name": "Cajero", "hint": "Punto de venta, caja y clientes", "permissions": frozenset(_SELL)},
-    "barista": {"name": "Barista", "hint": "Módulo barista y stock", "permissions": frozenset({"barista.use", "stock.view"})},
+    "barista": {"name": "Barista", "hint": "Módulo barista, stock y pedidos",
+                "permissions": frozenset({"barista.use", "stock.view", "kitchen.use"})},
+    "mozo": {"name": "Mozo", "hint": "Mesas y pedidos del salón", "permissions": frozenset({"tables.serve"})},
+    "cocina": {"name": "Cocina", "hint": "Pantalla de pedidos de cocina y barra", "permissions": frozenset({"kitchen.use"})},
+    "deposito": {"name": "Depósito", "hint": "Ver stock y recibir mercadería",
+                 "permissions": frozenset({"stock.view", "stock.receive"})},
 }
 
 # Permissions that only make sense with something else (the editor adds the requirement automatically).
@@ -71,6 +79,7 @@ REQUIRES: dict[str, str] = {
     "sales.void": "pos.sell",
     "stock.edit": "stock.view",
     "stock.adjust": "stock.view",
+    "stock.receive": "stock.view",
     "customers.manage": "customers.edit",
     "barista.manage": "barista.use",
 }
@@ -82,4 +91,18 @@ def normalize(perms: set[str] | frozenset[str] | list[str]) -> frozenset[str]:
     for p in list(out):
         if (req := REQUIRES.get(p)) is not None:
             out.add(req)
+    return frozenset(out)
+
+
+def drop_unsatisfied(perms: set[str] | frozenset[str]) -> frozenset[str]:
+    """Removes every permission whose requirement is missing (cascading), e.g. no `pos.sell` -> no discounts."""
+    out = set(perms)
+    changed = True
+    while changed:
+        changed = False
+        for p in list(out):
+            req = REQUIRES.get(p)
+            if req is not None and req not in out:
+                out.discard(p)
+                changed = True
     return frozenset(out)

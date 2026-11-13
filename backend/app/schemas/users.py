@@ -27,6 +27,15 @@ class UserMe(UserPublic):
 class UserOut(UserPublic):
     active: bool
     last_login_at: datetime | None
+    # Per-person exceptions over the role, and the resulting permissions (services/roles.py).
+    perm_grants: list[str] = []
+    perm_revokes: list[str] = []
+    effective_permissions: list[str] = []
+
+
+class UserPermissionsIn(BaseModel):
+    grants: list[str] = []
+    revokes: list[str] = []
 
 
 class UserCreate(BaseModel):
