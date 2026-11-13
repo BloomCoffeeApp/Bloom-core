@@ -283,7 +283,7 @@ export function AppShell() {
               <CircleHelp />
             </Button>
             <Button variant="ghost" size="icon" asChild className="relative">
-              <Link to="/avisos" aria-label="Alertas" data-tour="alerts">
+              <Link to="/avisos" aria-label={alertSummary?.open ? `Alertas: ${alertSummary.open}` : "Alertas"} data-tour="alerts">
                 <Bell />
                 {!!alertSummary?.open && (
                   <Badge

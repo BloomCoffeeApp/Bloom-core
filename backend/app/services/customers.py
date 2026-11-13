@@ -8,6 +8,7 @@ from fastapi import HTTPException
 from sqlalchemy import Select, and_, func, or_, select
 from sqlalchemy.orm import Session
 
+from app.db import like_contains
 from app.models import (
     CashMovement,
     CashSession,
@@ -20,7 +21,7 @@ from app.models import (
     User,
     utcnow,
 )
-from app.services import audit, free_plan, roles
+from app.services import audit, free_plan, idempotency, roles
 from app.services.timeutil import day_bounds_utc, local_today, to_local
 
 SEGMENTS = ("frecuentes", "inactivos", "cumpleanos_mes", "deudores")
@@ -77,8 +78,8 @@ def _list_query(q: str | None, segment: str | None, include_inactive: bool) -> S
     if not include_inactive:
         stmt = stmt.where(Customer.active.is_(True))
     if q and q.strip():
-        term = f"%{q.strip()}%"
-        conds = [Customer.name.ilike(term), Customer.phone.ilike(term), Customer.email.ilike(term)]
+        term = q.strip()
+        conds = [like_contains(Customer.name, term), like_contains(Customer.phone, term), like_contains(Customer.email, term)]
         digits = re.sub(r"\D", "", q)
         if len(digits) >= 3:
             phone_digits = func.replace(func.replace(func.replace(Customer.phone, " ", ""), "-", ""), "+", "")
@@ -337,7 +338,20 @@ def _fmt_qty(q: float) -> str:
 # ---------------------------------------------------------------- account & points
 
 
-def register_payment(db: Session, c: Customer, amount_cents: int, method: str, user: User) -> CustomerAccountMovement:
+def register_payment_once(db: Session, c: Customer, amount_cents: int, method: str, user: User, key: str | None) -> tuple[CustomerAccountMovement, bool]:
+    """`register_payment` that survives being sent twice (see services/idempotency). Second value True = a repeat."""
+    if key is None:
+        return register_payment(db, c, amount_cents, method, user), False
+    h = idempotency.body_hash({"customer_id": c.id, "amount_cents": amount_cents, "method": method})
+    done = idempotency.find(db, key, "account_payment", user, h)
+    if done is not None:
+        db.rollback()
+        return db.get(CustomerAccountMovement, done), True
+    mv = register_payment(db, c, amount_cents, method, user, _key=(key, h))
+    return mv, False
+
+
+def register_payment(db: Session, c: Customer, amount_cents: int, method: str, user: User, _key: tuple[str, str] | None = None) -> CustomerAccountMovement:
     if amount_cents <= 0:
         raise HTTPException(400, "El monto debe ser mayor a cero")
     if c.balance_cents <= 0:
@@ -366,6 +380,8 @@ def register_payment(db: Session, c: Customer, amount_cents: int, method: str, u
             )
     db.flush()
     audit.log(db, user.id, "payment", "customer", c.id, {"amount_cents": amount_cents, "method": method})
+    if _key:
+        idempotency.record(db, _key[0], "account_payment", user, _key[1], mv.id)
     db.commit()
     db.refresh(mv)
     return mv

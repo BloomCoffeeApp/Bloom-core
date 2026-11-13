@@ -492,7 +492,7 @@ export function CartPanel({
           disabled={!cart.lines.length || !cashOpen || pricing}
           onClick={onCheckout}
         >
-          COBRAR <span className="ml-2 text-sm font-normal opacity-70">F9</span>
+          COBRAR <span className="ml-2 text-sm font-normal opacity-90">F9</span>
         </Button>
       </div>
 

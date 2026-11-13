@@ -33,6 +33,15 @@ def get_db() -> Iterator[Session]:
         db.close()
 
 
+def like_contains(column, term: str):
+    """`column` contains `term`, case-insensitive, with `%`, `_` and backslash in the term taken LITERALLY.
+
+    The value is always a bound parameter (no SQL injection), but unescaped `%` / `_` act as wildcards: searching
+    for "100%" or "a_b" would match far more than typed. Use this for every user-typed search box."""
+    escaped = term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return column.ilike(f"%{escaped}%", escape="\\")
+
+
 def lock_writes(db: Session) -> None:
     """Takes SQLite's write lock NOW (waits up to the engine timeout if another request is writing).
 

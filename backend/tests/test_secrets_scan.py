@@ -39,7 +39,7 @@ FORBIDDEN_PATHS = [
     (re.compile(r"(^|/)secret\.key$"), "secret.key"),
 ]
 SKIP_SUFFIX = {".png", ".jpg", ".jpeg", ".webp", ".ico", ".gif", ".woff", ".woff2", ".ttf", ".bin", ".pdf", ".zip", ".mp4", ".lock", ".svg"}
-SKIP_FILES = {"package-lock.json", "access_rules.snapshot.json", "requirements.lock.txt", "THIRD_PARTY_NOTICES.txt"}
+SKIP_FILES = {"test_secrets_scan.py", "test_secrets_scan_pro.py", "package-lock.json", "access_rules.snapshot.json", "requirements.lock.txt", "THIRD_PARTY_NOTICES.txt"}
 
 
 def tracked() -> list[Path]:

@@ -1,6 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { api } from '@/lib/api'
+import { idempotencyKeyFor, releaseIdempotencyKey } from '@/lib/idempotency'
 
 import type { PaymentMethod, SaleDetail, SaleIn, SaleList, SalesFilters, TicketData } from './types'
 
@@ -38,8 +39,9 @@ export function useSale(id: number | null) {
 export function useCreateSale() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (body: SaleIn) => api.post<SaleDetail>('/sales', body),
+    mutationFn: (body: SaleIn) => api.post<SaleDetail>('/sales', body, { idempotencyKey: idempotencyKeyFor('sale', body) }),
     onSuccess: () => {
+      releaseIdempotencyKey('sale')
       qc.invalidateQueries({ queryKey: salesKeys.all })
       qc.invalidateQueries({ queryKey: ['cash'] })
       qc.invalidateQueries({ queryKey: ['pos', 'customers'] })

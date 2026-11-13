@@ -6,6 +6,7 @@ from fastapi import HTTPException
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
+from app.db import like_contains
 from app.models import (
     Modifier,
     ModifierGroup,
@@ -308,7 +309,7 @@ def list_products(
     if category_id is not None:
         query = query.where(Product.category_id == category_id)
     if q:
-        query = query.where(Product.name.ilike(f"%{q}%"))
+        query = query.where(like_contains(Product.name, q))
     products = list(db.scalars(query))
     categories = {c.id: c for c in db.scalars(select(ProductCategory))}
     stock = {s.id: s for s in db.scalars(select(StockItem))}

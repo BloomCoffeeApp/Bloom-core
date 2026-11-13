@@ -11,6 +11,7 @@ from fastapi import HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.db import like_contains
 from app.models import (
     InventoryCount,
     InventoryCountItem,
@@ -177,7 +178,7 @@ def list_items(
     if category_id is not None:
         query = query.where(StockItem.category_id == category_id)
     if q:
-        query = query.where(StockItem.name.ilike(f"%{q}%"))
+        query = query.where(like_contains(StockItem.name, q))
     cats, sups = _lookups(db)
     exp = _next_expiry(db)
     usable = free_plan.active_ids(db, "stock_items")

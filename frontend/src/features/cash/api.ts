@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { api } from '@/lib/api'
+import { idempotencyKeyFor, releaseIdempotencyKey } from '@/lib/idempotency'
 
 import type { CashMovement, CashSession, CashSessionDetail, CashSessionListItem } from './types'
 
@@ -43,8 +44,11 @@ export function useCashMovement() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (body: { type: 'in' | 'out'; amount_cents: number; reason: string }) =>
-      api.post<CashMovement>('/cash/movements', body),
-    onSuccess: () => qc.invalidateQueries({ queryKey: cashKeys.all }),
+      api.post<CashMovement>('/cash/movements', body, { idempotencyKey: idempotencyKeyFor('cash-movement', body) }),
+    onSuccess: () => {
+      releaseIdempotencyKey('cash-movement')
+      qc.invalidateQueries({ queryKey: cashKeys.all })
+    },
   })
 }
 

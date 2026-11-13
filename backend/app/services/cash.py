@@ -20,7 +20,7 @@ from app.models import (
     User,
     utcnow,
 )
-from app.services import audit, settings
+from app.services import audit, idempotency, settings
 
 CASH = "efectivo"
 
@@ -63,14 +63,24 @@ def open_session(db: Session, opening_cents: int, user: User) -> CashSession:
     return s
 
 
-def add_movement(db: Session, type_: str, amount_cents: int, reason: str, user: User) -> CashMovement:
+def add_movement(db: Session, type_: str, amount_cents: int, reason: str, user: User, key: str | None = None) -> tuple[CashMovement, bool]:
+    """Money in/out of the drawer. With an `Idempotency-Key`, sending the same movement twice records it once
+    (second value True = it was a repeat)."""
+    h = idempotency.body_hash({"type": type_, "amount_cents": amount_cents, "reason": reason.strip()}) if key else ""
+    if key:
+        done = idempotency.find(db, key, "cash_movement", user, h)
+        if done is not None:
+            db.rollback()
+            return db.get(CashMovement, done), True
     s = require_open_session(db)
     mv = CashMovement(session_id=s.id, type=type_, amount_cents=amount_cents, reason=reason.strip(), user_id=user.id)
     db.add(mv)
     db.flush()
     audit.log(db, user.id, f"movement_{type_}", "cash_session", s.id, {"amount_cents": amount_cents, "reason": reason})
+    if key:
+        idempotency.record(db, key, "cash_movement", user, h, mv.id)
     db.commit()
-    return mv
+    return mv, False
 
 
 def _live_totals(db: Session, session_id: int) -> dict[str, Any]:

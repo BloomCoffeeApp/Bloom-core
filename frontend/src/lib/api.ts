@@ -57,10 +57,11 @@ function errorMessage(body: unknown, fallback: string): string {
 }
 
 /** Extra headers for public (not logged-in) calls, e.g. a table diner's token. A 401 there is not a staff logout. */
-export type RequestOpts = { headers?: Record<string, string> }
+export type RequestOpts = { headers?: Record<string, string>; idempotencyKey?: string }
 
 async function request<T>(method: string, path: string, body?: unknown, query?: Query, opts?: RequestOpts): Promise<T> {
   const headers: Record<string, string> = { ...opts?.headers }
+  if (opts?.idempotencyKey) headers['Idempotency-Key'] = opts.idempotencyKey // a retry of the same operation must not repeat it
   const token = tokenStore.get()
   if (token) headers.Authorization = `Bearer ${token}`
   let payload: BodyInit | undefined

@@ -1,6 +1,6 @@
 from datetime import date, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -27,6 +27,7 @@ from app.schemas.sales import (
     TicketOut,
 )
 from app.services import cash as cash_svc
+from app.services import idempotency
 from app.services import roles
 from app.services import sales as sales_svc
 from app.services import settings as settings_svc
@@ -84,8 +85,16 @@ def cash_open(data: CashOpenIn, db: Session = Depends(get_db), user: User = Cash
 
 
 @router.post("/cash/movements", response_model=CashMovementOut)
-def cash_movement(data: CashMovementIn, db: Session = Depends(get_db), user: User = CashMoves) -> dict:
-    mv = cash_svc.add_movement(db, data.type, data.amount_cents, data.reason, user)
+def cash_movement(
+    data: CashMovementIn,
+    response: Response,
+    db: Session = Depends(get_db),
+    user: User = CashMoves,
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+) -> dict:
+    mv, repeated = cash_svc.add_movement(db, data.type, data.amount_cents, data.reason, user, idempotency.clean_key(idempotency_key))
+    if repeated:
+        response.headers["Idempotent-Replay"] = "true"
     return {**CashMovementOut.model_validate(mv).model_dump(), "user_name": user.name}
 
 
@@ -117,8 +126,18 @@ def cash_session_detail(session_id: int, db: Session = Depends(get_db), _: User 
 
 
 @router.post("/sales", response_model=SaleDetail)
-def create_sale(data: SaleIn, db: Session = Depends(get_db), user: User = Seller) -> dict:
-    sale = sales_svc.create_sale(db, data, user)
+def create_sale(
+    data: SaleIn,
+    response: Response,
+    db: Session = Depends(get_db),
+    user: User = Seller,
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+) -> dict:
+    """With an `Idempotency-Key` header the same sale sent twice is registered once and the repeat returns it
+    (header `Idempotent-Replay: true`). Without the header it behaves as it always did."""
+    sale, repeated = sales_svc.create_sale_once(db, data, user, idempotency.clean_key(idempotency_key))
+    if repeated:
+        response.headers["Idempotent-Replay"] = "true"
     return sales_svc.get_detail(db, sale.id)
 
 

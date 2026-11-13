@@ -1,6 +1,6 @@
 from typing import Any
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Header, Query, Response
 from sqlalchemy.orm import Session
 
 from app.auth import Perm
@@ -21,7 +21,7 @@ from app.schemas.customers import (
     PointsIn,
 )
 from app.services import customers as svc
-from app.services import free_plan
+from app.services import free_plan, idempotency
 
 router = APIRouter(prefix="/api", tags=["customers"])
 
@@ -86,10 +86,18 @@ def customer_sales(
 
 @router.post("/customers/{customer_id}/payments", response_model=AccountMovementOut)
 def register_payment(
-    customer_id: int, data: PaymentIn, db: Session = Depends(get_db), user: User = Staff
+    customer_id: int,
+    data: PaymentIn,
+    response: Response,
+    db: Session = Depends(get_db),
+    user: User = Staff,
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
 ) -> CustomerAccountMovement:
     c = svc.get_or_404(db, customer_id)
-    return svc.register_payment(db, c, data.amount_cents, data.method, user)
+    mv, repeated = svc.register_payment_once(db, c, data.amount_cents, data.method, user, idempotency.clean_key(idempotency_key))
+    if repeated:
+        response.headers["Idempotent-Replay"] = "true"
+    return mv
 
 
 @router.post("/customers/{customer_id}/points", response_model=LoyaltyTxOut)

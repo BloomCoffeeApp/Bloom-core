@@ -2,6 +2,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { toast } from 'sonner'
 
 import { api } from '@/lib/api'
+import { idempotencyKeyFor, releaseIdempotencyKey } from '@/lib/idempotency'
 
 import type {
   AccountMovement,
@@ -88,8 +89,9 @@ export function useRegisterPayment(id: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (body: { amount_cents: number; method: string }) =>
-      api.post<AccountMovement>(`/customers/${id}/payments`, body),
+      api.post<AccountMovement>(`/customers/${id}/payments`, body, { idempotencyKey: idempotencyKeyFor(`payment-${id}`, body) }),
     onSuccess: () => {
+      releaseIdempotencyKey(`payment-${id}`)
       qc.invalidateQueries({ queryKey: customerKeys.all })
       qc.invalidateQueries({ queryKey: ['alerts'] })
       toast.success('Pago registrado')

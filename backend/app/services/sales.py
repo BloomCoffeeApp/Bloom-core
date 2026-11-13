@@ -29,7 +29,7 @@ from app.models import (
 from app.db import lock_writes
 from app.models.collect import CollectCharge
 from app.schemas.sales import PaymentMethodUpdate, SaleIn
-from app.services import audit, channel_supplies, free_plan, orders, recipes, sale_hooks, settings, stock
+from app.services import audit, channel_supplies, free_plan, idempotency, orders, recipes, sale_hooks, settings, stock
 from app.services.orders import close_tab, tab_label
 from app.services.cash import CASH, method_names, require_open_session, user_names
 from app.services.timeutil import range_bounds_utc
@@ -105,6 +105,26 @@ def create_sale(db: Session, data: SaleIn, user: User) -> Sale:
         sale = _create_sale(db, data, user)
         db.commit()
         return sale
+    except Exception:
+        db.rollback()
+        raise
+
+
+def create_sale_once(db: Session, data: SaleIn, user: User, key: str | None) -> tuple[Sale, bool]:
+    """`create_sale` that survives being sent twice: with an `Idempotency-Key` the same request creates ONE sale and
+    every repeat returns it (second value True = it was a repeat). Without a key it behaves exactly as before."""
+    if key is None:
+        return create_sale(db, data, user), False
+    h = idempotency.body_hash(data)
+    try:
+        done = idempotency.find(db, key, "sale", user, h)  # also takes the write lock: concurrent repeats queue here
+        if done is not None:
+            db.rollback()  # nothing to save
+            return db.get(Sale, done), True
+        sale = _create_sale(db, data, user)
+        idempotency.record(db, key, "sale", user, h, sale.id)  # same transaction as the sale itself
+        db.commit()
+        return sale, False
     except Exception:
         db.rollback()
         raise

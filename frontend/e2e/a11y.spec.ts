@@ -13,10 +13,10 @@ test.describe('accessibility: main screens', () => {
     })
   }
 
-  test('dark /pos and /', async ({ page }) => {
+  test('dark main screens', async ({ page }) => {
     await page.emulateMedia({ colorScheme: 'dark' })
     await page.addInitScript(() => localStorage.setItem('cafe.theme', 'dark'))
-    for (const path of ['/', '/pos']) {
+    for (const path of ['/', '/pos', '/clientes', '/productos', '/stock', '/config', '/ventas']) {
       await page.goto(path)
       await page.waitForLoadState('networkidle')
       expect(await scan(page), `dark ${path}`).toEqual([])
