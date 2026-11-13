@@ -37,7 +37,7 @@ from app.models.sales import (
     SaleItem,
     SalePayment,
 )
-from app.models.staff import Employee, StaffAdvance, TimeEntry
+from app.models.staff import Employee, StaffAdvance, TimeEntry, TipPayout, TipPayoutLine
 from app.models.stock import (
     InventoryCount,
     InventoryCountItem,

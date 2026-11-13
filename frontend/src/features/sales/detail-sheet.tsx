@@ -38,7 +38,8 @@ export function SaleDetailSheet({ id, onOpenChange }: { id: number | null; onOpe
     voidM.mutate(
       { id: s.id, reason: reason.trim() },
       {
-        onSuccess: () => {
+        onSuccess: (done) => {
+          done.warnings?.forEach((w) => toast.warning(w))
           const tab = s.table_tab ? ` La cuenta de la ${s.table_tab.table_label ?? 'mesa'} se reabrió.` : ''
           toast.success(`Ticket #${s.number} anulado. Se reintegró el stock.${tab}`)
           setReason('')

@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.auth import CurrentUser, Perm
 from app.db import get_db
 from app.licensing import current_status, free_limits
-from app.models import CashSession, PaymentMethod, User
+from app.models import CashSession, PaymentMethod, Sale, User
 from app.schemas.sales import (
     CashCloseIn,
     CashMovementIn,
@@ -162,8 +162,14 @@ def sale_detail(sale_id: int, db: Session = Depends(get_db), _: User = Seller) -
 
 @router.post("/sales/{sale_id}/void", response_model=SaleDetail)
 def void_sale(sale_id: int, data: SaleVoidIn, db: Session = Depends(get_db), user: User = Voider) -> dict:
+    sale = db.get(Sale, sale_id)
+    settled = bool(sale and sale.tip_payout_id and sale.tip_cents)  # its tip was already shared (Pro `staff`)
     sales_svc.void_sale(db, sale_id, data.reason, user)
-    return sales_svc.get_detail(db, sale_id)
+    out = sales_svc.get_detail(db, sale_id)
+    if settled:
+        out["warnings"] = ["La propina de esta venta ya estaba liquidada: la liquidación no se modifica "
+                           "(si hace falta, ajustala por afuera)."]
+    return out
 
 
 @router.get("/sales/{sale_id}/ticket", response_model=TicketOut)

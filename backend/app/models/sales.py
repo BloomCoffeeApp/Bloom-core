@@ -68,6 +68,8 @@ class Sale(IdMixin, Base):
     # waiter later never changes a sale already charged.
     table_id: Mapped[int | None] = mapped_column(ForeignKey("dining_tables.id"), index=True)
     waiter_employee_id: Mapped[int | None] = mapped_column(ForeignKey("employees.id"), index=True)
+    # Pro `staff`: the tip payout (migration 0023) that already shared this sale's tip; NULL = still pending.
+    tip_payout_id: Mapped[int | None] = mapped_column(ForeignKey("tip_payouts.id"), index=True)
     subtotal_cents: Mapped[int] = mapped_column(default=0)
     discount_cents: Mapped[int] = mapped_column(default=0)
     # Delivery charge (only `delivery` channel): added to total_cents and payments, not to discounts or points.

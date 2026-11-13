@@ -262,6 +262,7 @@ class SaleTableTab(BaseModel):
 
 
 class SaleDetail(SaleOut):
+    warnings: list[str] = []  # e.g. voiding a sale whose tip was already settled
     items: list[SaleItemOut]
     payments: list[SalePaymentOut]
     customer: CustomerMini | None

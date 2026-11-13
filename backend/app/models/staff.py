@@ -6,7 +6,7 @@ Personal data kept minimal: name, position, an optional phone and notes.
 
 import datetime as dt
 
-from sqlalchemy import Date, DateTime, ForeignKey, Index, String, Text
+from sqlalchemy import JSON, Date, DateTime, ForeignKey, Index, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, IdMixin, TimestampMixin, utcnow
@@ -56,3 +56,29 @@ class StaffAdvance(IdMixin, Base):
     note: Mapped[str | None] = mapped_column(String(200))
     user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
     created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class TipPayout(IdMixin, Base):
+    """A settled tip-sharing period (Pro `staff`): the rule and the amounts per person, frozen when it is made.
+    Its sales are marked with `sales.tip_payout_id`. Internal record: not a payslip."""
+
+    __tablename__ = "tip_payouts"
+    period_start: Mapped[dt.date] = mapped_column(Date)
+    period_end: Mapped[dt.date] = mapped_column(Date)
+    rule_snapshot: Mapped[dict] = mapped_column(JSON)
+    total_cents: Mapped[int]
+    unassigned_cents: Mapped[int] = mapped_column(default=0, server_default="0")  # nobody to give it to
+    sales_count: Mapped[int] = mapped_column(default=0, server_default="0")
+    note: Mapped[str | None] = mapped_column(String(200))
+    created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class TipPayoutLine(IdMixin, Base):
+    __tablename__ = "tip_payout_lines"
+    payout_id: Mapped[int] = mapped_column(ForeignKey("tip_payouts.id", ondelete="CASCADE"), index=True)
+    employee_id: Mapped[int] = mapped_column(ForeignKey("employees.id"))
+    direct_cents: Mapped[int]
+    pool_cents: Mapped[int]
+    total_cents: Mapped[int]
+    minutes: Mapped[int]
