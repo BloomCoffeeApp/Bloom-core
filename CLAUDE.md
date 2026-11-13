@@ -63,3 +63,8 @@ App de gestión para cafetería (POS, caja, stock, compras, clientes, alertas, r
 - Las migraciones nuevas (`backend/migrations/versions/*.py`) se agregan siempre con el cambio que las usa.
 - Nunca se commitean: `test-results/`, `playwright-report/`, bases de datos (`*.db`), builds, `.env`.
 - Un commit por repo (core y pro son repos distintos). Mensajes en inglés.
+
+## Changelog (obligatorio)
+- Todo cambio que se commitea acá también suma una entrada en `../pro/CHANGELOG.md` (registro único de core, Pro y
+  servidor; se commitea en el repo pro). Reglas y formato: `../pro/CLAUDE.md` → «Changelog» y la cabecera del archivo.
+- Si el repo Pro no está presente, anotá la entrada en el mensaje final para sumarla después.
