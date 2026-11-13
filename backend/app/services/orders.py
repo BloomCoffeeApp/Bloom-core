@@ -792,7 +792,8 @@ def list_open_tabs(db: Session) -> list[dict[str, Any]]:
             CollectCharge.ref_type == "table_tab", CollectCharge.ref_id.in_([t.id for t in tabs]),
             CollectCharge.sale_id.is_(None), CollectCharge.status.in_(("pending", "approved")))):
         a, p = prepaid.get(ch.ref_id, (0, 0))  # type: ignore[arg-type]
-        prepaid[ch.ref_id] = (a + ch.amount_cents, p) if ch.status == "approved" else (a, p + ch.amount_cents)  # type: ignore[index]
+        bill = ch.amount_cents - (ch.tip_cents or 0)  # a tip is not part of the bill the cashier still has to collect
+        prepaid[ch.ref_id] = (a + bill, p) if ch.status == "approved" else (a, p + bill)  # type: ignore[index]
     out = []
     for tab in tabs:
         lines = tab_lines(by_tab[tab.id])
