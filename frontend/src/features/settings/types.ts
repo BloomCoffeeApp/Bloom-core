@@ -2,6 +2,8 @@ import type { Permission, Role } from '@/lib/auth'
 
 export interface BusinessSettings {
   name: string
+  /** Razón social (como figura en la inscripción); aparece en el comprobante. Opcional. */
+  legal_name?: string
   cuit: string
   address: string
   phone: string

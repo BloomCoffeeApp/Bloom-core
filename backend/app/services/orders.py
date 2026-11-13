@@ -538,6 +538,16 @@ def customer_changes(o: Order, c: Customer | None) -> list[dict[str, Any]]:
             for f, lbl, old, new in pairs if new and (old or "").strip() != new.strip()]
 
 
+def _json_or_none(text: str | None) -> dict[str, Any] | None:
+    import json
+
+    try:
+        data = json.loads(text) if text else None
+    except ValueError:
+        return None
+    return data if isinstance(data, dict) else None
+
+
 def online_info(o: Order, t: datetime, customer: Customer | None = None) -> dict[str, Any]:
     """What the order screen shows (and acts on) for a take away / delivery order from the online menu."""
     return {
@@ -563,6 +573,7 @@ def online_info(o: Order, t: datetime, customer: Customer | None = None) -> dict
         "tracking_url": o.tracking_url,
         "cancel_reason": o.cancel_reason,
         "sale_registered": o.sale_id is not None,
+        "invoice_request": _json_or_none(o.invoice_request),
         "customer_changes": customer_changes(o, customer),
     }
 

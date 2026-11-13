@@ -34,6 +34,9 @@ export function BusinessSection({ initial }: { initial: BusinessSettings }) {
         <Field label="Nombre del negocio" htmlFor="biz-name">
           <Input id="biz-name" value={f.name} onChange={set('name')} placeholder="Mi Cafetería" />
         </Field>
+        <Field label="Razón social" htmlFor="biz-legal" hint="Opcional. Como figura en tu inscripción; aparece en el comprobante.">
+          <Input id="biz-legal" value={f.legal_name ?? ''} onChange={set('legal_name')} placeholder="Mi Cafetería S.R.L. / Nombre y apellido" />
+        </Field>
         <Field label="CUIT" htmlFor="biz-cuit" hint="Formato 20-12345678-9">
           <Input
             id="biz-cuit"

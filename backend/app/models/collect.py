@@ -30,6 +30,8 @@ class CollectCharge(IdMixin, Base):
     provider_id: Mapped[str | None] = mapped_column(String(80), index=True)
     status: Mapped[str] = mapped_column(String(12), default="pending")
     status_detail: Mapped[str | None] = mapped_column(String(60))
+    # The provider's payment / operation number (shown on the customer's receipt).
+    operation_id: Mapped[str | None] = mapped_column(String(40))
     amount_cents: Mapped[int]
     refunded_cents: Mapped[int] = mapped_column(default=0, server_default="0")
     description: Mapped[str] = mapped_column(String(150))

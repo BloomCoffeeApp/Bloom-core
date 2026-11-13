@@ -132,6 +132,8 @@ class Order(IdMixin, Base):
     tracking_url: Mapped[str | None] = mapped_column(String(300))
     # The status changed and the server (tracking page) hasn't been told yet.
     sync_pending: Mapped[bool] = mapped_column(default=False, server_default=false())
+    # The customer asked for an invoice from the tracking page: JSON {name, cuit, email} (migration 0019).
+    invoice_request: Mapped[str | None] = mapped_column(String(400))
     items: Mapped[list["OrderItem"]] = relationship(cascade="all, delete-orphan", order_by="OrderItem.id")
 
 

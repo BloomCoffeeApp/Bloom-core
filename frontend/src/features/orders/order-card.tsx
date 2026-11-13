@@ -119,6 +119,11 @@ function OnlineBlock({ o, actions }: { o: Order; actions: CardActions }) {
           <span className="text-muted-foreground">· vence en {Math.ceil(on.expires_in_s / 60)} min</span>
         )}
       </p>
+      {on.invoice_request && (
+        <p className="rounded-lg border border-info/60 bg-info/10 p-2 text-xs" data-testid="invoice-request">
+          <b>Pidió factura</b>: {[on.invoice_request.name, on.invoice_request.cuit && `CUIT ${on.invoice_request.cuit}`, on.invoice_request.email].filter(Boolean).join(' · ') || 'sin datos'}
+        </p>
+      )}
       {on.customer_changes.length > 0 && (
         <div className="rounded-lg border border-warning/60 bg-warning/10 p-2" data-testid="customer-changes">
           <p className="font-medium">Datos nuevos del cliente</p>

@@ -80,6 +80,7 @@ class OnlineInfo(BaseModel):
     tracking_url: str | None = None
     cancel_reason: str | None = None
     sale_registered: bool = False
+    invoice_request: dict[str, str | None] | None = None  # «Pedir factura» from the tracking page
     customer_changes: list[CustomerChange] = []
 
 

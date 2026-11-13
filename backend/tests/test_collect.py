@@ -118,6 +118,8 @@ def test_pos_qr_charge_creates_the_sale_only_when_approved(fake, db):
     assert out["status"] == "approved" and out["sale_id"]
     assert out["sale"]["total_cents"] == LATTE and out["sale"]["payments"][0]["method"] == "mp_qr"
     assert _sales_count(db) == before + 1
+    db.expire_all()
+    assert db.get(CollectCharge, ch["id"]).operation_id.startswith("FAKE-")  # the provider's number, kept for the receipt
     # Polling again (or a second poller) never creates it twice.
     collect.refresh(db, db.get(CollectCharge, ch["id"]), force=True)
     assert collect.poll_due(db) == 0

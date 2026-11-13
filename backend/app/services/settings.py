@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from app.models import Setting
 
 DEFAULTS: dict[str, Any] = {
-    "business": {"name": "Mi Cafetería", "cuit": "", "address": "", "phone": "", "ticket_footer": "¡Gracias por tu visita!"},
+    "business": {"name": "Mi Cafetería", "legal_name": "", "cuit": "", "address": "", "phone": "", "ticket_footer": "¡Gracias por tu visita!"},
     "currency": "ARS",
     "lock_minutes": 10,
     "loyalty": {"enabled": True, "pesos_per_point": 1000, "points_per_reward": 100, "reward_value_cents": 500000},

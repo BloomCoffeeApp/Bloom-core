@@ -78,6 +78,7 @@ class ProviderCharge:
     id: str
     status: str = "pending"  # normalized: pending | approved | rejected | cancelled | expired | refunded
     status_detail: str | None = None
+    operation_id: str | None = None  # the provider's payment number, known once it is paid
     qr_data: str | None = None
     url: str | None = None
     expires_at: datetime | None = None
@@ -158,7 +159,7 @@ class FakeProvider:
     def get_status(self, provider_id, kind):
         with _fake_lock:
             st = _fake_status.get(provider_id, "pending")
-        return ProviderCharge(provider_id, status=st)
+        return ProviderCharge(provider_id, status=st, operation_id=f"FAKE-{provider_id[-8:]}" if st == "approved" else None)
 
     def refund(self, provider_id, amount_cents, *, kind, idempotency_key):
         return f"fake-refund-{secrets.token_hex(4)}"
@@ -536,6 +537,8 @@ def refresh(db: Session, ch: CollectCharge, force: bool = False) -> CollectCharg
         ch.poll_failures = 0
         if pc.status_detail:
             ch.status_detail = pc.status_detail[:60]
+        if pc.operation_id:
+            ch.operation_id = str(pc.operation_id)[:40]
         if pc.status == "approved":
             _approve(db, ch)
         elif pc.status in ("rejected", "cancelled", "expired"):

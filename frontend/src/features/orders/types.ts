@@ -58,6 +58,8 @@ export interface OnlineInfo {
   tracking_url: string | null
   cancel_reason: string | null
   sale_registered: boolean
+  /** The customer asked for an invoice on the tracking page. */
+  invoice_request: { name: string | null; cuit: string | null; email: string | null } | null
   customer_changes: CustomerChange[]
 }
 export type Level = 'pending' | 'ok' | 'warn' | 'late'
