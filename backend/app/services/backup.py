@@ -7,7 +7,12 @@ from app.config import BACKUP_DIR, DB_PATH
 
 def create_backup(label: str = "manual") -> Path:
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
-    dest = BACKUP_DIR / f"cafeteria-{datetime.now():%Y%m%d-%H%M%S}-{label}.db"
+    stamp = f"{datetime.now():%Y%m%d-%H%M%S}"
+    dest = BACKUP_DIR / f"cafeteria-{stamp}-{label}.db"
+    n = 1
+    while dest.exists():  # same second + same label (e.g. two restores in a row): never overwrite a copy
+        n += 1
+        dest = BACKUP_DIR / f"cafeteria-{stamp}-{n}-{label}.db"
     src = sqlite3.connect(DB_PATH)
     try:
         dst = sqlite3.connect(dest)

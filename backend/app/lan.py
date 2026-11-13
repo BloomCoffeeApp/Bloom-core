@@ -42,7 +42,7 @@ def apply(enabled: bool) -> None:
 
                 # lifespan off: the background jobs already run in the local server
                 server = uvicorn.Server(
-                    uvicorn.Config(app, host="0.0.0.0", port=config.PORT, lifespan="off", log_level="warning", log_config=None)
+                    uvicorn.Config(app, host="0.0.0.0", port=config.PORT, lifespan="off", log_level="warning", log_config=None)  # nosec B104 - LAN mode is opt-in
                 )
                 threading.Thread(target=server.run, name="lan-server", daemon=True).start()
                 _server = server

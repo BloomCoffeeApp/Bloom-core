@@ -79,7 +79,7 @@ def db_clock_evidence() -> float:
         with closing(sqlite3.connect(f"file:{Path(DB_PATH).as_posix()}?mode=ro", uri=True, timeout=1)) as con:
             for table in ("audit_log", "sales"):
                 try:
-                    (value,) = con.execute(f"SELECT max(ts) FROM {table}").fetchone()  # noqa: S608 (fixed names)
+                    (value,) = con.execute(f"SELECT max(ts) FROM {table}").fetchone()  # noqa: S608  # nosec B608 - fixed table names
                 except sqlite3.Error:
                     continue
                 if value:

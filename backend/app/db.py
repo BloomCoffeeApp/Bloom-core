@@ -1,6 +1,6 @@
 from collections.abc import Iterator
 
-from sqlalchemy import Engine, create_engine, event
+from sqlalchemy import Engine, create_engine, event, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.config import DATABASE_URL
@@ -31,3 +31,12 @@ def get_db() -> Iterator[Session]:
         yield db
     finally:
         db.close()
+
+
+def lock_writes(db: Session) -> None:
+    """Takes SQLite's write lock NOW (waits up to the engine timeout if another request is writing).
+
+    Use it before reading a value you are about to turn into a new row (`max(number) + 1`): without it two
+    requests read the same maximum and the second one fails on the unique constraint. The statement matches no
+    row, but any write statement starts the write transaction, which lasts until commit/rollback."""
+    db.execute(text("UPDATE settings SET value = value WHERE 0"))

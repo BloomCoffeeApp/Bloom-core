@@ -112,7 +112,7 @@ function SalesPage() {
           </div>
         )}
         <Select value={status} onValueChange={reset(setStatus)}>
-          <SelectTrigger className="h-10 w-40">
+          <SelectTrigger className="h-10 w-40" aria-label="Filtrar por estado">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -123,7 +123,7 @@ function SalesPage() {
           </SelectContent>
         </Select>
         <Select value={method} onValueChange={reset(setMethod)}>
-          <SelectTrigger className="h-10 w-44">
+          <SelectTrigger className="h-10 w-44" aria-label="Filtrar por medio de pago">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

@@ -271,7 +271,7 @@ export function StockPage() {
         toolbar={
           <div className="flex flex-wrap items-center gap-2">
             <Select value={category} onValueChange={setCategory}>
-              <SelectTrigger className="h-9 min-w-44">
+              <SelectTrigger className="h-9 min-w-44" aria-label="Filtrar por categoría">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

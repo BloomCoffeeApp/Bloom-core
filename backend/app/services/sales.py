@@ -26,6 +26,7 @@ from app.models import (
     User,
     utcnow,
 )
+from app.db import lock_writes
 from app.models.collect import CollectCharge
 from app.schemas.sales import PaymentMethodUpdate, SaleIn
 from app.services import audit, channel_supplies, free_plan, orders, recipes, sale_hooks, settings, stock
@@ -95,6 +96,7 @@ def update_payment_method(db: Session, method_id: int, data: PaymentMethodUpdate
 
 
 def next_number(db: Session) -> int:
+    lock_writes(db)  # concurrent cashiers (till + tablet on the LAN) must not read the same max and collide
     return int(db.scalar(select(func.max(Sale.number))) or 0) + 1
 
 

@@ -19,6 +19,7 @@ from fastapi import HTTPException
 from sqlalchemy import Integer, case, cast, func, select
 from sqlalchemy.orm import Session, selectinload
 
+from app.db import lock_writes
 from app.licensing import has_feature
 from app.models import (
     CollectCharge,
@@ -163,6 +164,7 @@ def route_stations(db: Session, order: Order) -> list[Order]:
 
 
 def next_number(db: Session) -> int:
+    lock_writes(db)  # same race as sale numbers (and orders have no unique constraint: duplicates were silent)
     a, b = day_bounds_utc(local_today_at(now()))
     return int(db.scalar(select(func.max(Order.number)).where(Order.created_at >= a, Order.created_at < b)) or 0) + 1
 

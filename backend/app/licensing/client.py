@@ -37,7 +37,10 @@ def server_url() -> str | None:
     if demo.is_enabled():  # the online demo never talks to the license server
         return None
     url = os.environ.get("BLOOM_LICENSE_SERVER") or BRAND.get("licenseServer")
-    return url.rstrip("/") if url else None
+    # Only http(s): urlopen would also follow file:// or ftp:// if a bad value got into brand.json/env.
+    if not url or not url.lower().startswith(("http://", "https://")):
+        return None
+    return url.rstrip("/")
 
 
 def _post(path: str, body: dict) -> dict:
@@ -59,7 +62,7 @@ def _send(method: str, path: str, body: dict) -> dict:
         method=method,
     )
     try:
-        with urllib.request.urlopen(req, timeout=TIMEOUT_S) as r:
+        with urllib.request.urlopen(req, timeout=TIMEOUT_S) as r:  # nosec B310 - scheme checked in server_url()
             return json.loads(r.read())
     except urllib.error.HTTPError as e:
         try:
@@ -78,7 +81,7 @@ def _get(path: str, query: dict | None = None) -> dict:
     qs = f"?{urllib.parse.urlencode(query)}" if query else ""
     req = urllib.request.Request(f"{url}{path}{qs}", headers={"User-Agent": f"{BRAND.get('appId')}/{APP_VERSION}"})
     try:
-        with urllib.request.urlopen(req, timeout=TIMEOUT_S) as r:
+        with urllib.request.urlopen(req, timeout=TIMEOUT_S) as r:  # nosec B310 - scheme checked in server_url()
             return json.loads(r.read())
     except urllib.error.HTTPError as e:
         try:
