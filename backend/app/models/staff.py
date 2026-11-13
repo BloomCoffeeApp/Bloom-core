@@ -27,6 +27,8 @@ class Employee(IdMixin, TimestampMixin, Base):
     notes: Mapped[str | None] = mapped_column(Text)
     color: Mapped[str] = mapped_column(String(20), default="amber")
     active: Mapped[bool] = mapped_column(default=True)
+    # Tip pool group ("salon", "barra", "cocina"; the shop defines them). NULL = not in the group pool.
+    tip_group: Mapped[str | None] = mapped_column(String(20))
 
 
 class TimeEntry(IdMixin, TimestampMixin, Base):

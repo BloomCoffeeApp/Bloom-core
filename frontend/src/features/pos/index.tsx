@@ -186,7 +186,7 @@ function PosPage() {
 
   const listTotal = useMemo(() => cartApi.cart.lines.reduce((a, l) => a + l.unit_cents * l.qty, 0), [cartApi.cart.lines])
 
-  const confirm: CheckoutConfirm = (payments, courtesy, tipCents = 0) => {
+  const confirm: CheckoutConfirm = (payments, courtesy, tipCents = 0, waiterId = null) => {
     setTip(tipCents)
     const { cart } = cartApi
     const body: SaleIn = {
@@ -211,6 +211,7 @@ function PosPage() {
       courtesy_reason: courtesy?.reason || null,
       tab_id: cart.tab?.id ?? null,
       tip_cents: courtesy ? 0 : tipCents,
+      waiter_employee_id: cart.tab ? waiterId : null,
       reward_program_id: courtesy ? null : (cart.reward?.program_id ?? null),
     }
     // QR / Point / transfer shown to the customer (Pro `payments`): the sale is registered on approval.
@@ -290,6 +291,7 @@ function PosPage() {
         total={payTotal}
         prepaid={prepaid}
         tips={config.data?.tips}
+        tabId={cartApi.cart.tab?.id ?? null}
         listTotal={listTotal}
         methods={methods ?? []}
         customer={cartApi.cart.customer}

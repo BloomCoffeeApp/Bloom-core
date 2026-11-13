@@ -36,11 +36,25 @@ class OrderStation(IdMixin, TimestampMixin, Base):
     print_tickets: Mapped[bool] = mapped_column(default=False)
 
 
+class FloorZone(IdMixin, TimestampMixin, Base):
+    """Pro (`public_menu`): a floor area ("Salon", "Terraza") that groups tables. Its waiter (an Employee, not a
+    login user) is the default for the tables that have none of their own (migration 0022)."""
+
+    __tablename__ = "floor_zones"
+    name: Mapped[str] = mapped_column(String(40))
+    sort_order: Mapped[int] = mapped_column(default=0)
+    active: Mapped[bool] = mapped_column(default=True)
+    waiter_employee_id: Mapped[int | None] = mapped_column(ForeignKey("employees.id"))
+
+
 class DiningTable(IdMixin, TimestampMixin, Base):
     __tablename__ = "dining_tables"
     label: Mapped[str] = mapped_column(String(20))
     sort_order: Mapped[int] = mapped_column(default=0)
     active: Mapped[bool] = mapped_column(default=True)
+    zone_id: Mapped[int | None] = mapped_column(ForeignKey("floor_zones.id"))
+    # Own waiter of the table (overrides the zone's). Effective waiter: tab -> table -> zone (services/orders.py).
+    waiter_employee_id: Mapped[int | None] = mapped_column(ForeignKey("employees.id"))
     # Secret printed in the table's QR (rotatable): without it nobody can order for this table.
     token: Mapped[str] = mapped_column(String(32), unique=True)
 
@@ -61,6 +75,8 @@ class TableTab(IdMixin, Base):
     # (an empty account nobody touches for a while is released by itself).
     join_code: Mapped[str | None] = mapped_column(String(4))
     last_activity_at: Mapped[datetime | None] = mapped_column(DateTime)
+    # Waiter serving this account (copied from the table/zone when it opens; reassignable while it is open).
+    waiter_employee_id: Mapped[int | None] = mapped_column(ForeignKey("employees.id"))
 
 
 class TableDiner(IdMixin, Base):

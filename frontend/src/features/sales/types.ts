@@ -64,6 +64,10 @@ export interface Sale {
   courtesy_reason: string | null
   channel: Channel
   table_label: string | null
+  /** Snapshot taken when a table account was charged. */
+  table_id?: number | null
+  waiter_employee_id?: number | null
+  waiter_name?: string | null
   cash_session_id: number | null
   user_id: number | null
   user_name: string | null
@@ -157,6 +161,8 @@ export interface SaleIn {
   tab_id?: number | null
   /** Optional tip on top of the total (the payments cover total + tip). */
   tip_cents?: number
+  /** Table sales: the waiter who served it (employee id); omitted = the table's own waiter. */
+  waiter_employee_id?: number | null
   /** Pro loyalty: stamp-card reward that discounts the sale. */
   reward_program_id?: number | null
 }

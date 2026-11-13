@@ -685,12 +685,38 @@ def resolve_call(db: Session, call_id: int, user: User) -> None:
 # ---------------------------------------------------------------- open tabs ("mesa abierta")
 
 
+def effective_waiter(db: Session, table_id: int | None, tab_id: int | None = None) -> int | None:
+    """Employee serving a table: the open tab's waiter, else the table's own, else its zone's (None if nobody).
+    The first assignment found wins; if that employee is no longer active the result is None (the sale never
+    gets a waiter who left, and it doesn't fall through to the zone's)."""
+    from app.models import Employee, FloorZone
+
+    tab = db.get(TableTab, tab_id) if tab_id is not None else None
+    if table_id is None and tab is not None:
+        table_id = tab.table_id
+    table = db.get(DiningTable, table_id) if table_id is not None else None
+    candidates = [
+        tab.waiter_employee_id if tab else None,
+        table.waiter_employee_id if table else None,
+    ]
+    if table is not None and table.zone_id is not None:
+        zone = db.get(FloorZone, table.zone_id)
+        candidates.append(zone.waiter_employee_id if zone else None)
+    for emp_id in candidates:
+        if emp_id is None:
+            continue
+        emp = db.get(Employee, emp_id)
+        return emp.id if emp is not None and emp.active else None
+    return None
+
+
 def open_tab(db: Session, table_id: int) -> TableTab:
     tab = db.scalar(select(TableTab).where(TableTab.table_id == table_id, TableTab.status == "open"))
     if tab is None:
         tab = TableTab(table_id=table_id, status="open", opened_at=now())
         db.add(tab)
         db.flush()
+        tab.waiter_employee_id = effective_waiter(db, table_id)  # the account starts with the table's waiter
     return tab
 
 

@@ -64,6 +64,10 @@ class Sale(IdMixin, Base):
     customer_id: Mapped[int | None] = mapped_column(ForeignKey("customers.id"), index=True)
     channel: Mapped[str] = mapped_column(String(10), default="salon")
     table_label: Mapped[str | None] = mapped_column(String(20))
+    # Snapshot at charge time (migration 0022): the table and the waiter who served it. Reassigning the table's
+    # waiter later never changes a sale already charged.
+    table_id: Mapped[int | None] = mapped_column(ForeignKey("dining_tables.id"), index=True)
+    waiter_employee_id: Mapped[int | None] = mapped_column(ForeignKey("employees.id"), index=True)
     subtotal_cents: Mapped[int] = mapped_column(default=0)
     discount_cents: Mapped[int] = mapped_column(default=0)
     # Delivery charge (only `delivery` channel): added to total_cents and payments, not to discounts or points.

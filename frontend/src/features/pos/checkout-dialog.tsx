@@ -12,7 +12,7 @@ import {
   Wallet,
   type LucideIcon,
 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 
 import { MoneyInput } from '@/components/money-input'
 import { Button } from '@/components/ui/button'
@@ -20,6 +20,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { fmtMoney } from '@/lib/format'
+import { proModules } from '@pro'
 import { cn } from '@/lib/utils'
 
 import type { PaymentIn, PaymentMethod } from '../sales/types'
@@ -43,7 +44,7 @@ export interface CourtesyIn {
   reason: string
 }
 
-export type CheckoutConfirm = (payments: PaymentIn[], courtesy: CourtesyIn | null, tipCents?: number) => void
+export type CheckoutConfirm = (payments: PaymentIn[], courtesy: CourtesyIn | null, tipCents?: number, waiterId?: number | null) => void
 
 /** Configuración → Propinas: optional tip the customer may add on top (never mandatory). */
 export interface TipsConfig {
@@ -140,6 +141,7 @@ function CheckoutBody({
   total: baseTotal,
   prepaid,
   tips,
+  tabId,
   methods,
   customer,
   submitting,
@@ -148,12 +150,14 @@ function CheckoutBody({
   total: number
   prepaid: number
   tips?: TipsConfig
+  tabId?: number | null
   methods: PaymentMethod[]
   customer: PosCustomer | null
   submitting: boolean
   onConfirm: CheckoutConfirm
 }) {
   const [tip, setTip] = useState(0)
+  const [waiterId, setWaiterId] = useState<number | null>(null) // null = the table's own waiter (the server resolves it)
   const total = baseTotal + tip // what the customer hands over: the sale plus the optional tip
   const [split, setSplit] = useState(false)
   const [rows, setRows] = useState<PayRow[]>(() => (baseTotal > 0 ? [{ method: 'efectivo', amount: baseTotal, tendered: null }] : []))
@@ -212,6 +216,7 @@ function CheckoutBody({
         })),
       null,
       tip,
+      waiterId,
     )
   }
 
@@ -275,6 +280,11 @@ function CheckoutBody({
 
       <div className="flex flex-col gap-4">
         <div className="space-y-2">
+          {tabId != null && proModules.CheckoutWaiter && (
+            <Suspense fallback={null}>
+              <proModules.CheckoutWaiter tabId={tabId} value={waiterId} onChange={setWaiterId} />
+            </Suspense>
+          )}
           {tips?.enabled && baseTotal > 0 && (
             <div className="space-y-2 rounded-2xl border bg-card p-3" data-testid="tip-picker">
               <p className="text-sm font-medium">Propina (opcional)</p>
@@ -398,6 +408,7 @@ function CheckoutContent({
   total,
   prepaid,
   tips,
+  tabId,
   listTotal,
   methods,
   customer,
@@ -407,6 +418,7 @@ function CheckoutContent({
   total: number
   prepaid: number
   tips?: TipsConfig
+  tabId?: number | null
   listTotal: number
   methods: PaymentMethod[]
   customer: PosCustomer | null
@@ -431,6 +443,7 @@ function CheckoutContent({
           total={total}
           prepaid={prepaid}
           tips={tips}
+          tabId={tabId}
           methods={methods}
           customer={customer}
           submitting={submitting}
@@ -447,6 +460,7 @@ export function CheckoutDialog({
   total,
   prepaid = 0,
   tips,
+  tabId,
   listTotal,
   methods,
   customer,
@@ -459,6 +473,8 @@ export function CheckoutDialog({
   /** Already paid from the table's phones: `total` is what is left to collect. */
   prepaid?: number
   tips?: TipsConfig
+  /** Open table account being charged (Pro shows the waiter picker for it). */
+  tabId?: number | null
   /** Menu value of the cart (no discounts/points): what a courtesy gives away. */
   listTotal: number
   methods: PaymentMethod[]
@@ -475,6 +491,7 @@ export function CheckoutDialog({
             total={total}
             prepaid={prepaid}
             tips={tips}
+            tabId={tabId}
             listTotal={listTotal}
             methods={methods}
             customer={customer}

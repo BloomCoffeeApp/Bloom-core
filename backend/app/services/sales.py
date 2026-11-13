@@ -293,6 +293,19 @@ def _create_sale(db: Session, data: SaleIn, user: User) -> Sale:
             available = max(customer.credit_limit_cents - customer.balance_cents, 0)
             raise HTTPException(400, f"Supera el límite de cuenta corriente (disponible ${available / 100:,.2f})")
 
+    # --- Waiter snapshot (table sales): who served the table at charge time ---
+    waiter_id = None
+    if tab is not None:
+        if data.waiter_employee_id is not None:
+            from app.models import Employee
+
+            emp = db.get(Employee, data.waiter_employee_id)
+            if emp is None or not emp.active:
+                raise HTTPException(422, "El mozo elegido no existe o está dado de baja")
+            waiter_id = emp.id
+        else:
+            waiter_id = orders.effective_waiter(db, tab.table_id, tab.id)
+
     # --- Persist ---
     points_earned = points_for(total - fee, cfg) if customer and not courtesy else 0
     sale = Sale(
@@ -302,6 +315,8 @@ def _create_sale(db: Session, data: SaleIn, user: User) -> Sale:
         customer_id=customer.id if customer else None,
         channel=data.channel,
         table_label=(data.table_label or "").strip() or None,
+        table_id=tab.table_id if tab is not None else None,
+        waiter_employee_id=waiter_id,
         subtotal_cents=subtotal,
         discount_cents=discount + points_disc + reward_disc,
         delivery_fee_cents=fee,
@@ -555,7 +570,16 @@ def _points_disc(sale: Sale, cfg: dict[str, Any]) -> int:
     return min(points_discount_cents(sale.points_redeemed, cfg), sale.discount_cents)
 
 
-def serialize(sale: Sale, unames: dict[int, str], cnames: dict[int, str], cfg: dict[str, Any]) -> dict[str, Any]:
+def waiter_names(db: Session, ids: set[int | None]) -> dict[int, str]:
+    from app.models import Employee
+
+    ids = {i for i in ids if i}
+    return {i: n for i, n in db.execute(select(Employee.id, Employee.name).where(Employee.id.in_(ids)))} if ids else {}
+
+
+def serialize(sale: Sale, unames: dict[int, str], cnames: dict[int, str], cfg: dict[str, Any],
+              wnames: dict[int, str] | None = None) -> dict[str, Any]:
+    wnames = wnames or {}
     return {
         "id": sale.id,
         "number": sale.number,
@@ -566,6 +590,9 @@ def serialize(sale: Sale, unames: dict[int, str], cnames: dict[int, str], cfg: d
         "courtesy_reason": sale.courtesy_reason,
         "channel": sale.channel,
         "table_label": sale.table_label,
+        "table_id": sale.table_id,
+        "waiter_employee_id": sale.waiter_employee_id,
+        "waiter_name": wnames.get(sale.waiter_employee_id) if sale.waiter_employee_id else None,
         "cash_session_id": sale.cash_session_id,
         "user_id": sale.user_id,
         "user_name": unames.get(sale.user_id) if sale.user_id else None,
@@ -598,7 +625,7 @@ def get_detail(db: Session, sale_id: int) -> dict[str, Any]:
     unames = user_names(db, {sale.user_id, sale.voided_by})
     customer = db.get(Customer, sale.customer_id) if sale.customer_id else None
     cnames = {customer.id: customer.name} if customer else {}
-    out = serialize(sale, unames, cnames, loyalty_cfg(db))
+    out = serialize(sale, unames, cnames, loyalty_cfg(db), waiter_names(db, {sale.waiter_employee_id}))
     out["items"] = sale.items
     out["payments"] = sale.payments
     out["change_cents"] = sum(p.change_cents for p in sale.payments)
@@ -659,8 +686,9 @@ def list_sales(
     cids = {s.customer_id for s in sales if s.customer_id}
     cnames = {i: n for i, n in db.execute(select(Customer.id, Customer.name).where(Customer.id.in_(cids)))} if cids else {}
     cfg = loyalty_cfg(db)
+    wnames = waiter_names(db, {s.waiter_employee_id for s in sales})
     return {
-        "items": [serialize(s, unames, cnames, cfg) for s in sales],
+        "items": [serialize(s, unames, cnames, cfg, wnames) for s in sales],
         "total": total,
         "page": page,
         "page_size": page_size,

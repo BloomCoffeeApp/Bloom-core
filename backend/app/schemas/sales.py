@@ -158,6 +158,8 @@ class SaleIn(BaseModel):
     courtesy_reason: str | None = Field(default=None, max_length=200)
     # Charging a table's open tab ("mesa abierta"): the tab closes with this sale.
     tab_id: int | None = None
+    # Waiter who served the table (Employee id). Omitted: the table's effective waiter (tab, table or zone).
+    waiter_employee_id: int | None = None
     # Pro `loyalty_pro`: redeem a stamp card whose reward is a discount on this sale.
     reward_program_id: int | None = None
 
@@ -227,6 +229,9 @@ class SaleOut(BaseModel):
     courtesy_reason: str | None = None
     channel: str
     table_label: str | None
+    table_id: int | None = None
+    waiter_employee_id: int | None = None
+    waiter_name: str | None = None
     cash_session_id: int | None
     user_id: int | None
     user_name: str | None

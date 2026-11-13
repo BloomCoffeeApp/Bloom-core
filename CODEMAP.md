@@ -33,7 +33,7 @@ Patrón: `routers/<x>.py` valida → `services/<x>.py` lógica → `models/<x>.p
 | Caja: apertura, movimientos, arqueo/cierre Z | `cash.py` | |
 | Stock: único punto de cambio | `stock.py` → `apply_movement` | **nunca** tocar `current_qty` directo |
 | Stock: ítems, kardex, mermas, conteos, sugerencias, paquetes | `stock_ops.py` (629) | descarte rápido con motivos: front `features/stock/discard.tsx` |
-| Pedidos (pantalla barra/cocina, mesas, cuentas abiertas) | `orders.py` (890) | entrada única `orders.transition(...)` |
+| Pedidos (pantalla barra/cocina, mesas, cuentas abiertas) | `orders.py` (890) | entrada única `orders.transition(...)`; `effective_waiter` (cuenta → mesa → zona) |
 | Máquina de estados por canal (Strategy) | `order_flows.py` | `FLOWS`: caja, mesa, take_away, delivery; API `GET /api/orders/flows` |
 | Cobros (QR, Point, links, transferencias, devoluciones) | `collect.py` (922) | protocolo `CollectProvider`; FakeProvider con `BLOOM_COLLECT_FAKE` |
 | Credenciales cifradas (DPAPI) | `secret_store.py` | |
