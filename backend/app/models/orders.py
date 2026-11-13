@@ -55,6 +55,13 @@ class DiningTable(IdMixin, TimestampMixin, Base):
     zone_id: Mapped[int | None] = mapped_column(ForeignKey("floor_zones.id"))
     # Own waiter of the table (overrides the zone's). Effective waiter: tab -> table -> zone (services/orders.py).
     waiter_employee_id: Mapped[int | None] = mapped_column(ForeignKey("employees.id"))
+    # Floor map (migration 0024): position and size in grid cells; pos NULL = not placed on the map yet.
+    pos_x: Mapped[int | None]
+    pos_y: Mapped[int | None]
+    width: Mapped[int] = mapped_column(default=4, server_default="4")
+    height: Mapped[int] = mapped_column(default=4, server_default="4")
+    shape: Mapped[str] = mapped_column(String(8), default="square", server_default="square")  # square|round|rect
+    seats: Mapped[int] = mapped_column(default=4, server_default="4")
     # Secret printed in the table's QR (rotatable): without it nobody can order for this table.
     token: Mapped[str] = mapped_column(String(32), unique=True)
 
