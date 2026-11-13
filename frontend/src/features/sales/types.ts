@@ -71,6 +71,8 @@ export interface Sale {
   customer_name: string | null
   subtotal_cents: number
   delivery_fee_cents: number
+  /** Optional tip paid on top of the total (not part of `total_cents`). */
+  tip_cents: number
   discount_cents: number
   points_discount_cents: number
   total_cents: number
@@ -153,6 +155,8 @@ export interface SaleIn {
   courtesy_reason?: string | null
   /** Charging a table's open tab: it closes with this sale. */
   tab_id?: number | null
+  /** Optional tip on top of the total (the payments cover total + tip). */
+  tip_cents?: number
   /** Pro loyalty: stamp-card reward that discounts the sale. */
   reward_program_id?: number | null
 }

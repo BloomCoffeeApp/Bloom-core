@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils'
 import { useAudit, useSaveSetting } from './api'
 import { Field, NumberInput, SettingsCard, SwitchRow } from './form'
 import { validNumbers } from './validation'
-import type { AlertsSettings, AuditRow, BusinessSettings, LoyaltySettings } from './types'
+import type { AlertsSettings, AuditRow, BusinessSettings, LoyaltySettings, TipsSettings } from './types'
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
 
@@ -56,6 +56,39 @@ export function BusinessSection({ initial }: { initial: BusinessSettings }) {
       <Field label="Pie de ticket" htmlFor="biz-footer" hint="Un mensaje corto al final de cada ticket.">
         <Textarea id="biz-footer" value={f.ticket_footer} onChange={set('ticket_footer')} rows={2} maxLength={200} />
       </Field>
+    </SettingsCard>
+  )
+}
+
+/** Configuración → Negocio → Propinas: an optional tip the customer may add when paying (POS and, in Pro, from the table). */
+export function TipsSection({ initial }: { initial: TipsSettings }) {
+  const [f, setF] = useState(initial)
+  const [text, setText] = useState(initial.percents.join(', '))
+  const save = useSaveSetting('tips', 'Propinas guardadas')
+  const percents = text
+    .split(/[,;\s]+/)
+    .map((x) => Number(x))
+    .filter((n) => Number.isFinite(n) && n > 0 && n <= 100)
+    .slice(0, 5)
+  const next = { ...f, percents: percents.length ? percents : [10, 15, 20] }
+  return (
+    <SettingsCard
+      title="Propinas"
+      description="Una propina opcional que el cliente puede sumar al pagar (en la caja y, si lo activás, desde el celular de la mesa). Nunca es obligatoria, va aparte del total de la venta y se muestra en el ticket y en el comprobante."
+      onSave={() => save.mutate(next)}
+      saving={save.isPending}
+      dirty={!same(next, initial)}
+    >
+      <SwitchRow
+        title="Ofrecer propina"
+        description="Apagado, no se muestra la opción en ningún lado."
+        control={<Switch checked={f.enabled} onCheckedChange={(enabled) => setF({ ...f, enabled })} aria-label="Ofrecer propina" />}
+      />
+      {f.enabled && (
+        <Field label="Porcentajes sugeridos" htmlFor="tips-percents" hint="Hasta 5, separados por coma. Además el cliente puede poner otro monto.">
+          <Input id="tips-percents" value={text} onChange={(e) => setText(e.target.value)} placeholder="10, 15, 20" />
+        </Field>
+      )}
     </SettingsCard>
   )
 }

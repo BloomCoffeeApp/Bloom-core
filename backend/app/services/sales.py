@@ -239,6 +239,14 @@ def _create_sale(db: Session, data: SaleIn, user: User) -> Sale:
             raise HTTPException(400, "Una cortesía no lleva costo de envío")
     total += fee
 
+    # --- Optional tip (on top of the total; not a sale amount) ---
+    tip = data.tip_cents
+    if tip:
+        if courtesy:
+            raise HTTPException(400, "Una cortesía no lleva propina")
+        if not (settings.get(db, "tips") or {}).get("enabled"):
+            raise HTTPException(400, "La propina no está activada en Configuración → Propinas")
+
     # --- Payments ---
     active_methods = set(db.scalars(select(PaymentMethod.code).where(PaymentMethod.active.is_(True))))
     payments: list[SalePayment] = []
@@ -265,16 +273,18 @@ def _create_sale(db: Session, data: SaleIn, user: User) -> Sale:
     # A table that already paid part (or all) of its bill from the phones (Mercado Pago): those payments count.
     prepaid_charges = table_prepaid_charges(db, tab) if tab is not None else []
     prepaid = sum(c.amount_cents for c in prepaid_charges)
+    prepaid_tip = sum(c.tip_cents or 0 for c in prepaid_charges)  # tips the phones already paid
+    sale_tip = tip + prepaid_tip
     if prepaid:
         method = next((m for m in ("mp_qr", "qr") if m in active_methods), None)
         if method is None:
             raise HTTPException(400, "Falta un medio de pago «QR Mercado Pago» activo para registrar lo que se pagó desde la mesa")
-        if prepaid > total:
+        if prepaid - prepaid_tip > total:
             raise HTTPException(409, "Lo pagado desde la mesa supera el total de la cuenta: revisalo antes de cobrar")
         payments.append(SalePayment(method=method, amount_cents=prepaid, tendered_cents=None, change_cents=0))
         paid += prepaid
-    if paid != total:
-        raise HTTPException(400, f"Los pagos ({paid / 100:.2f}) no coinciden con el total ({total / 100:.2f})")
+    if paid != total + sale_tip:
+        raise HTTPException(400, f"Los pagos ({paid / 100:.2f}) no coinciden con el total ({(total + sale_tip) / 100:.2f})")
     if cc_amount:
         if customer is None:
             raise HTTPException(400, "Para cobrar a cuenta corriente elegí un cliente")
@@ -295,6 +305,7 @@ def _create_sale(db: Session, data: SaleIn, user: User) -> Sale:
         subtotal_cents=subtotal,
         discount_cents=discount + points_disc + reward_disc,
         delivery_fee_cents=fee,
+        tip_cents=sale_tip,
         total_cents=total,
         reward_program_id=data.reward_program_id,
         reward_discount_cents=reward_disc,
@@ -563,6 +574,7 @@ def serialize(sale: Sale, unames: dict[int, str], cnames: dict[int, str], cfg: d
         "subtotal_cents": sale.subtotal_cents,
         "discount_cents": sale.discount_cents,
         "delivery_fee_cents": sale.delivery_fee_cents or 0,
+        "tip_cents": sale.tip_cents or 0,
         "points_discount_cents": _points_disc(sale, cfg),
         "total_cents": sale.total_cents,
         "cost_cents": sale.cost_cents,

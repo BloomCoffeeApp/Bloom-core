@@ -32,6 +32,8 @@ class CollectCharge(IdMixin, Base):
     status_detail: Mapped[str | None] = mapped_column(String(60))
     # The provider's payment / operation number (shown on the customer's receipt).
     operation_id: Mapped[str | None] = mapped_column(String(40))
+    # Part of amount_cents that is a tip (table payments from the phones).
+    tip_cents: Mapped[int] = mapped_column(default=0, server_default="0")
     # Paid from a table's phone (Pro): which diner (the payment and its receipt belong to that phone only).
     diner_id: Mapped[int | None] = mapped_column(ForeignKey("table_diners.id"), index=True)
     amount_cents: Mapped[int]

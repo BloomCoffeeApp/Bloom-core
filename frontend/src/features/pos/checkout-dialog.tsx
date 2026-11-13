@@ -43,7 +43,13 @@ export interface CourtesyIn {
   reason: string
 }
 
-export type CheckoutConfirm = (payments: PaymentIn[], courtesy: CourtesyIn | null) => void
+export type CheckoutConfirm = (payments: PaymentIn[], courtesy: CourtesyIn | null, tipCents?: number) => void
+
+/** Configuración → Propinas: optional tip the customer may add on top (never mandatory). */
+export interface TipsConfig {
+  enabled: boolean
+  percents: number[]
+}
 
 function CourtesyToggle({ on, onChange }: { on: boolean; onChange: (on: boolean) => void }) {
   return (
@@ -131,8 +137,9 @@ interface PayRow {
 }
 
 function CheckoutBody({
-  total,
+  total: baseTotal,
   prepaid,
+  tips,
   methods,
   customer,
   submitting,
@@ -140,13 +147,23 @@ function CheckoutBody({
 }: {
   total: number
   prepaid: number
+  tips?: TipsConfig
   methods: PaymentMethod[]
   customer: PosCustomer | null
   submitting: boolean
   onConfirm: CheckoutConfirm
 }) {
+  const [tip, setTip] = useState(0)
+  const total = baseTotal + tip // what the customer hands over: the sale plus the optional tip
   const [split, setSplit] = useState(false)
-  const [rows, setRows] = useState<PayRow[]>(() => (total > 0 ? [{ method: 'efectivo', amount: total, tendered: null }] : []))
+  const [rows, setRows] = useState<PayRow[]>(() => (baseTotal > 0 ? [{ method: 'efectivo', amount: baseTotal, tendered: null }] : []))
+  const changeTip = (t: number) => {
+    setTip(t)
+    setSplit(false)
+    setRows((r) => (baseTotal + t > 0 ? [{ method: r[0]?.method ?? 'efectivo', amount: baseTotal + t, tendered: null }] : []))
+    setActive(0)
+  }
+  const [customTip, setCustomTip] = useState(false)
   const [active, setActive] = useState(0)
 
   const paid = rows.reduce((a, r) => a + (r.amount || 0), 0)
@@ -194,6 +211,7 @@ function CheckoutBody({
           tendered_cents: r.method === 'efectivo' && r.tendered != null ? r.tendered : null,
         })),
       null,
+      tip,
     )
   }
 
@@ -257,6 +275,29 @@ function CheckoutBody({
 
       <div className="flex flex-col gap-4">
         <div className="space-y-2">
+          {tips?.enabled && baseTotal > 0 && (
+            <div className="space-y-2 rounded-2xl border bg-card p-3" data-testid="tip-picker">
+              <p className="text-sm font-medium">Propina (opcional)</p>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" variant={tip === 0 && !customTip ? 'default' : 'outline'} className="h-11" onClick={() => { setCustomTip(false); changeTip(0) }}>
+                  Sin propina
+                </Button>
+                {tips.percents.map((p) => {
+                  const amount = Math.round((baseTotal * p) / 10000) * 100
+                  return (
+                    <Button key={p} type="button" variant={tip === amount && !customTip ? 'default' : 'outline'} className="h-11" onClick={() => { setCustomTip(false); changeTip(amount) }}>
+                      {p} % · {fmtMoney(amount)}
+                    </Button>
+                  )
+                })}
+                <Button type="button" variant={customTip ? 'default' : 'outline'} className="h-11" onClick={() => setCustomTip(true)}>
+                  Otro monto
+                </Button>
+              </div>
+              {customTip && <MoneyInput value={tip} onChange={(c) => changeTip(c ?? 0)} aria-label="Monto de la propina" />}
+              {tip > 0 && <p className="text-xs text-muted-foreground">La propina va aparte del total de la venta: {fmtMoney(tip)}.</p>}
+            </div>
+          )}
           {rows.length === 0 && total > 0 && <p className="text-sm text-muted-foreground">Elegí un medio de pago.</p>}
           {total === 0 && (
             <p className="rounded-xl bg-success/15 p-3 text-sm">
@@ -356,6 +397,7 @@ function CheckoutBody({
 function CheckoutContent({
   total,
   prepaid,
+  tips,
   listTotal,
   methods,
   customer,
@@ -364,6 +406,7 @@ function CheckoutContent({
 }: {
   total: number
   prepaid: number
+  tips?: TipsConfig
   listTotal: number
   methods: PaymentMethod[]
   customer: PosCustomer | null
@@ -387,6 +430,7 @@ function CheckoutContent({
           key={total}
           total={total}
           prepaid={prepaid}
+          tips={tips}
           methods={methods}
           customer={customer}
           submitting={submitting}
@@ -402,6 +446,7 @@ export function CheckoutDialog({
   onOpenChange,
   total,
   prepaid = 0,
+  tips,
   listTotal,
   methods,
   customer,
@@ -413,6 +458,7 @@ export function CheckoutDialog({
   total: number
   /** Already paid from the table's phones: `total` is what is left to collect. */
   prepaid?: number
+  tips?: TipsConfig
   /** Menu value of the cart (no discounts/points): what a courtesy gives away. */
   listTotal: number
   methods: PaymentMethod[]
@@ -428,6 +474,7 @@ export function CheckoutDialog({
           <CheckoutContent
             total={total}
             prepaid={prepaid}
+            tips={tips}
             listTotal={listTotal}
             methods={methods}
             customer={customer}

@@ -91,6 +91,7 @@ function PosPage() {
   const [done, setDone] = useState<SaleDetail | null>(null)
   const [openCash, setOpenCash] = useState(false)
   const [tabsOpen, setTabsOpen] = useState(false)
+  const [tip, setTip] = useState(0) // optional tip of the checkout in progress (QR/Point charge include it)
   const [collectReq, setCollectReq] = useState<{ sale: SaleIn; method: CollectMethod } | null>(null)
   const collect = useCollectStatus()
   const tabs = useOpenTabs()
@@ -185,7 +186,8 @@ function PosPage() {
 
   const listTotal = useMemo(() => cartApi.cart.lines.reduce((a, l) => a + l.unit_cents * l.qty, 0), [cartApi.cart.lines])
 
-  const confirm: CheckoutConfirm = (payments, courtesy) => {
+  const confirm: CheckoutConfirm = (payments, courtesy, tipCents = 0) => {
+    setTip(tipCents)
     const { cart } = cartApi
     const body: SaleIn = {
       items: cart.lines.map((l) => ({
@@ -208,6 +210,7 @@ function PosPage() {
       is_courtesy: !!courtesy,
       courtesy_reason: courtesy?.reason || null,
       tab_id: cart.tab?.id ?? null,
+      tip_cents: courtesy ? 0 : tipCents,
       reward_program_id: courtesy ? null : (cart.reward?.program_id ?? null),
     }
     // QR / Point / transfer shown to the customer (Pro `payments`): the sale is registered on approval.
@@ -286,6 +289,7 @@ function PosPage() {
         onOpenChange={setCheckout}
         total={payTotal}
         prepaid={prepaid}
+        tips={config.data?.tips}
         listTotal={listTotal}
         methods={methods ?? []}
         customer={cartApi.cart.customer}
@@ -294,7 +298,7 @@ function PosPage() {
       />
       <CollectChargeDialog
         request={collectReq}
-        total={payTotal}
+        total={payTotal + tip}
         onApproved={onSold}
         onClose={() => {
           setCollectReq(null)

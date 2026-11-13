@@ -151,6 +151,12 @@ export function SaleDetailSheet({ id, onOpenChange }: { id: number | null; onOpe
                   <span>Total</span>
                   <span className="tabular">{fmtMoney(s.total_cents)}</span>
                 </div>
+                {s.tip_cents > 0 && (
+                  <div className="flex justify-between" data-testid="sale-tip">
+                    <span className="text-muted-foreground">Propina</span>
+                    <span className="tabular">{fmtMoney(s.tip_cents)}</span>
+                  </div>
+                )}
                 {can('reports.view') && (
                   <div className="flex justify-between text-xs text-muted-foreground">
                     <span>Costo estimado</span>

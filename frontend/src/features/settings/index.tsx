@@ -31,7 +31,7 @@ import { type Permission, useAuth } from '@/lib/auth'
 
 import { usePaymentMethods, useSettings } from './api'
 import { CardSkeleton } from './form'
-import { AlertsSection, AppearanceSection, BusinessSection, LoyaltySection, SecuritySection } from './general-sections'
+import { AlertsSection, AppearanceSection, BusinessSection, LoyaltySection, SecuritySection, TipsSection } from './general-sections'
 import { AccountSection } from '../account/account-section'
 import { NotificationsSection } from '../account/notifications-section'
 import { LicenseSection } from '../license/license-section'
@@ -81,6 +81,7 @@ function SettingsPage() {
         { value: 'negocio', perm: 'settings.manage', label: 'Negocio', icon: Building2, render: withSettings(() => (
           <div className="space-y-6">
             <BusinessSection initial={s!.business} />
+            <TipsSection initial={s!.tips} />
             <BusinessProfileSection />
           </div>
         )) },

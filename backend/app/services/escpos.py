@@ -264,6 +264,8 @@ def ticket(data: dict[str, Any], layout: Layout, *, open_drawer: bool = False, d
     if sale.get("is_courtesy") and sale.get("courtesy_cents"):
         d.row("Valor de la cortesía", money(sale["courtesy_cents"]))
     d.row("TOTAL", money(sale["total_cents"]), bold=True, h=2)
+    if (sale.get("tip_cents") or 0) > 0:  # optional, on top of the total
+        d.row("Propina", money(sale["tip_cents"]))
     if sale["payments"]:
         d.rule()
     for p in sale["payments"]:

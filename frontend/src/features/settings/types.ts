@@ -39,7 +39,15 @@ export interface PublicMenuSettings {
   message: string
 }
 
+/** Optional tip the customer may add when paying (never mandatory). */
+export interface TipsSettings {
+  enabled: boolean
+  /** Suggested percentages (of the total of the products). */
+  percents: number[]
+}
+
 export interface AllSettings {
+  tips: TipsSettings
   business: BusinessSettings
   currency: string
   lock_minutes: number

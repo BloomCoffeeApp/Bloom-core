@@ -100,4 +100,27 @@ test.describe('Ventas', () => {
     await expect(sheet.getByText('Envío', { exact: true })).toBeVisible()
     await expect(sheet.getByText(/500,00/).first()).toBeVisible()
   })
+
+  test('optional tip: offered at checkout, on top of the total, recorded on the sale', async ({ page, request }) => {
+    const headers = await authHeaders(page)
+    expect((await request.put('/api/settings/tips', { headers, data: { enabled: true, percents: [10, 15] } })).ok()).toBeTruthy()
+    try {
+      await openPos(page)
+      await addMedialuna(page)
+      const dialog = await openCheckout(page)
+      const picker = dialog.getByTestId('tip-picker')
+      await expect(picker).toContainText('Propina (opcional)')
+      await picker.getByRole('button', { name: /^10 %/ }).click()
+      await expect(dialog.getByTestId('tip-picker')).toContainText('La propina va aparte del total de la venta')
+      const done = await confirmCheckout(page, dialog)
+      const n = await ticketNumber(done)
+      await page.goto('/ventas')
+      await page.getByPlaceholder('N° de ticket').fill(String(n))
+      await page.getByRole('row').filter({ hasText: `#${n}` }).click()
+      const sheet = page.getByRole('dialog', { name: new RegExp(`Ticket #${n}`) })
+      await expect(sheet.getByTestId('sale-tip')).toContainText('$')
+    } finally {
+      await request.put('/api/settings/tips', { headers, data: { enabled: false, percents: [10, 15, 20] } })
+    }
+  })
 })

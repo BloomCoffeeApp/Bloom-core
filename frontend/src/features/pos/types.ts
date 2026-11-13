@@ -60,6 +60,8 @@ export interface PosCustomer {
 export interface PosConfig {
   loyalty: { enabled: boolean; pesos_per_point: number; points_per_reward: number; reward_value_cents: number }
   can_discount: boolean
+  /** Optional tips (Configuración → Propinas). */
+  tips?: { enabled: boolean; percents: number[] }
 }
 
 export interface CartLine {

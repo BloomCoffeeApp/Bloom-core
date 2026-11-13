@@ -264,6 +264,44 @@ def test_payment_methods_toggle(seeded):
     assert client.patch(f"/api/payment-methods/{target['id']}", json={"active": True}, headers=hc).status_code == 403
 
 
+def _tips(client, admin, enabled=True):
+    r = client.put("/api/settings/tips", json={"enabled": enabled, "percents": [10, 15, 20]}, headers=admin)
+    assert r.status_code == 200, r.text
+
+
+def test_optional_tip_is_on_top_of_the_total_and_recorded(seeded, db):
+    client, admin = seeded
+    tip = 40000
+    body = _sale_body(db, tip_cents=tip, payments=[{"method": "efectivo", "amount_cents": LATTE + tip}])
+    # Off by default: the café has to turn tips on.
+    off = client.post("/api/sales", json=body, headers=admin)
+    assert off.status_code == 400 and "Propinas" in off.json()["detail"]
+    _tips(client, admin)
+    r = client.post("/api/sales", json=body, headers=admin)
+    assert r.status_code == 200, r.text
+    s = r.json()
+    assert s["tip_cents"] == tip and s["total_cents"] == LATTE  # the sale's total never includes the tip
+    assert client.get(f"/api/sales/{s['id']}", headers=admin).json()["tip_cents"] == tip
+    assert sum(p["amount_cents"] for p in s["payments"]) == LATTE + tip  # the register counts the money that came in
+    # The payments have to cover total + tip.
+    short = _sale_body(db, tip_cents=tip, payments=[{"method": "efectivo", "amount_cents": LATTE}])
+    assert client.post("/api/sales", json=short, headers=admin).status_code == 400
+    # Never on a courtesy, never negative.
+    courtesy = _sale_body(db, tip_cents=tip, is_courtesy=True, payments=[])
+    assert client.post("/api/sales", json=courtesy, headers=admin).status_code == 400
+    assert client.post("/api/sales", json=_sale_body(db, tip_cents=-1, payments=[{"method": "efectivo", "amount_cents": LATTE}]), headers=admin).status_code == 422
+    assert client.get("/api/pos/config", headers=admin).json()["tips"] == {"enabled": True, "percents": [10, 15, 20]}
+
+
+def test_tip_is_printed_on_the_ticket_after_the_total(seeded, db):
+    from app.services import escpos
+    from tests import escpos_samples as S
+
+    text = escpos.ticket(S.ticket(tip_cents=40000), escpos.Layout()).decode("cp858", errors="replace")
+    assert text.index("TOTAL") < text.index("Propina") < text.index("$ 400,00", text.index("Propina"))
+    assert "Propina" not in escpos.ticket(S.ticket(), escpos.Layout()).decode("cp858", errors="replace")
+
+
 def test_delivery_fee_adds_to_total_and_payments(seeded, db):
     client, admin = seeded
     fee = 50000

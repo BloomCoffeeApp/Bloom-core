@@ -29,6 +29,7 @@ from app.schemas.sales import (
 from app.services import cash as cash_svc
 from app.services import roles
 from app.services import sales as sales_svc
+from app.services import settings as settings_svc
 from app.services.timeutil import local_today
 
 router = APIRouter(prefix="/api", tags=["sales"])
@@ -58,7 +59,7 @@ def update_payment_method(
 @router.get("/pos/config")
 def pos_config(db: Session = Depends(get_db), user: User = CurrentUser) -> dict:
     """Settings the POS needs to preview totals (the backend always recalculates)."""
-    return {"loyalty": sales_svc.loyalty_cfg(db), "can_discount": sales_svc.can_discount(user)}
+    return {"loyalty": sales_svc.loyalty_cfg(db), "can_discount": sales_svc.can_discount(user), "tips": settings_svc.get(db, "tips")}
 
 
 @router.post("/pos/quote", response_model=QuoteOut)

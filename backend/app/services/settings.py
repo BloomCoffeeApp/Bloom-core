@@ -7,6 +7,8 @@ from app.models import Setting
 DEFAULTS: dict[str, Any] = {
     "business": {"name": "Mi Cafetería", "legal_name": "", "cuit": "", "address": "", "phone": "", "ticket_footer": "¡Gracias por tu visita!"},
     "currency": "ARS",
+    # Optional tip the customer may add when paying (never mandatory, never in the total of the products).
+    "tips": {"enabled": False, "percents": [10, 15, 20]},
     "lock_minutes": 10,
     "loyalty": {"enabled": True, "pesos_per_point": 1000, "points_per_reward": 100, "reward_value_cents": 500000},
     "alerts": {"expiry_days": 5, "supplier_due_days": 3, "roast_max_days": 30, "roast_min_days": 5},

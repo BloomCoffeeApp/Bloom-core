@@ -35,9 +35,11 @@ def build_receipt(
     delivery_fee_cents: int = 0,
     operation_id: str | None = None,
     channel_label: str | None = None,
+    tip_cents: int = 0,
 ) -> dict[str, Any]:
     """`lines`: {qty, name, size_name?, modifiers?, total_cents}. Whatever the lines plus the shipping
-    fee exceed `total_cents` by is shown as a discount, so the receipt always adds up."""
+    fee exceed `total_cents` by is shown as a discount, so the receipt always adds up. `tip_cents` is the optional
+    tip paid on top: it is not part of `total_cents`; `paid_cents` is what actually went out (total + tip)."""
     clean = [
         {
             "qty": ln["qty"],
@@ -58,6 +60,8 @@ def build_receipt(
         "delivery_fee_cents": int(delivery_fee_cents),
         "discount_cents": max(gross - int(total_cents), 0),
         "total_cents": int(total_cents),
+        "tip_cents": int(tip_cents),
+        "paid_cents": int(total_cents) + int(tip_cents),
         "method_label": method_label,
         "operation_id": operation_id or None,
         "legend": LEGEND,
