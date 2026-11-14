@@ -84,8 +84,10 @@ npm run e2e:headed   # viendo el navegador
 npm run e2e:ui       # modo interactivo de Playwright
 ```
 
-- Usan el **Microsoft Edge** que viene con Windows (no hace falta descargar navegadores).
-  Para usar el Chromium de Playwright: `$env:PW_CHANNEL="chromium"` (antes `npx playwright install chromium`).
+- Usan el **Chromium sin interfaz de Playwright** (no abre ventanas). La primera vez hay que bajarlo:
+  `npx playwright install --only-shell chromium` (unos 120 MB).
+  Para usar el Microsoft Edge instalado en su lugar: `$env:PW_CHANNEL="msedge"` (su modo sin interfaz deja ventanas
+  ocultas «Bloom» que quedan colgadas en Alt+Tab).
 - Levantan su propio backend (puerto 47899) y Vite (puerto 5199) con una **base de datos nueva y aislada**
   en una carpeta temporal: no tocan tu `dev.db` ni los servidores de desarrollo que tengas abiertos.
 - La configuración inicial se hace con datos de ejemplo (admin "Admin", PIN `0000`).

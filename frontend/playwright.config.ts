@@ -33,8 +33,10 @@ if (!process.env.BLOOM_E2E_DIR) {
 const DATA_DIR = process.env.BLOOM_E2E_DIR
 const PRO_LINK = path.join(FRONTEND, 'e2e', 'pro')
 const MOBILE = /\.mobile\.spec\.ts$/
-// Android phone (Chromium engine = the Edge channel used here; WebKit/iPhone would need a download).
-const PHONE = { ...devices['Pixel 7'], channel: process.env.PW_CHANNEL ?? 'msedge' }
+// Android phone (Chromium engine; WebKit/iPhone would need another download). No `channel` by default: Playwright's
+// own headless Chromium opens no windows. Set PW_CHANNEL=msedge to use the installed Edge instead (its headless
+// mode leaves hidden "Bloom" windows that linger in Alt+Tab).
+const PHONE = { ...devices['Pixel 7'], channel: process.env.PW_CHANNEL }
 const PRO_E2E = fs.existsSync(PRO_LINK) ? fs.realpathSync(PRO_LINK) : null
 
 // Throwaway license key pair: the setup project signs a Pro license the e2e backend accepts.
@@ -57,7 +59,7 @@ export default defineConfig({
   reporter: [['list'], ['html', { open: 'never', outputFolder: `playwright-report/${API_PORT}` }]],
   use: {
     baseURL: `http://localhost:${WEB_PORT}`,
-    channel: process.env.PW_CHANNEL ?? 'msedge',
+    channel: process.env.PW_CHANNEL,
     headless: true,
     locale: 'es-AR',
     timezoneId: 'America/Argentina/Buenos_Aires',

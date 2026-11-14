@@ -28,7 +28,7 @@ export default defineConfig({
   reporter: [['list']],
   use: {
     baseURL: `http://localhost:${WEB_PORT}`,
-    channel: process.env.PW_CHANNEL ?? 'msedge',
+    channel: process.env.PW_CHANNEL, // unset = Playwright's headless Chromium; PW_CHANNEL=msedge for Edge
     headless: true,
     locale: 'es-AR',
     timezoneId: 'America/Argentina/Buenos_Aires',
