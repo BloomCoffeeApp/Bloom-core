@@ -27,7 +27,7 @@ def test_builtin_roles_keep_their_historical_permissions():
     assert BUILTIN_ROLES["barista"]["permissions"] == {"barista.use", "stock.view", "kitchen.use"}
     assert BUILTIN_ROLES["mozo"]["permissions"] == {"tables.serve"}
     assert BUILTIN_ROLES["cocina"]["permissions"] == {"kitchen.use"}
-    assert BUILTIN_ROLES["deposito"]["permissions"] == {"stock.view", "stock.receive"}
+    assert BUILTIN_ROLES["deposito"]["permissions"] == {"stock.view", "stock.receive", "stock.count"}
     enc = BUILTIN_ROLES["encargado"]["permissions"]
     assert sell <= enc and {"pos.discount", "sales.void", "catalog.edit", "reports.view", "stock.adjust"} <= enc
     # Admin-level things stay out of the manager's default set.

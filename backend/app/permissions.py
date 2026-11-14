@@ -26,6 +26,7 @@ PERMISSIONS: dict[str, tuple[str, str, str]] = {
     "stock.view": ("Productos y stock", "Ver stock", "Insumos, movimientos, conteos y sugerencias de compra"),
     "stock.edit": ("Productos y stock", "Editar insumos", "Alta, baja y edición de insumos y sus categorías"),
     "stock.adjust": ("Productos y stock", "Ajustes, mermas y conteos", "Corregir existencias (queda registrado)"),
+    "stock.count": ("Productos y stock", "Contar stock", "Cargar las cantidades de un conteo de inventario (aplicarlo al stock lo hace quien ajusta)"),
     "purchases.manage": ("Productos y stock", "Compras y proveedores", "Órdenes, recepciones, proveedores y pagos"),
     "stock.receive": ("Productos y stock", "Recibir mercadería", "Ver las órdenes de compra y anotar lo que llega al depósito"),
     # Clientes
@@ -53,7 +54,7 @@ ALL = frozenset(PERMISSIONS)
 
 _SELL = {"pos.sell", "pos.courtesy", "cash.open_close", "cash.movements", "customers.edit", "tables.serve", "kitchen.use"}
 _MANAGE = {
-    "pos.discount", "sales.void", "catalog.edit", "prices.edit", "stock.view", "stock.edit", "stock.adjust",
+    "pos.discount", "sales.void", "catalog.edit", "prices.edit", "stock.view", "stock.edit", "stock.adjust", "stock.count",
     "purchases.manage", "customers.manage", "promos.manage", "orders.manage", "notices.manage",
     "barista.use", "barista.manage", "reports.view", "expenses.manage", "tips.manage",
 }
@@ -68,8 +69,8 @@ BUILTIN_ROLES: dict[str, dict] = {
                 "permissions": frozenset({"barista.use", "stock.view", "kitchen.use"})},
     "mozo": {"name": "Mozo", "hint": "Mesas y pedidos del salón", "permissions": frozenset({"tables.serve"})},
     "cocina": {"name": "Cocina", "hint": "Pantalla de pedidos de cocina y barra", "permissions": frozenset({"kitchen.use"})},
-    "deposito": {"name": "Depósito", "hint": "Ver stock y recibir mercadería",
-                 "permissions": frozenset({"stock.view", "stock.receive"})},
+    "deposito": {"name": "Depósito", "hint": "Ver stock, recibir mercadería y contar",
+                 "permissions": frozenset({"stock.view", "stock.receive", "stock.count"})},
 }
 
 # Permissions that only make sense with something else (the editor adds the requirement automatically).
@@ -80,6 +81,7 @@ REQUIRES: dict[str, str] = {
     "stock.edit": "stock.view",
     "stock.adjust": "stock.view",
     "stock.receive": "stock.view",
+    "stock.count": "stock.view",
     "customers.manage": "customers.edit",
     "barista.manage": "barista.use",
 }

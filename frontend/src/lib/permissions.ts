@@ -11,6 +11,7 @@ export type Permission =
   | 'stock.view'
   | 'stock.edit'
   | 'stock.adjust'
+  | 'stock.count'
   | 'purchases.manage'
   | 'customers.edit'
   | 'customers.manage'

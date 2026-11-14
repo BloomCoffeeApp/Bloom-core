@@ -33,6 +33,8 @@ router = APIRouter(prefix="/api", tags=["stock"])
 Reader = Perm("stock.view")
 Manager = Perm("stock.edit")
 Adjuster = Perm("stock.adjust")
+# Loading the quantities of a count: whoever adjusts stock, or the warehouse (applying it stays with the adjusters).
+Counter = Perm("stock.adjust", "stock.count")
 
 
 # ---- Categories
@@ -123,7 +125,7 @@ def waste(data: WasteIn, db: Session = Depends(get_db), me: User = Adjuster) -> 
 
 
 # Quick discard of small spills from the POS / barista (people who sell or prepare, not only stock managers).
-QuickDiscarder = Perm("pos.sell", "barista.use", "stock.adjust")
+QuickDiscarder = Perm("pos.sell", "barista.use", "kitchen.use", "stock.adjust")
 
 
 @router.get("/stock/quick-items", response_model=list[QuickItemOut])
@@ -154,7 +156,7 @@ def list_counts(db: Session = Depends(get_db), _: User = Reader):
 
 
 @router.post("/stock/counts", response_model=CountOut)
-def create_count(data: CountCreate, db: Session = Depends(get_db), me: User = Adjuster) -> CountOut:
+def create_count(data: CountCreate, db: Session = Depends(get_db), me: User = Counter) -> CountOut:
     return svc.create_count(db, data, me)
 
 
@@ -164,13 +166,13 @@ def get_count(count_id: int, db: Session = Depends(get_db), _: User = Reader) ->
 
 
 @router.patch("/stock/counts/{count_id}/items", response_model=CountOut)
-def patch_count_items(count_id: int, data: CountItemsPatch, db: Session = Depends(get_db), _: User = Adjuster):
+def patch_count_items(count_id: int, data: CountItemsPatch, db: Session = Depends(get_db), _: User = Counter):
     return svc.set_counted_bulk(db, count_id, data.items)
 
 
 @router.patch("/stock/counts/{count_id}/items/{item_id}", response_model=CountOut)
 def patch_count_item(
-    count_id: int, item_id: int, data: CountItemPatch, db: Session = Depends(get_db), _: User = Adjuster
+    count_id: int, item_id: int, data: CountItemPatch, db: Session = Depends(get_db), _: User = Counter
 ):
     return svc.set_counted(db, count_id, item_id, data.counted_qty)
 

@@ -1,6 +1,6 @@
 """Order screen (bar/kitchen): live board, status changes, waiter calls, settings and open tabs."""
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.auth import CurrentUser, Perm
@@ -8,7 +8,7 @@ from app.db import get_db
 from app.models import User
 from app.schemas.common import Ok
 from app.schemas.orders import BoardOut, OrderOut, OrdersSettings, OrderStatusIn, TabOut
-from app.services import order_flows
+from app.services import order_flows, roles
 from app.services import orders as svc
 
 router = APIRouter(prefix="/api", tags=["orders"])
@@ -17,6 +17,8 @@ Manager = Perm("orders.manage")
 Seller = Perm("pos.sell")
 # Moving orders along / answering waiter calls: the floor, the kitchen/bar and the register (as before).
 Floor = Perm("tables.serve", "kitchen.use", "orders.manage", "pos.sell")
+# Cancelling or rejecting an order: the register, the floor or the manager. The kitchen only moves orders forward.
+CANCELLERS = ("orders.manage", "pos.sell", "tables.serve")
 
 
 @router.get("/orders/board", response_model=BoardOut)
@@ -27,6 +29,8 @@ def board(station_id: int | None = None, db: Session = Depends(get_db), _: User 
 
 @router.post("/orders/{order_id}/status", response_model=OrderOut)
 def set_status(order_id: int, data: OrderStatusIn, db: Session = Depends(get_db), user: User = Floor) -> dict:
+    if data.status in ("cancelled", "rejected") and not roles.has(user, *CANCELLERS):
+        raise HTTPException(403, "Cancelar o rechazar un pedido lo hace la caja o el encargado")
     params = {"eta_minutes": data.eta_minutes} if data.eta_minutes is not None else None
     svc.set_status(db, order_id, data.status, user, data.reason, params)
     row = next((o for o in svc.board(db)["orders"] if o["id"] == order_id), None)
