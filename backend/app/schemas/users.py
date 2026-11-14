@@ -56,6 +56,19 @@ class UserUpdate(BaseModel):
 class LoginIn(BaseModel):
     user_id: int
     pin: str
+    # The staff phone app (`/equipo`) says so and shows the team code from the QR at the register.
+    client: str | None = Field(default=None, pattern=r"^equipo$")
+    team_key: str | None = Field(default=None, max_length=64)
+
+
+class SessionOut(BaseModel):
+    id: int
+    client: str | None
+    user_agent: str | None
+    created_at: datetime
+    last_seen_at: datetime | None
+    expires_at: datetime
+    current: bool = False
 
 
 class LoginOut(BaseModel):

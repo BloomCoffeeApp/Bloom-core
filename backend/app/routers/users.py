@@ -10,8 +10,9 @@ from app.db import get_db
 from app.licensing import has_feature
 from app.licensing.features import PRO_LABEL
 from app.models import User
-from app.schemas.users import UserCreate, UserOut, UserPermissionsIn, UserUpdate
-from app.services import audit, business_profile, free_plan, roles
+from app.schemas.common import Ok
+from app.schemas.users import SessionOut, UserCreate, UserOut, UserPermissionsIn, UserUpdate
+from app.services import audit, business_profile, free_plan, roles, user_sessions
 from app.services import settings as settings_svc
 
 router = APIRouter(prefix="/api", tags=["users"])
@@ -92,6 +93,22 @@ def set_user_permissions(
         raise HTTPException(404, "Usuario no encontrado")
     roles.set_overrides(db, me, user, data.grants, data.revokes)
     return user_out(db, user)
+
+
+@router.get("/users/{user_id}/sessions", response_model=list[SessionOut])
+def user_open_sessions(user_id: int, db: Session = Depends(get_db), me: User = UsersAdmin) -> list[dict[str, Any]]:
+    target = db.get(User, user_id)
+    if not target:
+        raise HTTPException(404, "Usuario no encontrado")
+    if me.id != target.id:
+        roles.check_can_assign(db, me, target.role, target=target)
+    return user_sessions.list_for(db, user_id)
+
+
+@router.delete("/users/{user_id}/sessions/{session_id}", response_model=Ok)
+def disconnect_session(user_id: int, session_id: int, db: Session = Depends(get_db), me: User = UsersAdmin) -> Ok:
+    user_sessions.disconnect(db, me, user_id, session_id)
+    return Ok()
 
 
 @router.get("/settings")

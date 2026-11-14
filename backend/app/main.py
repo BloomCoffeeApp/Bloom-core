@@ -27,6 +27,7 @@ from app.routers import (
     sales,
     stock,
     system,
+    team,
     updates,
     users,
 )
@@ -39,7 +40,7 @@ except ImportError:
 ROUTER_MODULES = (
     account,
     auth, license, remote_config, users, roles, business, dashboard, catalog, stock, sales, orders, customers, alerts, system, updates,
-    printing, expenses, collect, channel_supplies, diagnostics,
+    printing, expenses, collect, channel_supplies, diagnostics, team,
 )
 EDITION = "pro" if bloom_pro else "free"
 

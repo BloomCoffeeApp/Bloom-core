@@ -15,6 +15,7 @@ from app.db import get_db
 from app.models import User, UserSession, utcnow
 
 _hasher = PasswordHasher()
+SEEN_EVERY_S = 60
 
 
 def hash_pin(pin: str) -> str:
@@ -88,11 +89,15 @@ def revoke_sessions(db: Session, user_id: int) -> None:
     db.execute(delete(UserSession).where(UserSession.user_id == user_id))
 
 
-def create_session(db: Session, user: User) -> str:
+def create_session(db: Session, user: User, *, client: str | None = None, user_agent: str | None = None) -> str:
     db.execute(delete(UserSession).where(UserSession.expires_at < utcnow()))
     token = secrets.token_urlsafe(32)
+    now = utcnow()
     db.add(
-        UserSession(token=token, user_id=user.id, expires_at=utcnow() + timedelta(hours=SESSION_HOURS))
+        UserSession(
+            token=token, user_id=user.id, expires_at=now + timedelta(hours=SESSION_HOURS), client=client,
+            user_agent=(user_agent or "")[:200] or None, last_seen_at=now,
+        )
     )
     user.last_login_at = utcnow()
     db.commit()
@@ -111,6 +116,10 @@ def get_current_user(
     user = db.get(User, sess.user_id)
     if not user or not user.active:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Usuario inactivo")
+    now = utcnow()
+    if sess.last_seen_at is None or (now - sess.last_seen_at).total_seconds() >= SEEN_EVERY_S:
+        sess.last_seen_at = now  # "last activity" shown in Usuarios → Sesiones abiertas
+        db.commit()
     from app.services import free_plan
 
     if free_plan.is_locked(db, "users", user.id):

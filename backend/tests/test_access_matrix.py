@@ -37,6 +37,7 @@ PUBLIC: list[tuple[str, str]] = [
     (r"^/api/auth/logout$", "logout reads its own bearer token and is harmless without one"),
     (r"^/api/business/catalog$", "business-profile catalog for the first-run wizard (static text, no data)"),
     (r"^/api/staff/clock$", "time clock by PIN without a session (shares the login throttle)"),
+    (r"^/api/team/(users|status)$", "staff phone app: staff list / code check, both behind the team code from the register QR (throttled per IP)"),
     (r"^/api/public/.*$", "customer-facing menu/pickup/screens: token-protected or read-only by design"),
     (r"^/(?!api/).*$", "front-end routes and static files"),
 ]
@@ -117,7 +118,9 @@ ROLES = list(permissions.BUILTIN_ROLES)  # admin, encargado, cajero, barista, mo
 
 
 def _fill(path: str) -> str:
-    return re.sub(r"\{[^}]+\}", "1", path)
+    # `{user_id}` is a user nobody has: id 1 is the admin and rank rules (not permissions) would answer 403 for
+    # everyone below them, which says nothing about the permission this matrix is checking.
+    return re.sub(r"\{[^}]+\}", "1", path.replace("{user_id}", "999999"))
 
 
 def _body(method: str):

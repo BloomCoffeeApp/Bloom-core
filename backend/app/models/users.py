@@ -28,6 +28,11 @@ class UserSession(IdMixin, Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     expires_at: Mapped[datetime] = mapped_column(DateTime)
+    # Which app opened it ("equipo" = the staff phone app; None = the normal app), the browser and the last
+    # time it was used (touched at most once a minute by `auth.get_current_user`).
+    client: Mapped[str | None] = mapped_column(String(20))
+    user_agent: Mapped[str | None] = mapped_column(String(200))
+    last_seen_at: Mapped[datetime | None] = mapped_column(DateTime)
 
 
 class AuditLog(IdMixin, Base):
