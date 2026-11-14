@@ -57,8 +57,8 @@ function ScreenBody({ s }: { s: ScreenState }) {
     )
   if (s.state === 'approved')
     return (
-      <div className="flex flex-col items-center gap-5 text-center" role="status" data-testid="screen-approved">
-        <div className="flex size-36 items-center justify-center rounded-full bg-success/15 text-success">
+      <div className="motion-fade flex flex-col items-center gap-5 text-center" role="status" data-testid="screen-approved">
+        <div className="motion-pop flex size-36 items-center justify-center rounded-full bg-success/15 text-success">
           <CircleCheckBig className="size-20" />
         </div>
         <h1 className="font-heading text-5xl font-semibold sm:text-7xl">¡Pago aprobado!</h1>

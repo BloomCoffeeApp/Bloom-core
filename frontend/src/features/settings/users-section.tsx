@@ -128,7 +128,7 @@ function UserDialog({ state, onClose }: { state: Exclude<DialogState, { mode: 'p
                       aria-label={c}
                       onClick={() => setColor(c)}
                       className={cn(
-                        'flex size-9 items-center justify-center rounded-full text-xs font-semibold transition-all',
+                        'flex size-9 items-center justify-center rounded-full text-xs font-semibold transition-[transform,box-shadow,border-color,background-color,color] motion-fast',
                         AVATAR_COLORS[c],
                         color === c ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : 'opacity-70 hover:opacity-100',
                       )}

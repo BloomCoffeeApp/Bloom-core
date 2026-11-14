@@ -25,6 +25,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { fmtMoney } from '@/lib/format'
+import { useBump } from '@/lib/motion'
 import { cn } from '@/lib/utils'
 
 import type { Channel } from '../sales/types'
@@ -244,6 +245,7 @@ export function CartPanel({
   /** What the business type shows (channels, tables, customers, loyalty). */
   sections?: PosSections
 }) {
+  const totalBump = useBump(totals.total)
   const { cart } = cartApi
   const [editing, setEditing] = useState<CartLine | null>(null)
   const [discOpen, setDiscOpen] = useState(false)
@@ -359,7 +361,7 @@ export function CartPanel({
             {cart.lines.map((l, i) => {
               const promo = quote?.find((q) => q.index === i && q.discount_cents > 0 && q.promo_name)
               return (
-              <li key={l.key} className="flex items-start gap-2 px-3 py-2.5" data-testid="cart-line">
+              <li key={l.key} className="motion-enter flex items-start gap-2 px-3 py-2.5" data-testid="cart-line">
                 <button className="min-w-0 flex-1 text-left" onClick={() => !l.reward && setEditing(l)}>
                   <p className="leading-tight font-medium">
                     <span>{l.name}</span>
@@ -483,7 +485,12 @@ export function CartPanel({
           </div>
           <div className="text-right">
             <p className="text-xs text-muted-foreground">Total</p>
-            <p className="tabular font-heading text-4xl leading-none font-semibold tracking-tight">{fmtMoney(totals.total)}</p>
+            <p
+              key={totalBump.key}
+              className={cn('tabular origin-right font-heading text-4xl leading-none font-semibold tracking-tight', totalBump.className)}
+            >
+              {fmtMoney(totals.total)}
+            </p>
           </div>
         </div>
         {totals.pointsEarned > 0 && <p className="text-right text-xs text-muted-foreground">Suma {totals.pointsEarned} puntos</p>}

@@ -123,7 +123,7 @@ export function DataTable<T>({
               rows.map((row) => (
                 <TableRow
                   key={row.id}
-                  className={cn(onRowClick && 'cursor-pointer')}
+                  className={cn('motion-fade', onRowClick && 'cursor-pointer')}
                   onClick={() => onRowClick?.(row.original)}
                 >
                   {row.getVisibleCells().map((cell) => (

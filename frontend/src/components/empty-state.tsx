@@ -14,7 +14,7 @@ export function EmptyState({
   action?: ReactNode
 }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed px-6 py-14 text-center">
+    <div className="motion-fade flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed px-6 py-14 text-center">
       <div className="flex size-14 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
         <Icon className="size-7" />
       </div>

@@ -48,7 +48,7 @@ export function ColorSwatches({ value, onChange }: { value: string | null; onCha
           aria-label={c}
           onClick={() => onChange(c)}
           className={cn(
-            'size-7 rounded-full ring-offset-2 ring-offset-background transition-all',
+            'size-7 rounded-full ring-offset-2 ring-offset-background transition-[transform,box-shadow,border-color,background-color,color] motion-fast',
             PALETTE[c].dot,
             value === c ? 'ring-2 ring-foreground' : 'opacity-70 hover:opacity-100',
           )}

@@ -145,7 +145,7 @@ export function BarList({
           </div>
           <div className="h-1.5 overflow-hidden rounded-full bg-muted">
             <div
-              className="h-full rounded-full bg-primary/80 transition-all"
+              className="h-full rounded-full bg-primary/80 transition-[width] motion-base"
               style={{ width: `${Math.max(2, (it.value / max) * 100)}%` }}
             />
           </div>

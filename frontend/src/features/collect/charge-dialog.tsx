@@ -205,8 +205,8 @@ function ChargeFlow({
 
   if (ch.status === 'approved') {
     return (
-      <div className="flex flex-col items-center gap-4 py-4 text-center" role="status">
-        <div className="flex size-20 items-center justify-center rounded-full bg-success/15 text-success">
+      <div className="motion-fade flex flex-col items-center gap-4 py-4 text-center" role="status">
+        <div className="motion-pop flex size-20 items-center justify-center rounded-full bg-success/15 text-success">
           <CircleCheckBig className="size-11" />
         </div>
         <p className="font-heading text-2xl font-semibold">¡Pago aprobado!</p>

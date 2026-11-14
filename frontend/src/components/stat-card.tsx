@@ -38,7 +38,7 @@ export function StatCard({
           {loading ? (
             <Skeleton className="h-8 w-28" />
           ) : (
-            <p className="tabular truncate text-2xl font-semibold tracking-tight">{value}</p>
+            <p className="motion-fade tabular truncate text-2xl font-semibold tracking-tight">{value}</p>
           )}
           {(delta != null || hint) && !loading && (
             <div className="flex items-center gap-2 text-xs text-muted-foreground">

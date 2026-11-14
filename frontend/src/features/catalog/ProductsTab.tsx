@@ -225,7 +225,7 @@ export function ProductsTab() {
                     onClick={() => open(p)}
                     onKeyDown={(e) => e.key === 'Enter' && open(p)}
                     className={cn(
-                      'cursor-pointer gap-3 rounded-2xl p-4 transition-all hover:-translate-y-0.5 hover:shadow-md',
+                      'cursor-pointer gap-3 rounded-2xl p-4 transition-[transform,box-shadow,border-color,background-color,color] motion-fast hover:-translate-y-0.5 hover:shadow-md',
                       !p.active && 'opacity-60',
                     )}
                   >

@@ -28,6 +28,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { fmtMoney, fmtNumber } from '@/lib/format'
+import { useBump } from '@/lib/motion'
 import { cn } from '@/lib/utils'
 
 import { CHANNEL_LABEL } from '../sales/types'
@@ -164,6 +165,7 @@ function OnlineBlock({ o, actions }: { o: Order; actions: CardActions }) {
 
 export function OrderCard({ order: o, elapsed, level, actions }: { order: Order; elapsed: number; level: Level; actions: CardActions }) {
   const st = LEVEL_STYLE[level]
+  const statusBump = useBump(o.status, 'motion-pop')
   const ready = o.status === 'ready' || o.status === 'dispatched'
   const waiting = o.received_at == null
   const main = o.actions.filter((a) => a.place === 'main')
@@ -176,7 +178,7 @@ export function OrderCard({ order: o, elapsed, level, actions }: { order: Order;
       data-flow={o.flow}
       data-level={level}
       aria-label={`Pedido ${o.number}`}
-      className={cn('flex flex-col gap-3 rounded-2xl border-2 bg-card p-3 shadow-xs', ready ? 'border-success/40 opacity-95' : st.card)}
+      className={cn('motion-enter flex flex-col gap-3 rounded-2xl border-2 bg-card p-3 shadow-xs transition-[border-color,box-shadow] motion-base', ready ? 'border-success/40 opacity-95' : st.card)}
     >
       <header className="flex items-start justify-between gap-2">
         <div className="min-w-0">
@@ -188,7 +190,11 @@ export function OrderCard({ order: o, elapsed, level, actions }: { order: Order;
             {o.table_label && !o.online && <span>· {CHANNEL_LABEL[o.channel]}</span>}
             {o.sale_number && <span>· Ticket #{o.sale_number}</span>}
           </p>
-          <span className="mt-1.5 inline-block rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary" data-testid="order-status">
+          <span
+            key={statusBump.key}
+            className={cn('mt-1.5 inline-block rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary', statusBump.className)}
+            data-testid="order-status"
+          >
             {o.status_label}
           </span>
         </div>

@@ -186,6 +186,88 @@
     .drink-steam { animation: none; opacity: 0.8; }
 }
 
+/* ---------------------------------------------------------------------------------------------
+   Motion: one scale and one curve for the whole app. Components use the `motion-*` utilities
+   (they feed tw-animate-css and Tailwind's `transition`) instead of hard-coded durations.
+   Only transform/opacity are animated; the guard below handles `prefers-reduced-motion`.
+   --------------------------------------------------------------------------------------------- */
+:root {
+    --motion-fast: 120ms;   /* hover, menus, overlays */
+    --motion-base: 180ms;   /* dialogs, popovers, cards */
+    --motion-slow: 260ms;   /* side sheets, screens */
+    --ease-out-soft: cubic-bezier(0.2, 0.8, 0.2, 1);   /* things that enter */
+    --ease-in-soft: cubic-bezier(0.4, 0, 1, 1);        /* things that leave */
+}
+@utility motion-fast {
+    --tw-duration: var(--motion-fast);
+    --tw-ease: var(--motion-ease, var(--ease-out-soft));
+}
+@utility motion-base {
+    --tw-duration: var(--motion-base);
+    --tw-ease: var(--motion-ease, var(--ease-out-soft));
+}
+@utility motion-slow {
+    --tw-duration: var(--motion-slow);
+    --tw-ease: var(--motion-ease, var(--ease-out-soft));
+}
+/* Add on data-closed: so leaving is a little snappier than entering. */
+@utility motion-exit {
+    --motion-ease: var(--ease-in-soft);
+}
+
+/* Feedback animations (CSS only, no library). Entrances only: nothing waits for an exit. */
+@keyframes motion-enter {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: none; }
+}
+@keyframes motion-fade {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+@keyframes motion-bump {
+    0% { transform: scale(1); }
+    40% { transform: scale(1.08); }
+    100% { transform: scale(1); }
+}
+@keyframes motion-pop {
+    0% { opacity: 0; transform: scale(0.6); }
+    70% { opacity: 1; transform: scale(1.08); }
+    100% { opacity: 1; transform: scale(1); }
+}
+@keyframes motion-flash {
+    from { box-shadow: 0 0 0 0 color-mix(in oklab, var(--primary) 55%, transparent); }
+    to { box-shadow: 0 0 0 8px transparent; }
+}
+@utility motion-enter {
+    animation: motion-enter var(--motion-base) var(--ease-out-soft) backwards;
+}
+@utility motion-fade {
+    animation: motion-fade var(--motion-base) var(--ease-out-soft) backwards;
+}
+@utility motion-bump {
+    animation: motion-bump var(--motion-base) var(--ease-out-soft);
+}
+@utility motion-pop {
+    animation: motion-pop var(--motion-slow) var(--ease-out-soft) backwards;
+}
+@utility motion-flash {
+    animation: motion-flash 1s var(--ease-out-soft);
+}
+
+/* Reduced motion, for everything (infinite pulse/ping stop after one cycle; loaders keep spinning). */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+    .animate-spin {
+        animation-duration: 1s !important;
+        animation-iteration-count: infinite !important;
+    }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

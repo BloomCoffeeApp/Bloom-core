@@ -206,7 +206,7 @@ function TourOverlay({
     height: rect.height + PAD * 2,
   }
   const pos = cardPosition(rect, cardH)
-  const veil = 'fixed bg-background/60 backdrop-blur-[3px] transition-all duration-300 ease-out'
+  const veil = 'fixed bg-background/60 backdrop-blur-[3px] transition-[top,left,right,bottom,width,height] motion-base'
 
   return createPortal(
     <div className="fixed inset-0 z-[100]" role="dialog" aria-modal="true" aria-labelledby="tour-title">
@@ -219,7 +219,7 @@ function TourOverlay({
           <div className={veil} style={{ top: hole.top, left: hole.left + hole.width, right: 0, height: hole.height }} />
           {/* Blocks clicks on the target so the tour can't be left half-way. */}
           <div
-            className="fixed rounded-xl ring-2 ring-primary transition-all duration-300 ease-out"
+            className="fixed rounded-xl ring-2 ring-primary transition-[top,left,width,height] motion-base"
             style={hole}
           >
             <span className="absolute inset-0 animate-ping rounded-xl ring-2 ring-primary/60 [animation-duration:1.6s]" />
@@ -231,7 +231,7 @@ function TourOverlay({
 
       <div
         ref={setCard}
-        className="fixed rounded-2xl border bg-popover p-5 text-popover-foreground shadow-2xl transition-all duration-300 ease-out"
+        className="fixed rounded-2xl border bg-popover p-5 text-popover-foreground shadow-2xl transition-[top,left,right,bottom] motion-base"
         style={pos}
       >
         <button

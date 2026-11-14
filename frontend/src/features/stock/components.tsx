@@ -59,7 +59,7 @@ export function LevelBar({ item }: { item: Pick<StockItem, 'current_qty' | 'min_
     <div className="relative h-2 w-full min-w-24 overflow-hidden rounded-full bg-muted">
       <div
         className={cn(
-          'h-full rounded-full transition-all',
+          'h-full rounded-full transition-[width] motion-base',
           item.status === 'ok' ? 'bg-success' : item.status === 'low' ? 'bg-warning' : 'bg-destructive',
         )}
         style={{ width: `${pct}%` }}

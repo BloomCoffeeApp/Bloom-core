@@ -135,7 +135,7 @@ export function ProductGrid({
                   key={p.id}
                   onClick={() => onPick(p)}
                   className={cn(
-                    'group relative flex min-h-28 flex-col justify-between overflow-hidden rounded-2xl border p-3 text-left shadow-xs transition-all select-none active:scale-[0.97]',
+                    'group relative flex min-h-28 flex-col justify-between overflow-hidden rounded-2xl border p-3 text-left shadow-xs transition-[transform,box-shadow,border-color,background-color,color] motion-fast select-none active:scale-[0.97]',
                     cls.tile,
                   )}
                 >

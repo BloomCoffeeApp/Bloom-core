@@ -309,7 +309,10 @@ export function AppShell() {
         <PriceChangeBanner />
         <AnnouncementsBanner />
         <main className={cn('flex-1', fullBleed ? 'p-0' : 'mx-auto w-full max-w-[1500px] p-4 md:p-6')}>
-          <Outlet />
+          {/* Remount per module (first path segment) so switching modules fades in; sub-routes keep their state. */}
+          <div key={location.pathname.split('/')[1] ?? ''} className="motion-fade">
+            <Outlet />
+          </div>
         </main>
       </SidebarInset>
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
