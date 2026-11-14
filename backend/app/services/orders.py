@@ -822,6 +822,7 @@ def list_open_tabs(db: Session) -> list[dict[str, Any]]:
         a, p = prepaid.get(ch.ref_id, (0, 0))  # type: ignore[arg-type]
         bill = ch.amount_cents - (ch.tip_cents or 0)  # a tip is not part of the bill the cashier still has to collect
         prepaid[ch.ref_id] = (a + bill, p) if ch.status == "approved" else (a, p + bill)  # type: ignore[index]
+    bill_tables = {c["table_id"] for c in active_calls(db) if c["kind"] == "bill"}
     out = []
     for tab in tabs:
         lines = tab_lines(by_tab[tab.id])
@@ -841,6 +842,7 @@ def list_open_tabs(db: Session) -> list[dict[str, Any]]:
                 "total_cents": int(round(sum(ln["unit_price_cents"] * ln["qty"] for ln in lines))),
                 "prepaid_cents": prepaid.get(tab.id, (0, 0))[0],  # paid from the phones, not charged yet
                 "paying_cents": prepaid.get(tab.id, (0, 0))[1],  # a payment from a phone is in progress
+                "bill_requested": tab.table_id in bill_tables,  # the table (or its waiter) asked for the bill
             }
         )
     return out

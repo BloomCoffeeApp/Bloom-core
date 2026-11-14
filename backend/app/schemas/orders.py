@@ -174,6 +174,7 @@ class TabOut(BaseModel):
     lines: list[TabLineOut]
     total_cents: int
     prepaid_cents: int = 0  # already paid from the phones (Mercado Pago): the cashier collects total − this
+    bill_requested: bool = False  # the table or its waiter asked for the bill
     paying_cents: int = 0  # a payment from a phone is in progress: charging the table waits for it
 
 
