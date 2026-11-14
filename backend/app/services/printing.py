@@ -43,6 +43,7 @@ run_async = True  # tests flip it to send queued kitchen tickets synchronously
 _locks: defaultdict[str, threading.Lock] = defaultdict(threading.Lock)
 _failures: dict[int, dict[str, Any]] = {}
 _failures_lock = threading.Lock()
+_last_print: dict[str, bool | None] = {"ok": None}
 
 
 # ---------------------------------------------------------------- availability + config
@@ -135,7 +136,17 @@ def transport(p: dict[str, Any]) -> Callable[[bytes, str], None]:
 def send(p: dict[str, Any], data: bytes, doc_name: str) -> None:
     """One job at a time per printer (interleaved raw jobs would mix tickets)."""
     with _locks[p["id"] or p["target"]]:
-        transport(p)(data, doc_name)
+        try:
+            transport(p)(data, doc_name)
+        except Exception:
+            _last_print["ok"] = False
+            raise
+        _last_print["ok"] = True
+
+
+def last_print_ok() -> bool | None:
+    """Did the last job sent since the app started reach the printer? None = nothing printed yet."""
+    return _last_print["ok"]
 
 
 def _send_or_502(p: dict[str, Any], data: bytes, doc_name: str) -> None:

@@ -37,6 +37,7 @@ import {
   useSaveSetting,
   useSystemInfo,
 } from './api'
+import { DiagnosticDialog } from '../diagnostics/diagnostic-dialog'
 import { Field, NumberInput, SettingsCard, SwitchRow } from './form'
 import { LanHelp } from './lan-help'
 import { ThirdPartyLicenses } from './third-party-licenses'
@@ -385,6 +386,7 @@ export function PaymentMethodsSection({ query }: { query: ReturnType<typeof useP
 
 export function AboutSection({ isAdmin }: { isAdmin: boolean }) {
   const info = useSystemInfo(isAdmin)
+  const [diagOpen, setDiagOpen] = useState(false)
   return (
     <SettingsCard title="Acerca de">
       <div className="flex flex-col items-center gap-3 py-4 text-center">
@@ -397,6 +399,18 @@ export function AboutSection({ isAdmin }: { isAdmin: boolean }) {
       </div>
       {isAdmin && <UpdatesPanel />}
       <SupportCard />
+      {isAdmin && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4">
+          <div className="text-sm">
+            <p className="font-medium">Diagnóstico para soporte</p>
+            <p className="text-muted-foreground">Si algo no anda, mandanos un resumen técnico. Vos ves antes qué se envía.</p>
+          </div>
+          <Button variant="outline" className="min-h-11" onClick={() => setDiagOpen(true)}>
+            Enviar diagnóstico a soporte
+          </Button>
+          <DiagnosticDialog open={diagOpen} onOpenChange={setDiagOpen} />
+        </div>
+      )}
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="flex items-start gap-3 rounded-xl border p-4">
           <Scale className="mt-0.5 size-5 text-muted-foreground" />
@@ -409,7 +423,7 @@ export function AboutSection({ isAdmin }: { isAdmin: boolean }) {
           <ExternalLink className="mt-0.5 size-5 text-muted-foreground" />
           <div className="text-sm">
             <p className="font-medium">Tus datos son tuyos</p>
-            <p className="text-muted-foreground">Todo se guarda en esta computadora. Tus datos nunca se envían a internet.</p>
+            <p className="text-muted-foreground">Todo se guarda en esta computadora. Tus ventas, clientes y productos nunca se envían a internet.</p>
           </div>
         </div>
       </div>

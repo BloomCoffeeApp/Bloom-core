@@ -28,7 +28,9 @@ REFRESH_EVERY_S = 12 * 3600
 
 
 class LicenseServerError(Exception):
-    pass
+    def __init__(self, message: str = "", status: int | None = None):
+        super().__init__(message)
+        self.status = status  # HTTP status when the server answered; None when it couldn't be reached
 
 
 def server_url() -> str | None:
@@ -69,7 +71,7 @@ def _send(method: str, path: str, body: dict) -> dict:
             detail = json.loads(e.read()).get("detail")
         except Exception:
             detail = None
-        raise LicenseServerError(detail or f"El servidor de licencias respondió {e.code}.") from e
+        raise LicenseServerError(detail or f"El servidor de licencias respondió {e.code}.", e.code) from e
     except (urllib.error.URLError, TimeoutError, OSError) as e:
         raise LicenseServerError("No se pudo conectar con el servidor de licencias. Revisá la conexión a internet.") from e
 
@@ -88,7 +90,7 @@ def _get(path: str, query: dict | None = None) -> dict:
             detail = json.loads(e.read()).get("detail")
         except Exception:
             detail = None
-        raise LicenseServerError(detail or f"El servidor de licencias respondió {e.code}.") from e
+        raise LicenseServerError(detail or f"El servidor de licencias respondió {e.code}.", e.code) from e
     except (urllib.error.URLError, TimeoutError, OSError) as e:
         raise LicenseServerError("No se pudo conectar con el servidor de licencias. Revisá la conexión a internet.") from e
 
@@ -341,3 +343,23 @@ def email_preferences() -> dict:
 
 def update_email_preferences(news: bool | None, updates: bool | None) -> dict:
     return _put("/v1/account/preferences", {**_account_auth(), "news": news, "updates": updates})
+
+
+# ---------------------------------------------------------------- support diagnostic (the owner sends it by hand)
+
+
+def has_token() -> bool:
+    return token_path().exists()
+
+
+def send_diagnostic(diagnostic: dict) -> dict:
+    """Sends the (already scrubbed) support diagnostic; returns {support_code}. The license token goes along
+    when there is one so support can tell whose it is; without a license it is anonymous."""
+    body: dict = {"machine_id": machine_id(), "consent": True, "diagnostic": diagnostic}
+    try:
+        token = token_path().read_text(encoding="utf-8").strip()
+    except OSError:
+        token = ""
+    if token:
+        body["token"] = token
+    return _post("/v1/diagnostics", body)

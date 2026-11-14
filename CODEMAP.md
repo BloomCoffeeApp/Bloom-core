@@ -46,6 +46,7 @@ Patrón: `routers/<x>.py` valida → `services/<x>.py` lógica → `models/<x>.p
 | Perfil de negocio (qué módulos se muestran) | `business_profile.py` | ocultar es solo UI |
 | Backups/restore, info del sistema, auditoría | `system.py`, `backup.py`, `audit.py` | restore rechaza bases demo |
 | Actualizaciones in-app (manifiesto firmado) | `updates.py` | |
+| Diagnóstico para soporte (resumen limpio, vista previa y envío con consentimiento) | `diagnostics.py` | router `/api/diagnostics`; front `features/diagnostics/`; cliente `licensing/client.send_diagnostic` |
 | Fotos de productos | `product_images.py` | |
 | Datos demo | `seed.py`, `demo_sales.py` | 100% ficticios |
 | Fechas locales | `timeutil.py` | DB en UTC naive |
