@@ -19,6 +19,11 @@ const queryClient = new QueryClient({
   },
 })
 
+// Bloom Equipo (/equipo) installs as its own app: swap the manifest before the browser reads it for «Agregar a la pantalla».
+if (/^\/equipo(\/|$)/.test(window.location.pathname)) {
+  document.querySelector<HTMLLinkElement>('link[rel="manifest"]')?.setAttribute('href', '/equipo.webmanifest')
+}
+
 registerPwa()
 
 createRoot(document.getElementById('root')!).render(

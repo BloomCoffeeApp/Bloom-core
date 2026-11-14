@@ -30,15 +30,17 @@ function brandHtml(): Plugin {
 // The worker is registered only in secure contexts (localhost / https) and never inside the
 // desktop window (src/lib/pwa.ts). Over plain http on the LAN the manifest alone still allows
 // "Agregar a la pantalla principal".
-function manifest() {
+function manifest(team = false) {
   const c = brand.colors ?? {}
   return {
-    name: brand.name,
-    short_name: brand.name,
-    description: brand.description ?? '',
+    // Bloom Equipo (staff phones, /equipo) is installed apart from the main app: own id, start page and scope.
+    ...(team ? { id: '/equipo' } : {}),
+    name: team ? `${brand.name} Equipo` : brand.name,
+    short_name: team ? 'Equipo' : brand.name,
+    description: team ? `${brand.name} para el equipo: mesas y pedidos desde el celular` : (brand.description ?? ''),
     lang: 'es-AR',
-    start_url: '/',
-    scope: '/',
+    start_url: team ? '/equipo' : '/',
+    scope: team ? '/equipo' : '/',
     display: 'standalone',
     orientation: 'any',
     background_color: c.background ?? '#FAF7F2',
@@ -52,7 +54,7 @@ function manifest() {
 }
 
 function pwa(): Plugin {
-  const body = () => JSON.stringify(manifest(), null, 2)
+  const body = (team = false) => JSON.stringify(manifest(team), null, 2)
   return {
     name: 'bloom-pwa',
     configureServer(server) {
@@ -60,9 +62,14 @@ function pwa(): Plugin {
         res.setHeader('Content-Type', 'application/manifest+json')
         res.end(body())
       })
+      server.middlewares.use('/equipo.webmanifest', (_req, res) => {
+        res.setHeader('Content-Type', 'application/manifest+json')
+        res.end(body(true))
+      })
     },
     generateBundle(_opts, bundle) {
       this.emitFile({ type: 'asset', fileName: 'manifest.webmanifest', source: body() })
+      this.emitFile({ type: 'asset', fileName: 'equipo.webmanifest', source: body(true) })
       const files = Object.keys(bundle).filter((f) => f.startsWith('assets/') && !f.endsWith('.map'))
       const shell = ['/index.html', '/manifest.webmanifest', '/logo.svg', '/icons/icon-192.png', '/icons/icon-512.png',
         '/icons/maskable-512.png', '/icons/apple-touch-icon.png', ...files.map((f) => `/${f}`)]

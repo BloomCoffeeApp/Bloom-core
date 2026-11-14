@@ -23,6 +23,8 @@ const isPublicMenuPath = () => /^\/menu(\/|$)/.test(window.location.pathname)
 // Customer-facing payment screen (tablet/TV on the LAN, by its secret token): public too.
 const CustomerScreen = lazy(() => import('@/features/collect/customer-screen'))
 const isCustomerScreenPath = () => /^\/pantalla-cliente\/?$/.test(window.location.pathname)
+// Staff phone app (Bloom Equipo, Pro): its own login behind the code in the register's QR.
+const isTeamPath = () => /^\/equipo(\/|$)/.test(window.location.pathname)
 
 function Splash() {
   return (
@@ -39,6 +41,7 @@ export default function App() {
         <CustomerScreen />
       </Suspense>
     )
+  if (isTeamPath()) return <TeamRoute />
   const PublicMenuApp = proModules.PublicMenuApp
   if (PublicMenuApp && isPublicMenuPath())
     return (
@@ -49,6 +52,25 @@ export default function App() {
       </Suspense>
     )
   return <PrivateApp />
+}
+
+function TeamRoute() {
+  const TeamApp = proModules.TeamApp
+  if (!TeamApp)
+    return (
+      <div className="flex min-h-svh flex-col items-center justify-center gap-3 p-6 text-center">
+        <Coffee className="size-10 text-primary" />
+        <h1 className="font-heading text-2xl font-semibold">Bloom Equipo</h1>
+        <p className="max-w-sm text-muted-foreground">La app del equipo para celulares es parte de Bloom Pro.</p>
+      </div>
+    )
+  return (
+    <Suspense fallback={<Splash />}>
+      <BrowserRouter>
+        <TeamApp />
+      </BrowserRouter>
+    </Suspense>
+  )
 }
 
 /** The app shell loaded (maybe from the installed app's cache) but the shop's PC doesn't answer. */

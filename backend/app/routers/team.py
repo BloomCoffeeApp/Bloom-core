@@ -53,7 +53,7 @@ def info(db: Session = Depends(get_db), _: User = Show) -> dict:
     cfg = team_access.config(db)
     data = system_svc.info(db)
     return {
-        "url": _url(db), "lan_enabled": data["lan_enabled"], "lan_active": data["lan_active"],
+        "url": _url(db), "code": cfg["key"], "lan_enabled": data["lan_enabled"], "lan_active": data["lan_active"],
         "network_public": data["network_public"], "rotate": cfg["rotate"], "lock_minutes": cfg["lock_minutes"],
         "rotated_on": cfg.get("rotated_on"),
     }

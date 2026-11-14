@@ -41,6 +41,8 @@ export interface ProModules {
   TimeClockDialog?: Lazy<{ open: boolean; onOpenChange: (open: boolean) => void; userId?: number }>
   /** After login / before logout: «¿Fichar entrada / salida?» when the business turned it on (staff). */
   ClockPrompts?: Lazy<{ userId: number; logoutRequested: boolean; onLogoutProceed: () => void; onLogoutCancel: () => void }>
+  /** `/equipo`: Bloom Equipo, the staff phone app (waiter first): login with the register's QR code, «Mis mesas» (public_menu). */
+  TeamApp?: Lazy
   /** Configuración → Cobros: «Conectar Mercado Pago», the store/POS for the QR and the Point device (payments). */
   MercadoPagoConnect?: Lazy
 }

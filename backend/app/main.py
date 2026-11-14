@@ -119,7 +119,7 @@ def create_app(run_lifespan: bool = True) -> FastAPI:
             revalidate = {"Cache-Control": "no-cache"}
             candidate = (FRONTEND_DIST / path).resolve()
             if path and candidate.is_file() and FRONTEND_DIST.resolve() in candidate.parents:
-                if path == "manifest.webmanifest":
+                if path in ("manifest.webmanifest", "equipo.webmanifest"):
                     return FileResponse(candidate, media_type="application/manifest+json", headers=revalidate)
                 if path in ("sw.js", "index.html"):
                     return FileResponse(candidate, headers=revalidate)

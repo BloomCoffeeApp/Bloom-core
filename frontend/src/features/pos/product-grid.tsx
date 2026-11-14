@@ -21,12 +21,15 @@ export function ProductGrid({
   error,
   onPick,
   searchRef,
+  showDiscard = true,
 }: {
   catalog: PosCatalog | undefined
   loading: boolean
   error: Error | null
   onPick: (p: PosProduct) => void
   searchRef: RefObject<HTMLInputElement | null>
+  /** The quick-discard button needs register/bar permissions: the waiter's phone hides it. */
+  showDiscard?: boolean
 }) {
   const [q, setQ] = useState('')
   const [cat, setCat] = useState<number | 'all'>('all')
@@ -77,7 +80,7 @@ export function ProductGrid({
             </button>
           )}
         </div>
-        <QuickDiscardButton className="h-14 rounded-2xl" label={false} />
+        {showDiscard && <QuickDiscardButton className="h-14 rounded-2xl" label={false} />}
       </div>
 
       <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">

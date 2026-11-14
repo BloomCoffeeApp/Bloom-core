@@ -1,4 +1,4 @@
-import { BellRing, ClipboardList, Expand, Globe, MessageCircle, Minimize, MonitorPlay, Receipt, Volume2 } from 'lucide-react'
+import { BellRing, ClipboardList, Expand, Globe, MessageCircle, Minimize, MonitorPlay, Receipt, Smartphone, Volume2 } from 'lucide-react'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Route, Routes } from 'react-router'
 import { toast } from 'sonner'
@@ -12,10 +12,12 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
 import { proModules } from '@pro'
 import { useNow } from '@/hooks/use-now'
+import { useAuth } from '@/lib/auth'
 import { fmtMoney } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 import { useHasFeature } from '../license/api'
+import { TeamAccessDialog } from '../team/team-access-dialog'
 import { useBoard, useOnlineOrderAction, useResolveCall, useSetOrderStatus, whatsappLink } from './api'
 import { OrderCard } from './order-card'
 import { printKitchenTicket } from './print'
@@ -75,6 +77,8 @@ function OrdersPage() {
   const [eta, setEta] = useState(20)
   const [waNotify, setWaNotify] = useState(true)
   const [fullscreen, setFullscreen] = useState(false)
+  const [teamQr, setTeamQr] = useState(false)
+  const { can } = useAuth()
   const rootRef = useRef<HTMLDivElement>(null)
 
   const proFeature = useHasFeature('orders_pro')
@@ -271,6 +275,11 @@ function OrdersPage() {
               </a>
             </Button>
           )}
+          {proModules.TeamApp && can('orders.manage', 'pos.sell') && (
+            <Button variant="outline" className="h-11" onClick={() => setTeamQr(true)}>
+              <Smartphone /> <span className="hidden lg:inline">QR para el equipo</span>
+            </Button>
+          )}
           <SoundMenu prefs={prefs} onChange={setPrefs} pro={pro} />
           <Button variant="outline" className="size-11" onClick={toggleFullscreen} aria-label={fullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}>
             {fullscreen ? <Minimize /> : <Expand />}
@@ -457,6 +466,7 @@ function OrdersPage() {
           />
         )}
       </ConfirmDialog>
+      {proModules.TeamApp && <TeamAccessDialog open={teamQr} onOpenChange={setTeamQr} />}
     </div>
   )
 }

@@ -119,6 +119,7 @@ def test_config_validation_and_permissions(api):
     assert client.put("/api/team/config", json={"rotate": "weekly"}, headers=admin).status_code == 422
     assert client.put("/api/team/config", json={"lock_minutes": 0}, headers=admin).status_code == 422
     assert client.put("/api/team/config", json={"lock_minutes": 45}, headers=admin).json()["lock_minutes"] == 45
+    assert client.get("/api/team/info", headers=admin).json()["code"] == _key()
     _user(client, admin, "Mozo C", "mozo")
     h = login(client, "Mozo C", "4321")
     assert client.post("/api/team/rotate", headers=h).status_code == 403

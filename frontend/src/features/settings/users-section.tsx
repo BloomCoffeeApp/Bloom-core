@@ -1,4 +1,4 @@
-import { KeyRound, Loader2, Pencil, Plus, ShieldCheck, UserPlus } from 'lucide-react'
+import { KeyRound, Loader2, Pencil, Plus, ShieldCheck, Smartphone, UserPlus } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
 
@@ -19,6 +19,7 @@ import { cn } from '@/lib/utils'
 import { useCreateUser, useRoles, useUpdateUser, useUsers } from './api'
 import { Field, SettingsCard } from './form'
 import type { UserRow } from './types'
+import { SessionsDialog } from '../team/sessions-dialog'
 import { UserPermissionsDialog } from './user-permissions-dialog'
 
 const COLORS = Object.keys(AVATAR_COLORS)
@@ -37,6 +38,7 @@ type DialogState =
   | { mode: 'edit'; user: UserRow }
   | { mode: 'pin'; user: UserRow }
   | { mode: 'permissions'; user: UserRow }
+  | { mode: 'sessions'; user: UserRow }
   | null
 
 function UserDialog({ state, onClose }: { state: Exclude<DialogState, { mode: 'permissions' } | null>; onClose: () => void }) {
@@ -248,6 +250,9 @@ export function UsersSection() {
         enableSorting: false,
         cell: ({ row }) => (
           <div className="flex justify-end gap-1">
+            <Button variant="ghost" size="sm" onClick={() => setDialog({ mode: 'sessions', user: row.original })}>
+              <Smartphone /> Sesiones
+            </Button>
             <Button variant="ghost" size="sm" onClick={() => setDialog({ mode: 'pin', user: row.original })}>
               <KeyRound /> PIN
             </Button>
@@ -292,7 +297,8 @@ export function UsersSection() {
         }
       />
       {dialog?.mode === 'permissions' && <UserPermissionsDialog key={dialog.user.id} user={dialog.user} onClose={() => setDialog(null)} />}
-      {dialog && dialog.mode !== 'permissions' && (
+      {dialog?.mode === 'sessions' && <SessionsDialog key={dialog.user.id} user={dialog.user} onClose={() => setDialog(null)} />}
+      {dialog && dialog.mode !== 'permissions' && dialog.mode !== 'sessions' && (
         <UserDialog key={dialog.mode + ('user' in dialog ? dialog.user.id : '')} state={dialog} onClose={() => setDialog(null)} />
       )}
     </SettingsCard>
