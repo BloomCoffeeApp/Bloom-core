@@ -8,7 +8,7 @@
 import type { Channel } from '../sales/types'
 
 export type SoundId = 'campana' | 'dingdong' | 'marimba' | 'bip'
-export type AlertKind = 'new' | 'late' | 'call'
+export type AlertKind = 'new' | 'late' | 'call' | 'paid'
 
 export const SOUNDS: { id: SoundId; label: string }[] = [
   { id: 'campana', label: 'Campanita' },
@@ -107,6 +107,13 @@ const CALL: Note[] = [
   [2637, 0.75, 0.4, 'sine', 0.3],
 ]
 
+// A table paid everything from the phones: three short rising notes (different from the call ping and the late buzz).
+const PAID: Note[] = [
+  [659.3, 0, 0.18, 'sine', 0.3],
+  [830.6, 0.14, 0.18, 'sine', 0.3],
+  [987.8, 0.28, 0.5, 'sine', 0.3],
+]
+
 function playNotes(notes: Note[]) {
   const c = audio()
   if (!c || c.state !== 'running') return
@@ -134,6 +141,7 @@ export function playAlert(kind: AlertKind, prefs: SoundPrefs, channel?: Channel,
   if (prefs.muted) return
   if (kind === 'late') return playNotes(LATE)
   if (kind === 'call') return playNotes(CALL)
+  if (kind === 'paid') return playNotes(PAID)
   const id = (pro && channel && prefs.perChannel[channel]) || prefs.sound
   playSound(id)
 }
