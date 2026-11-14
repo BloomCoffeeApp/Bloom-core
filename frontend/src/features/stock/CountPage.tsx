@@ -206,7 +206,7 @@ function PackageCount({ item, pkg, editable, onSave }: { item: CountItem; pkg: S
   )
 }
 
-function CountRow({
+export function CountRow({
   item,
   editable,
   onSave,
