@@ -62,6 +62,9 @@ class LineOut(BaseModel):
     unit_cost_cents: float
     subtotal_cents: int
     expiry_date: date | None = None
+    # Order lines only: what already arrived (partial receipts) and what is still pending.
+    received_qty: float = 0
+    pending_qty: float | None = None
 
 
 # ---------- Purchase orders ----------
@@ -90,6 +93,8 @@ class OrderOut(BaseModel):
     created_at: datetime
     items: list[LineOut]
     purchase_id: int | None = None
+    # Every receipt (purchase) made against this order, oldest first.
+    receipts: list[int] = []
 
 
 class FromSuggestionsIn(BaseModel):
@@ -150,6 +155,7 @@ class PurchaseOut(BaseModel):
     created_at: datetime
     items: list[LineOut] = []
     payments: list[PaymentOut] = []
+    has_remito: bool = False
 
 
 class SupplierAccount(BaseModel):

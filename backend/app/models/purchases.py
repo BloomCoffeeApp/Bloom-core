@@ -22,7 +22,7 @@ class Supplier(IdMixin, TimestampMixin, Base):
 class PurchaseOrder(IdMixin, TimestampMixin, Base):
     __tablename__ = "purchase_orders"
     supplier_id: Mapped[int] = mapped_column(ForeignKey("suppliers.id"))
-    status: Mapped[str] = mapped_column(String(12), default="draft")  # draft|sent|received|cancelled
+    status: Mapped[str] = mapped_column(String(12), default="draft")  # draft|sent|partial|received|cancelled
     expected_date: Mapped[date | None] = mapped_column(Date)
     notes: Mapped[str | None] = mapped_column(Text)
     total_cents: Mapped[int] = mapped_column(default=0)
@@ -36,6 +36,8 @@ class PurchaseOrderItem(IdMixin, Base):
     stock_item_id: Mapped[int] = mapped_column(ForeignKey("stock_items.id"))
     qty: Mapped[float] = mapped_column(Float)
     unit_cost_cents: Mapped[float] = mapped_column(Float, default=0)
+    # What already arrived (partial receipts add up; the order is «received» when nothing is pending).
+    received_qty: Mapped[float] = mapped_column(Float, default=0, server_default="0")
 
 
 class Purchase(IdMixin, TimestampMixin, Base):
@@ -50,6 +52,8 @@ class Purchase(IdMixin, TimestampMixin, Base):
     status: Mapped[str] = mapped_column(String(12), default="pending")  # pending|partial|paid
     notes: Mapped[str | None] = mapped_column(Text)
     user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    # Photo of the delivery note (remito) taken at the warehouse; kept outside the public /uploads (`<datos>/receipts/`).
+    remito_path: Mapped[str | None] = mapped_column(String(40))
     items: Mapped[list["PurchaseItem"]] = relationship(cascade="all, delete-orphan")
     payments: Mapped[list["SupplierPayment"]] = relationship(cascade="all, delete-orphan")
 
