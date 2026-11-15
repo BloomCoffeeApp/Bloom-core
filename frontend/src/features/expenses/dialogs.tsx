@@ -1,6 +1,7 @@
 import { Camera, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
+import { DatePicker } from '@/components/date-picker'
 import { MoneyInput } from '@/components/money-input'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -207,7 +208,7 @@ export function ExpenseDialog({
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="exp-date">Fecha (mes al que corresponde)</Label>
-              <Input id="exp-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+              <DatePicker id="exp-date" value={date} onChange={(v) => setDate(v)} />
             </div>
           </div>
           {!editing && (
@@ -230,7 +231,7 @@ export function ExpenseDialog({
             {(status === 'pending' || (editing && expense?.status === 'pending')) && (
               <div className="grid gap-1.5">
                 <Label htmlFor="exp-due">Vence el</Label>
-                <Input id="exp-due" type="date" value={due} onChange={(e) => setDue(e.target.value)} />
+                <DatePicker id="exp-due" value={due} onChange={(v) => setDue(v)} />
               </div>
             )}
             <div className="grid gap-1.5">

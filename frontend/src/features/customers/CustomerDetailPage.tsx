@@ -21,6 +21,7 @@ import {
 import { Suspense, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 
+import { hasBirthYear } from './birthday-utils'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { EmptyState } from '@/components/empty-state'
 import { StatCard } from '@/components/stat-card'
@@ -154,7 +155,7 @@ function Detail({ c }: { c: CustomerDetail }) {
               )}
               {c.birthday && (
                 <span className="inline-flex items-center gap-1.5">
-                  <Cake className="size-4" /> {fmtDate(c.birthday)} · {age(c.birthday)} años
+                  <Cake className="size-4" /> {hasBirthYear(c.birthday) ? `${fmtDate(c.birthday)} · ${age(c.birthday)} años` : fmtDate(c.birthday).slice(0, 5)}
                 </span>
               )}
               <span className="inline-flex items-center gap-1.5">

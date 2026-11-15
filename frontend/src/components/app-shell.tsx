@@ -1,13 +1,13 @@
 import { useQuery } from '@tanstack/react-query'
-import { Bell, CircleHelp, Clock, GraduationCap, Lock, LogOut, Monitor, Moon, Search, Sparkles, Sun } from 'lucide-react'
+import { CircleHelp, Clock, GraduationCap, Lock, LogOut, Monitor, Moon, Search, Sparkles, Sun } from 'lucide-react'
 import { Fragment, Suspense, useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 
 import { CommandPalette } from '@/components/command-palette'
+import { NotificationsPopover } from '@/components/notifications-popover'
 import { useDesktop, useTitleBarDrag } from '@/components/use-desktop'
 import { WindowControls } from '@/components/window-controls'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -282,21 +282,7 @@ export function AppShell() {
             <Button variant="ghost" size="icon" onClick={tour.start} aria-label="Ver tutorial" title="Ver tutorial">
               <CircleHelp />
             </Button>
-            <Button variant="ghost" size="icon" asChild className="relative">
-              <Link to="/avisos" aria-label={alertSummary?.open ? `Alertas: ${alertSummary.open}` : "Alertas"} data-tour="alerts">
-                <Bell />
-                {!!alertSummary?.open && (
-                  <Badge
-                    className={cn(
-                      'absolute -top-1 -right-1 h-4 min-w-4 rounded-full px-1 text-[10px]',
-                      alertSummary.critical ? 'bg-destructive text-white' : '',
-                    )}
-                  >
-                    {alertSummary.open}
-                  </Badge>
-                )}
-              </Link>
-            </Button>
+            <NotificationsPopover />
             <Button variant="ghost" size="icon" onClick={requestLogout} aria-label="Bloquear" data-tour="lock">
               <Lock />
             </Button>

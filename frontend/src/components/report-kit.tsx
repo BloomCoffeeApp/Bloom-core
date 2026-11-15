@@ -1,7 +1,7 @@
 import { CalendarRange } from 'lucide-react'
 import type { ReactNode } from 'react'
 
-import { Input } from '@/components/ui/input'
+import { DatePicker } from '@/components/date-picker'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { type DateRange, PRESET_LABEL, type PresetKey, presetRange } from '@/components/report-utils'
 import { fmtMoney } from '@/lib/format'
@@ -56,23 +56,9 @@ export function RangePicker({
       />
       <div className="flex items-center gap-1.5 rounded-lg border bg-card px-2 py-1">
         <CalendarRange className="size-4 text-muted-foreground" />
-        <Input
-          type="date"
-          aria-label="Desde"
-          value={range.from}
-          max={range.to}
-          onChange={(e) => e.target.value && onChange({ ...range, from: e.target.value }, null)}
-          className="h-7 w-36 border-0 bg-transparent px-1 shadow-none focus-visible:ring-0 dark:bg-transparent"
-        />
+        <DatePicker aria-label="Desde" value={range.from} max={range.to} onChange={(v) => v && onChange({ ...range, from: v }, null)} className="h-7 w-36 min-w-0 justify-center gap-1 border-0 bg-transparent px-1 shadow-none dark:bg-transparent" />
         <span className="text-xs text-muted-foreground">a</span>
-        <Input
-          type="date"
-          aria-label="Hasta"
-          value={range.to}
-          min={range.from}
-          onChange={(e) => e.target.value && onChange({ ...range, to: e.target.value }, null)}
-          className="h-7 w-36 border-0 bg-transparent px-1 shadow-none focus-visible:ring-0 dark:bg-transparent"
-        />
+        <DatePicker aria-label="Hasta" value={range.to} min={range.from} onChange={(v) => v && onChange({ ...range, to: v }, null)} className="h-7 w-36 min-w-0 justify-center gap-1 border-0 bg-transparent px-1 shadow-none dark:bg-transparent" />
       </div>
     </div>
   )

@@ -1,4 +1,4 @@
-import { createContext, type MouseEvent, useContext, useMemo } from 'react'
+import { createContext, type MouseEvent, type RefObject, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 
 /** Python API exposed by desktop_window.py when running inside the desktop app. */
 export interface DesktopApi {
@@ -6,6 +6,8 @@ export interface DesktopApi {
   minimize: () => Promise<void>
   toggle_maximize: () => Promise<boolean>
   is_maximized: () => Promise<boolean>
+  is_fullscreen: () => Promise<boolean>
+  toggle_fullscreen: () => Promise<boolean>
   close: () => Promise<void>
   start_drag: () => Promise<void>
   start_resize: (edge: Edge) => Promise<void>
@@ -57,4 +59,40 @@ export function useTitleBarDrag({ selfOnly = false }: { selfOnly?: boolean } = {
       },
     }
   }, [api, toggleMaximize, selfOnly])
+}
+
+/** Full screen that works everywhere: the native window in the desktop app (the browser API does nothing
+ * inside it), the element's `requestFullscreen()` in a browser or tablet. Esc leaves it in both. */
+export function useFullscreen(target?: RefObject<HTMLElement | null>) {
+  const { api } = useDesktop()
+  const [fullscreen, setFullscreen] = useState(false)
+  const native = !!api?.toggle_fullscreen
+
+  useEffect(() => {
+    if (native) return
+    const on = () => setFullscreen(document.fullscreenElement != null)
+    document.addEventListener('fullscreenchange', on)
+    return () => document.removeEventListener('fullscreenchange', on)
+  }, [native])
+
+  const toggle = useCallback(async () => {
+    try {
+      if (api?.toggle_fullscreen) setFullscreen(await api.toggle_fullscreen())
+      else if (document.fullscreenElement) await document.exitFullscreen()
+      else await (target?.current ?? document.documentElement).requestFullscreen()
+    } catch {
+      /* not allowed (iframe/webview): ignore */
+    }
+  }, [api, target])
+
+  useEffect(() => {
+    if (!native || !fullscreen) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') void api?.toggle_fullscreen?.().then(setFullscreen)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [api, native, fullscreen])
+
+  return { fullscreen, toggle }
 }

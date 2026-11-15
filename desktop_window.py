@@ -181,6 +181,15 @@ class WindowApi:
         self._ui(toggle)
         return self.is_maximized()
 
+    def is_fullscreen(self) -> bool:
+        form = self._form() if IS_WINDOWS and self._window is not None else None
+        return bool(form is not None and getattr(form, "is_fullscreen", False))
+
+    def toggle_fullscreen(self) -> bool:
+        """Real full screen of the native window (the page's `requestFullscreen()` does nothing inside it)."""
+        self._window.toggle_fullscreen()
+        return self.is_fullscreen()
+
     def close(self) -> None:
         self._window.destroy()
 

@@ -5,6 +5,7 @@ import { ConfirmDialog } from '@/components/confirm-dialog'
 import { EmptyState } from '@/components/empty-state'
 import { MoneyInput } from '@/components/money-input'
 import { Badge } from '@/components/ui/badge'
+import { NumberStepper } from '@/components/number-stepper'
 import { Button } from '@/components/ui/button'
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
@@ -78,11 +79,11 @@ function GroupDialog({ open, onOpenChange, group }: { open: boolean; onOpenChang
           </div>
           <div className="grid gap-1.5">
             <Label htmlFor="g-min">Mínimo</Label>
-            <Input id="g-min" type="number" min={0} className="tabular" value={min} onChange={(e) => setMin(e.target.value)} />
+            <NumberStepper id="g-min" min={0} value={min} onChange={setMin} />
           </div>
           <div className="grid gap-1.5">
             <Label htmlFor="g-max">Máximo</Label>
-            <Input id="g-max" type="number" min={1} className="tabular" value={max} onChange={(e) => setMax(e.target.value)} />
+            <NumberStepper id="g-max" min={1} value={max} onChange={setMax} />
           </div>
         </div>
         {minN > maxN && <p className="text-xs text-destructive">El mínimo no puede superar al máximo.</p>}

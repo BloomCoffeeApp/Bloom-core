@@ -19,6 +19,8 @@ export interface ProModules {
   TablesSettings?: Lazy
   /** Orders screen: phones connected to each open table, approvals, «Liberar mesa» (public_menu). */
   TableSessionsPanel?: Lazy
+  /** `/salon`: the floor map as its own screen, with «Crear mesas» when there are none (public_menu). */
+  FloorPlanPage?: Lazy
   /** Checkout of a table's account: pick the waiter who served it (public_menu). */
   CheckoutWaiter?: Lazy<{ tabId: number; value: number | null; onChange: (employeeId: number | null) => void }>
   /** Configuración → Pedidos: stations and pickup screen (orders_pro). */

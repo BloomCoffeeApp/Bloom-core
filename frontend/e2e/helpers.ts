@@ -114,3 +114,36 @@ export const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 /** A StatCard (label + value + hint), located by its exact label. */
 export const statCard = (scope: Page | Locator, label: string) =>
   scope.getByText(label, { exact: true }).first().locator('xpath=ancestor::*[@data-slot="card"][1]')
+
+const MONTHS_ES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
+
+/** Picks `iso` (YYYY-MM-DD) in a DatePicker (the app's own calendar, not the browser's): opens the field with
+ * that label, walks to the right year and month, and clicks the day. */
+export async function pickDate(scope: Page | Locator, label: string | RegExp, iso: string) {
+  const page = 'goto' in scope ? scope : scope.page()
+  await scope.getByLabel(label).first().click()
+  const pop = page.getByTestId('date-picker-popover')
+  await pop.waitFor()
+  const [y, m] = iso.split('-').map(Number)
+  const current = async () => {
+    const [month, , year] = ((await pop.getByRole('grid').getAttribute('aria-label')) ?? '').split(' ')
+    return { month: MONTHS_ES.indexOf(month) + 1, year: Number(year) }
+  }
+  for (let guard = 0; guard < 400; guard++) {
+    const c = await current()
+    if (c.year !== y) await pop.getByRole('button', { name: c.year < y ? 'Año siguiente' : 'Año anterior' }).click()
+    else if (c.month !== m) await pop.getByRole('button', { name: c.month < m ? 'Mes siguiente' : 'Mes anterior' }).click()
+    else break
+  }
+  await pop.locator(`[data-day="${iso}"]`).click()
+  await pop.waitFor({ state: 'hidden' })
+}
+
+/** Empties a clearable DatePicker with its «Borrar» button. */
+export async function clearDate(scope: Page | Locator, label: string | RegExp) {
+  const page = 'goto' in scope ? scope : scope.page()
+  await scope.getByLabel(label).first().click()
+  const pop = page.getByTestId('date-picker-popover')
+  await pop.getByRole('button', { name: 'Borrar' }).click()
+  await pop.waitFor({ state: 'hidden' })
+}

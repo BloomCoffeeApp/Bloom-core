@@ -15,6 +15,7 @@ import {
   UserRoundCheck,
   Users,
   Wallet,
+  Armchair,
 } from 'lucide-react'
 
 import type { ModuleKey } from '@/features/business/types'
@@ -39,6 +40,7 @@ export const NAV: NavItem[] = [
   { to: '/', label: 'Inicio', icon: LayoutDashboard, perms: [], group: 'operacion' },
   { to: '/pos', label: 'Punto de venta', icon: ShoppingCart, perms: ['pos.sell'], group: 'operacion', shortcut: 'F1' },
   { to: '/pedidos', label: 'Pedidos', icon: ClipboardList, perms: [], group: 'operacion', module: 'orders' },
+  { to: '/salon', label: 'Salón', icon: Armchair, perms: [], group: 'operacion', feature: 'public_menu', module: 'tables' },
   { to: '/caja', label: 'Caja', icon: Wallet, perms: ['cash.open_close', 'cash.movements'], group: 'operacion' },
   { to: '/barista', label: 'Barista', icon: Coffee, perms: ['barista.use'], group: 'operacion', feature: 'barista', module: 'barista' },
   { to: '/productos', label: 'Productos', icon: Package, perms: ['catalog.edit', 'prices.edit'], group: 'gestion' },

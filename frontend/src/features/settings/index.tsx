@@ -37,7 +37,7 @@ import { NotificationsSection } from '../account/notifications-section'
 import { LicenseSection } from '../license/license-section'
 import { FreeActivesSection } from '../license/free-actives-section'
 import { UpgradeCard } from '../license/pro-gate'
-import { useHasFeature } from '../license/api'
+import { useFreePlan, useHasFeature } from '../license/api'
 import { proModules } from '@pro'
 import { AboutSection, BackupSection, NetworkSection, PaymentMethodsSection } from './system-sections'
 import { RolesSection } from './roles-section'
@@ -73,6 +73,7 @@ function SettingsPage() {
   const ordersPro = useHasFeature('orders_pro')
   const stampsPro = useHasFeature('loyalty_pro')
   const modules = useModules()
+  const freePlan = useFreePlan()
 
   const withSettings = (fn: () => ReactNode) => () => (s ? fn() : <CardSkeleton />)
 
@@ -86,7 +87,7 @@ function SettingsPage() {
           </div>
         )) },
         { value: 'licencia', perm: 'admin', label: 'Licencia', icon: Sparkles, render: () => <LicenseSection /> },
-        { value: 'activos', perm: 'admin', label: 'Elegí tus activos', icon: Lock, render: () => <FreeActivesSection /> },
+        { value: 'activos', perm: 'admin', label: freePlan.data && !freePlan.data.limited ? 'Plan gratuito' : 'Elegí tus activos', icon: Lock, render: () => <FreeActivesSection /> },
         { value: 'cuenta', perm: 'admin', label: 'Cuenta', icon: UserRound, render: () => <AccountSection /> },
         { value: 'notificaciones', perm: 'admin', label: 'Notificaciones', icon: Mail, render: () => <NotificationsSection /> },
         { value: 'usuarios', perm: 'users.manage', label: 'Usuarios', icon: Users, render: () => <UsersSection /> },

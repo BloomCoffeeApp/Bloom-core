@@ -40,7 +40,8 @@ test.describe('Ventas', () => {
       await expect(page.getByText(/No hay ventas|N°/).first()).toBeVisible()
     }
     await page.getByRole('button', { name: 'Rango', exact: true }).click()
-    await expect(page.locator('input[type="date"]')).toHaveCount(2)
+    await expect(page.getByLabel('Desde')).toBeVisible()
+    await expect(page.getByLabel('Hasta')).toBeVisible()
 
     // Ticket number search ignores the dates
     await page.getByPlaceholder('N° de ticket').fill(String(n))

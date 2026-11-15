@@ -40,6 +40,7 @@ Patrón: `routers/<x>.py` valida → `services/<x>.py` lógica → `models/<x>.p
 | Gastos (categorías, fijos mensuales, pagos, ganancia) | `expenses.py` (661) | Free; el reporte de ganancia es Pro |
 | Clientes, cuenta corriente, puntos | `customers.py` | |
 | Alertas (motor de reglas; `register_rule` para que Pro sume las suyas) | `alerts_engine.py` | |
+| Lo urgente de la campana (pedidos por confirmar, llamados de mesa) | `notifications.py` (`GET /api/notifications/urgent` en `routers/alerts.py`) | |
 | Avisos internos y checklists apertura/cierre | `notices.py` | |
 | Dashboard / KPIs (helpers usados por reportes Pro) | `dashboard.py` | |
 | Impresión térmica ESC/POS directa | `printing.py`, `escpos.py`, `printers.py` | |
@@ -59,7 +60,8 @@ Patrón: `routers/<x>.py` valida → `services/<x>.py` lógica → `models/<x>.p
   `dashboard`, `settings` (incluye `roles-section.tsx`, `users-section.tsx`), `license`, `account`, `business`,
   `printing`, `updates`, `remote-config`, `tutorial`, `auth`.
 - Compartidos (reusar antes de crear): `components/` → DataTable, PageHeader, MoneyInput, StatCard, EmptyState,
-  ConfirmDialog, report-kit. Formato: `lib/format.ts`. PWA: `lib/pwa.ts` + `pwa/sw.template.js`.
+  ConfirmDialog, report-kit, **NumberStepper** (números con − / +), **DatePicker** (calendario propio: nunca `type="date"`),
+  **NotificationsPopover** (la campana), `useFullscreen` (`use-desktop.ts`: ventana nativa en escritorio). Formato: `lib/format.ts`. PWA: `lib/pwa.ts` + `pwa/sw.template.js`.
 - Punto de enchufe Pro: `pro-modules.ts` (forma), `pro-stub.ts` (Free), alias `@pro`; gating `features/license/pro-gate.tsx`.
 - POS: `features/pos/` (`cart-panel.tsx`, `checkout-dialog.tsx`, `use-cart.ts`, `modifier-dialog.tsx`).
 

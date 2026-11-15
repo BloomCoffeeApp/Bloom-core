@@ -3,7 +3,7 @@ import path from 'node:path'
 import type { Page } from '@playwright/test'
 
 import { expect, test } from './fixtures'
-import { authHeaders, ensureCashOpenApi, money, uid } from './helpers'
+import { authHeaders, ensureCashOpenApi, money, pickDate, uid } from './helpers'
 
 /** Optional screenshots for reviews: BLOOM_SHOTS=<folder>. */
 async function shot(page: Page, name: string) {
@@ -54,7 +54,7 @@ test('expenses: cash expense out of the drawer, pending → paid, monthly fixed 
   await form.getByRole('radio', { name: 'Pendiente de pago' }).click()
   const tomorrow = new Date(Date.now() + 86_400_000)
   const iso = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`
-  await form.getByLabel('Vence el').fill(iso)
+  await pickDate(form, 'Vence el', iso)
   await form.getByRole('button', { name: 'Cargar gasto' }).click()
   const pending = page.getByRole('row').filter({ hasText: `ABL ${tag}` })
   await expect(pending).toContainText('Pendiente')

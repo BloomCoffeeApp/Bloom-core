@@ -1,5 +1,6 @@
 import { useState } from 'react'
 
+import { BirthdayField } from './birthday-field'
 import { MoneyInput } from '@/components/money-input'
 import { Button } from '@/components/ui/button'
 import {
@@ -125,9 +126,9 @@ export function CustomerFormDialog({
               <Label htmlFor="c-email">Email</Label>
               <Input id="c-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
             </div>
-            <div className="grid gap-2">
+            <div className="grid gap-2 sm:col-span-2">
               <Label htmlFor="c-bday">Cumpleaños</Label>
-              <Input id="c-bday" type="date" value={birthday} onChange={(e) => setBirthday(e.target.value)} />
+              <BirthdayField id="c-bday" value={birthday} onChange={setBirthday} />
             </div>
             {can('customers.manage') && (
               <div className="grid gap-2">

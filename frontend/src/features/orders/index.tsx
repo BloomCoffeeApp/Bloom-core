@@ -1,12 +1,13 @@
 import { BellRing, ClipboardList, Expand, Globe, MessageCircle, Minimize, MonitorPlay, Receipt, Smartphone, Volume2 } from 'lucide-react'
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Route, Routes } from 'react-router'
 import { toast } from 'sonner'
 
+import { useFullscreen } from '@/components/use-desktop'
 import { ConfirmDialog } from '@/components/confirm-dialog'
+import { NumberStepper } from '@/components/number-stepper'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
@@ -76,7 +77,6 @@ function OrdersPage() {
   const [reason, setReason] = useState('')
   const [eta, setEta] = useState(20)
   const [waNotify, setWaNotify] = useState(true)
-  const [fullscreen, setFullscreen] = useState(false)
   const [teamQr, setTeamQr] = useState(false)
   const { can } = useAuth()
   const rootRef = useRef<HTMLDivElement>(null)
@@ -195,20 +195,7 @@ function OrdersPage() {
     seen.current = null
   }, [effectiveStation])
 
-  // ------------------------------------------------------------ fullscreen
-  useEffect(() => {
-    const on = () => setFullscreen(document.fullscreenElement === rootRef.current)
-    document.addEventListener('fullscreenchange', on)
-    return () => document.removeEventListener('fullscreenchange', on)
-  }, [])
-  const toggleFullscreen = useCallback(async () => {
-    try {
-      if (document.fullscreenElement) await document.exitFullscreen()
-      else await rootRef.current?.requestFullscreen()
-    } catch {
-      /* not allowed (iframe/webview): ignore */
-    }
-  }, [])
+  const { fullscreen, toggle: toggleFullscreen } = useFullscreen(rootRef)
 
   const act = {
     busy: setStatus.isPending || online.isPending,
@@ -438,13 +425,13 @@ function OrdersPage() {
                   {m} min
                 </Button>
               ))}
-              <Input
-                type="number"
+              <NumberStepper
                 min={1}
                 max={600}
+                step={5}
+                suffix="min"
                 value={eta}
-                onChange={(e) => setEta(Math.max(1, Math.min(600, Number(e.target.value) || 1)))}
-                className="h-11 w-24"
+                onChange={(v) => setEta(Math.max(1, Math.min(600, Number(v) || 1)))}
                 aria-label="Minutos"
               />
             </div>

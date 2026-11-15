@@ -18,9 +18,11 @@ from app.schemas.alerts import (
     NoticeOut,
     NoticeUpdate,
     RunItemPatch,
+    UrgentOut,
 )
 from app.schemas.common import Ok
 from app.services import alerts_engine, roles
+from app.services import notifications as notif_svc
 from app.services import notices as nsvc
 
 router = APIRouter(prefix="/api", tags=["alerts"])
@@ -86,6 +88,13 @@ def list_alerts(
 @router.get("/alerts/summary", response_model=AlertSummary)
 def alerts_summary(db: Session = Depends(get_db), user: User = CurrentUser) -> dict[str, int]:
     return _summary(db, user)
+
+
+@router.get("/notifications/urgent", response_model=UrgentOut)
+def urgent_notifications(db: Session = Depends(get_db), _: User = CurrentUser) -> dict[str, Any]:
+    """The bell's «Ahora»: customer orders waiting for confirmation and tables calling (same audience as the
+    Orders board: any logged-in user)."""
+    return notif_svc.urgent(db)
 
 
 @router.post("/alerts/read-all", response_model=AlertSummary)

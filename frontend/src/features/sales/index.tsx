@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, Receipt, Search, ShoppingCart } from 'lucide
 import { useMemo, useState } from 'react'
 import { Link, Route, Routes } from 'react-router'
 
+import { DatePicker } from '@/components/date-picker'
 import { EmptyState } from '@/components/empty-state'
 import { PageHeader } from '@/components/page-header'
 import { StatCard } from '@/components/stat-card'
@@ -106,9 +107,9 @@ function SalesPage() {
         </div>
         {preset === 'range' && (
           <div className="flex items-center gap-2">
-            <Input type="date" className="h-10 w-40" value={range.from} max={range.to} onChange={(e) => reset(setRange)({ ...range, from: e.target.value })} />
+            <DatePicker aria-label="Desde" className="h-10 w-40" value={range.from} max={range.to} onChange={(v) => reset(setRange)({ ...range, from: v })} />
             <span className="text-muted-foreground">a</span>
-            <Input type="date" className="h-10 w-40" value={range.to} min={range.from} onChange={(e) => reset(setRange)({ ...range, to: e.target.value })} />
+            <DatePicker aria-label="Hasta" className="h-10 w-40" value={range.to} min={range.from} onChange={(v) => reset(setRange)({ ...range, to: v })} />
           </div>
         )}
         <Select value={status} onValueChange={reset(setStatus)}>

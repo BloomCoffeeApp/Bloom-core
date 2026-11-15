@@ -52,6 +52,7 @@ export function AppRoutes() {
           <Route index element={<Dashboard />} />
           <Route path="pos/*" element={<Guard perms={['pos.sell']}><Pos /></Guard>} />
           <Route path="pedidos/*" element={<ModuleRoute module="orders"><Orders /></ModuleRoute>} />
+          <Route path="salon/*" element={<ModuleRoute module="tables"><ProModule feature="public_menu" component={pro.FloorPlanPage} /></ModuleRoute>} />
           <Route path="caja/*" element={<Guard perms={['cash.open_close', 'cash.movements']}><Cash /></Guard>} />
           <Route path="ventas/*" element={<Guard perms={['pos.sell']}><Sales /></Guard>} />
           <Route path="barista/*" element={<Guard perms={['barista.use']}><ModuleRoute module="barista"><ProModule feature="barista" component={pro.Barista} /></ModuleRoute></Guard>} />

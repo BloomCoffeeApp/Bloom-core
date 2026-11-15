@@ -1,4 +1,4 @@
-import { Check, Clock, Lock, Search, Sparkles } from 'lucide-react'
+import { Check, ChevronDown, Clock, Lock, Pause, Search, Sparkles } from 'lucide-react'
 import { useMemo, useState } from 'react'
 
 import { Badge } from '@/components/ui/badge'
@@ -22,6 +22,7 @@ const KINDS: { kind: FreeKind; label: string; one: string; many: string }[] = [
 export function FreeActivesSection() {
   const plan = useFreePlan()
   const [kind, setKind] = useState<FreeKind>('products')
+  const [open, setOpen] = useState(false)
 
   if (!plan.data) return <Skeleton className="h-96 rounded-2xl" />
   const o = plan.data
@@ -31,7 +32,7 @@ export function FreeActivesSection() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 font-heading text-lg">
             {o.limited ? <Lock className="size-5 text-warning" /> : <Sparkles className="size-5 text-primary" />}
-            Elegí tus activos
+            {o.limited ? 'Elegí tus activos' : 'Si algún día volvés al plan gratuito'}
           </CardTitle>
           <CardDescription>
             {o.limited ? (
@@ -42,25 +43,40 @@ export function FreeActivesSection() {
               </>
             ) : (
               <>
-                Con Pro todo está activo. Esta selección se usa solamente si algún día volvés al plan gratuito (por
-                defecto, los más antiguos).
+                Con Pro <b>todo está activo y no hay nada bloqueado</b>. Esto es solo por si algún día pasás al plan
+                gratuito: elegí qué quedaría activo (por defecto, lo más antiguo); lo demás quedaría en pausa, sin
+                borrarse.
               </>
             )}
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
-          <p className="flex items-start gap-2">
-            <Check className="mt-0.5 size-4 shrink-0 text-success" />
-            Sumar uno en un lugar libre (por ejemplo, después de archivar otro) se puede cuando quieras.
-          </p>
-          <p className="flex items-start gap-2">
-            <Clock className="mt-0.5 size-4 shrink-0 text-warning" />
-            Cambiar un activo por uno bloqueado se puede una vez cada {o.cooldown_days}{' '}
-            {o.cooldown_days === 1 ? 'día' : 'días'}.
-          </p>
+          {!o.limited && (
+            <div className="sm:col-span-2">
+              <Button variant="outline" className="h-11 gap-2" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+                {open ? 'Ocultar la selección' : 'Elegir qué quedaría activo'}
+                <ChevronDown className={cn('size-4 transition-transform', open && 'rotate-180')} />
+              </Button>
+            </div>
+          )}
+          {o.limited && (
+            <>
+            <p className="flex items-start gap-2">
+              <Check className="mt-0.5 size-4 shrink-0 text-success" />
+              Sumar uno en un lugar libre (por ejemplo, después de archivar otro) se puede cuando quieras.
+            </p>
+            <p className="flex items-start gap-2">
+              <Clock className="mt-0.5 size-4 shrink-0 text-warning" />
+              Cambiar un activo por uno bloqueado se puede una vez cada {o.cooldown_days}{' '}
+              {o.cooldown_days === 1 ? 'día' : 'días'}.
+            </p>
+            </>
+          )}
         </CardContent>
       </Card>
 
+      {(o.limited || open) && (
+        <>
       <div role="tablist" aria-label="Tipo" className="flex flex-wrap gap-1 rounded-xl bg-muted p-1">
         {KINDS.map((k) => {
           const s = o.kinds[k.kind]
@@ -78,15 +94,19 @@ export function FreeActivesSection() {
               )}
             >
               {k.label}
-              <span className="tabular text-xs text-muted-foreground">
-                {s.used}/{s.limit}
-              </span>
+              {o.limited && (
+                <span className="tabular text-xs text-muted-foreground">
+                  {s.used}/{s.limit}
+                </span>
+              )}
               {s.locked > 0 && <Lock className="size-3.5 text-warning" aria-label={`${s.locked} bloqueados`} />}
             </button>
           )
         })}
       </div>
       <KindChooser key={kind} kind={kind} labels={KINDS.find((k) => k.kind === kind)!} />
+        </>
+      )}
     </div>
   )
 }
@@ -130,10 +150,11 @@ function KindChooser({ kind, labels }: { kind: FreeKind; labels: (typeof KINDS)[
       <CardHeader className="gap-3">
         <div className="flex flex-wrap items-center gap-3">
           <CardTitle className="font-heading text-base">
+            {s.limited ? null : 'Se mantendrían '}
             <span className="tabular" data-testid="free-count">
               {sel.size}/{s.limit}
             </span>{' '}
-            {labels.many} activos
+            {s.limited ? `${labels.many} activos` : labels.many}
           </CardTitle>
           {s.limited ? (
             <Badge variant="outline" className="gap-1">
@@ -190,11 +211,12 @@ function KindChooser({ kind, labels }: { kind: FreeKind; labels: (typeof KINDS)[
                         on ? 'border-primary bg-primary text-primary-foreground' : 'border-input',
                       )}
                     >
-                      {on ? <Check className="size-4" /> : <Lock className="size-3.5 text-muted-foreground" />}
+                      {on ? <Check className="size-4" /> : s.limited ? <Lock className="size-3.5 text-muted-foreground" /> : <Pause className="size-3.5 text-muted-foreground" />}
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate font-medium">{item.name}</span>
                       {item.detail && <span className="block truncate text-xs text-muted-foreground">{detail(kind, item)}</span>}
+                      {!on && !s.limited && <span className="block truncate text-xs text-muted-foreground">Quedaría en pausa en el plan gratuito</span>}
                     </span>
                     {item.is_admin && <Badge variant="outline">Admin</Badge>}
                   </button>
@@ -217,11 +239,12 @@ function KindChooser({ kind, labels }: { kind: FreeKind; labels: (typeof KINDS)[
             </Button>
           )}
           <Button
+            variant={s.limited ? 'default' : 'secondary'}
             className="h-11 px-5"
             disabled={!dirty || blocked || needsAdmin || save.isPending}
             onClick={() => save.mutate([...sel], { onSuccess: () => setPicked(null) })}
           >
-            Guardar activos
+            {s.limited ? 'Guardar activos' : 'Guardar selección'}
           </Button>
         </div>
       </CardContent>

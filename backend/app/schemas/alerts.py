@@ -123,3 +123,20 @@ class ChecklistRunOut(BaseModel):
 
 class RunItemPatch(BaseModel):
     done: bool
+
+
+# ---------------------------------------------------------------- notifications (bell popup)
+
+
+class UrgentItem(BaseModel):
+    key: str
+    kind: str  # online_order | table_order | call_waiter | call_bill
+    title: str
+    detail: str | None = None
+    at: datetime
+    to: str
+
+
+class UrgentOut(BaseModel):
+    items: list[UrgentItem]
+    total: int

@@ -101,6 +101,7 @@
  "GET /api/loyalty/programs": "perm:customers.edit",
  "GET /api/modifier-groups": "auth",
  "GET /api/notices": "auth",
+ "GET /api/notifications/urgent": "auth",
  "GET /api/online-orders/customer": "perm:customers.edit",
  "GET /api/online-orders/settings": "auth",
  "GET /api/online-orders/{order_id}/whatsapp": "auth",
