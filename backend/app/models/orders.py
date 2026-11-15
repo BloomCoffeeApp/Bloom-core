@@ -63,6 +63,7 @@ class DiningTable(IdMixin, TimestampMixin, Base):
     # rect|round (migration 0030 turned the old `square` into `rect`: a rectangle with equal sides is a square)
     shape: Mapped[str] = mapped_column(String(8), default="rect", server_default="rect")
     seats: Mapped[int] = mapped_column(default=4, server_default="4")
+    floor_id: Mapped[int] = mapped_column(default=1, server_default="1", index=True)  # which floor plan (migration 0031)
     # Secret printed in the table's QR (rotatable): without it nobody can order for this table.
     token: Mapped[str] = mapped_column(String(32), unique=True)
 
@@ -78,6 +79,15 @@ class FloorItem(IdMixin, Base):
     pos_y: Mapped[int]
     width: Mapped[int] = mapped_column(default=4, server_default="4")
     height: Mapped[int] = mapped_column(default=2, server_default="2")
+    floor_id: Mapped[int] = mapped_column(default=1, server_default="1", index=True)
+
+
+class Floor(IdMixin, Base):
+    """A floor of the premises (basement, ground floor, first floor…): each one has its own plan."""
+
+    __tablename__ = "floors"
+    name: Mapped[str] = mapped_column(String(40))
+    sort_order: Mapped[int] = mapped_column(default=0, server_default="0")
 
 
 class TableTab(IdMixin, Base):
