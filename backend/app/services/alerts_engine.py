@@ -276,6 +276,19 @@ ENGINE_TYPES = {
     "birthday", "roast_old", "maintenance", "debt_over_limit", "expense_due",
 }
 
+# Alert type -> permission needed to see it (amounts like salaries are for managers only).
+PERMISSION_TYPES: dict[str, str] = {"expense_due": "expenses.manage"}
+
+
+def register_rule(key: str, fn: Callable[[Session, dict[str, Any]], list[Spec]], types: set[str],
+                  permission: str | None = None) -> None:
+    """Extension point for Pro modules: adds a rule, the alert types it owns (they get auto-resolved when the
+    condition clears) and, optionally, the permission a user needs to see those alerts. Idempotent."""
+    RULES[key] = fn
+    ENGINE_TYPES.update(types)
+    if permission:
+        PERMISSION_TYPES.update({t: permission for t in types})
+
 
 # ---------------------------------------------------------------- engine
 

@@ -6,6 +6,7 @@ import {
   Check,
   CheckCheck,
   CircleAlert,
+  Clock,
   Coffee,
   CreditCard,
   Eye,
@@ -17,6 +18,7 @@ import {
   RefreshCw,
   ShieldCheck,
   TriangleAlert,
+  UserX,
   Wallet,
   Wrench,
 } from 'lucide-react'
@@ -45,6 +47,8 @@ const TYPE_ICON: Record<string, LucideIcon> = {
   roast_old: Coffee,
   maintenance: Wrench,
   debt_over_limit: CreditCard,
+  staff_late: Clock,
+  staff_absent: UserX,
 }
 
 const SEVERITY: Record<Severity, { label: string; icon: LucideIcon; chip: string; bar: string; heading: string }> = {

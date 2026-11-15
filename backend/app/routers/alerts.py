@@ -32,8 +32,11 @@ _SEVERITY_ORDER = case({"critical": 0, "warning": 1}, value=Alert.severity, else
 
 
 def _hidden_types(user: User | None) -> tuple[str, ...]:
-    """Alert types this user may not see (business expenses: amounts like salaries are for managers only)."""
-    return () if user is None or roles.has(user, "expenses.manage") else ("expense_due",)
+    """Alert types this user may not see (business expenses, staff lateness…: for managers only). The map lives
+    in the engine (`PERMISSION_TYPES`) so Pro rules can register their own."""
+    if user is None:
+        return ()
+    return tuple(t for t, perm in alerts_engine.PERMISSION_TYPES.items() if not roles.has(user, perm))
 
 
 def _summary(db: Session, user: User | None = None) -> dict[str, int]:

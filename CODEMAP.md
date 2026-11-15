@@ -39,7 +39,7 @@ Patrón: `routers/<x>.py` valida → `services/<x>.py` lógica → `models/<x>.p
 | Credenciales cifradas (DPAPI) | `secret_store.py` | |
 | Gastos (categorías, fijos mensuales, pagos, ganancia) | `expenses.py` (661) | Free; el reporte de ganancia es Pro |
 | Clientes, cuenta corriente, puntos | `customers.py` | |
-| Alertas (motor de reglas) | `alerts_engine.py` | |
+| Alertas (motor de reglas; `register_rule` para que Pro sume las suyas) | `alerts_engine.py` | |
 | Avisos internos y checklists apertura/cierre | `notices.py` | |
 | Dashboard / KPIs (helpers usados por reportes Pro) | `dashboard.py` | |
 | Impresión térmica ESC/POS directa | `printing.py`, `escpos.py`, `printers.py` | |

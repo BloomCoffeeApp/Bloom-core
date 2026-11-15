@@ -46,6 +46,36 @@ class TimeEntry(IdMixin, TimestampMixin, Base):
     edited_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
 
 
+class Shift(IdMixin, TimestampMixin, Base):
+    """A planned shift ("turno"): who works on which local day and from/to what time (the weekly grid).
+
+    Times are local wall clock "HH:MM"; an end before the start means the shift ends the next day."""
+
+    __tablename__ = "shifts"
+    __table_args__ = (Index("ix_shifts_employee_date", "employee_id", "date"),)
+    employee_id: Mapped[int] = mapped_column(ForeignKey("employees.id", ondelete="CASCADE"))
+    date: Mapped[dt.date] = mapped_column(Date, index=True)
+    start_time: Mapped[str] = mapped_column(String(5))
+    end_time: Mapped[str] = mapped_column(String(5))
+    break_minutes: Mapped[int] = mapped_column(default=0, server_default="0")
+    note: Mapped[str | None] = mapped_column(String(200))
+    created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+
+
+class Holiday(IdMixin, Base):
+    """A public holiday ("feriado"): hours worked that day are paid with the holiday surcharge.
+
+    `source="builtin"` rows come from the bundled list (one year at a time); removing one is `active=False`
+    so it is never seeded again."""
+
+    __tablename__ = "holidays"
+    date: Mapped[dt.date] = mapped_column(Date, unique=True)
+    name: Mapped[str] = mapped_column(String(80))
+    kind: Mapped[str] = mapped_column(String(10), default="national")  # national | provincial | local
+    source: Mapped[str] = mapped_column(String(10), default="custom")  # builtin | custom
+    active: Mapped[bool] = mapped_column(default=True, server_default="1")
+
+
 class StaffAdvance(IdMixin, Base):
     """Advance on pay ("adelanto"): deducted from the estimate of the period that contains `date`."""
 

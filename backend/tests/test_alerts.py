@@ -178,3 +178,31 @@ def test_checklist_run_today(seeded):
     r = client.patch(f"/api/checklists/{cid}", json={"items": [{"id": item_id, "text": "Reponer servilletas y sorbetes"}, {"text": "Limpiar mesas"}]}, headers=h)
     assert [i["text"] for i in r.json()["items"]] == ["Reponer servilletas y sorbetes", "Limpiar mesas"]
     assert r.json()["items"][0]["id"] == item_id
+
+
+def test_registered_rule_is_evaluated_resolved_and_hidden_without_permission(seeded, monkeypatch):
+    """Pro modules plug rules into the engine: `register_rule` adds the rule, owns its alert types (so they
+    auto-resolve) and hides them from users who lack the permission."""
+    client, h = seeded
+    for name in ("RULES", "ENGINE_TYPES", "PERMISSION_TYPES"):  # restore the registry after the test
+        monkeypatch.setattr(alerts_engine, name, type(getattr(alerts_engine, name))(getattr(alerts_engine, name)))
+    state = {"on": True}
+
+    def rule(db, cfg):
+        spec = alerts_engine.Spec(key="plug:1", type="plug_t", severity="warning", title="Aviso del módulo", message="m")
+        return [spec] if state["on"] else []
+
+    alerts_engine.register_rule("plug", rule, {"plug_t"}, permission="staff.manage")
+    alerts_engine.register_rule("plug", rule, {"plug_t"}, permission="staff.manage")  # idempotent
+    _evaluate()
+    _evaluate()
+    assert _alerts("plug:") == [("plug:1", "open", "warning")]
+
+    def seen(headers):
+        return [a["type"] for a in client.get("/api/alerts", headers=headers).json() if a["type"] == "plug_t"]
+
+    assert seen(h) == ["plug_t"]  # the admin has staff.manage
+    assert seen(login(client, "Caja Demo", "1111")) == []  # the cashier doesn't
+    state["on"] = False  # condition cleared → resolved by the engine (its type is registered as engine-owned)
+    _evaluate()
+    assert [s for _, s, _ in _alerts("plug:")] == ["resolved"]
