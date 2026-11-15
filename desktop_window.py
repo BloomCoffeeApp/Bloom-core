@@ -58,6 +58,8 @@ class WindowApi:
         self._window = None
         self._hwnd = 0
         self._state_path = state_path
+        self._fullscreen = False
+        self._fs_was_maximized = False
 
     # ---------------------------------------------------------------- setup (Python side)
 
@@ -80,6 +82,8 @@ class WindowApi:
             form.Invoke(Func[Type](fn))
 
     def _fit_maximized_bounds(self, form) -> None:
+        if self._fullscreen:  # full screen covers the whole monitor, taskbar included
+            return
         # A borderless form maximizes over the taskbar unless told the work area.
         # MaximizedBounds is relative to the monitor the window is on.
         from System.Drawing import Rectangle
@@ -129,8 +133,8 @@ class WindowApi:
         """Stores the window rect in physical pixels (exact regardless of DPI scaling)."""
         try:
             state = self._load_state()
-            state["maximized"] = self.is_maximized()
-            if not state["maximized"] and self._hwnd:
+            state["maximized"] = self.is_maximized() and not self._fullscreen or (self._fullscreen and self._fs_was_maximized)
+            if not state["maximized"] and self._hwnd and not self._fullscreen:
                 r = wintypes.RECT()
                 user32.GetWindowRect(self._hwnd, ctypes.byref(r))
                 state.update(x=r.left, y=r.top, width=r.right - r.left, height=r.bottom - r.top)
@@ -182,13 +186,36 @@ class WindowApi:
         return self.is_maximized()
 
     def is_fullscreen(self) -> bool:
-        form = self._form() if IS_WINDOWS and self._window is not None else None
-        return bool(form is not None and getattr(form, "is_fullscreen", False))
+        return self._fullscreen
 
     def toggle_fullscreen(self) -> bool:
-        """Real full screen of the native window (the page's `requestFullscreen()` does nothing inside it)."""
-        self._window.toggle_fullscreen()
-        return self.is_fullscreen()
+        """Real full screen of the native window: covers the whole monitor (taskbar included) and Esc / the
+        button leave it. pywebview's own `toggle_fullscreen` is undone by our `Move` handler that keeps the
+        maximized bounds on the work area, and the page's `requestFullscreen()` does nothing inside the window."""
+        if not IS_WINDOWS:
+            return False
+        from System.Drawing import Rectangle
+        from System.Windows.Forms import FormWindowState, Screen
+
+        def toggle():
+            form = self._form()
+            if not self._fullscreen:
+                self._fs_was_maximized = form.WindowState == FormWindowState.Maximized
+                self._fullscreen = True
+                b = Screen.FromHandle(form.Handle).Bounds
+                form.MaximizedBounds = Rectangle(0, 0, b.Width, b.Height)  # relative to the monitor
+                if form.WindowState == FormWindowState.Maximized:
+                    form.WindowState = FormWindowState.Normal  # so Windows recomputes the maximized rect
+                form.WindowState = FormWindowState.Maximized
+            else:
+                self._fullscreen = False
+                self._fit_maximized_bounds(form)
+                form.WindowState = FormWindowState.Normal
+                if self._fs_was_maximized:
+                    form.WindowState = FormWindowState.Maximized
+
+        self._ui(toggle)
+        return self._fullscreen
 
     def close(self) -> None:
         self._window.destroy()

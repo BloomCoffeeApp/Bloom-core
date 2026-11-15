@@ -94,5 +94,11 @@ export function useFullscreen(target?: RefObject<HTMLElement | null>) {
     return () => window.removeEventListener('keydown', onKey)
   }, [api, native, fullscreen])
 
+  // Full screen hides the app's own chrome (sidebar and top bar): see `.bloom-fullscreen` in index.css.
+  useEffect(() => {
+    document.documentElement.classList.toggle('bloom-fullscreen', fullscreen)
+    return () => document.documentElement.classList.remove('bloom-fullscreen')
+  }, [fullscreen])
+
   return { fullscreen, toggle }
 }

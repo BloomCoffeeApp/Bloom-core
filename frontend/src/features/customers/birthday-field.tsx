@@ -35,7 +35,7 @@ export function BirthdayField({ value, onChange, id }: BirthdayFieldProps) {
         <SelectTrigger id={id} className="h-11 w-full" aria-label="Día">
           <SelectValue placeholder="Día" />
         </SelectTrigger>
-        <SelectContent className="max-h-64">
+        <SelectContent>
           {Array.from({ length: 31 }, (_, i) => i + 1).map((n) => (
             <SelectItem key={n} value={String(n)}>
               {n}
@@ -47,7 +47,7 @@ export function BirthdayField({ value, onChange, id }: BirthdayFieldProps) {
         <SelectTrigger className="h-11 w-full" aria-label="Mes">
           <SelectValue placeholder="Mes" />
         </SelectTrigger>
-        <SelectContent className="max-h-64">
+        <SelectContent>
           {MONTHS.map((name, i) => (
             <SelectItem key={name} value={String(i + 1)} className="capitalize">
               {name}
@@ -59,7 +59,7 @@ export function BirthdayField({ value, onChange, id }: BirthdayFieldProps) {
         <SelectTrigger className="h-11 w-full" aria-label="Año (opcional)">
           <SelectValue placeholder="Año" />
         </SelectTrigger>
-        <SelectContent className="max-h-64">
+        <SelectContent>
           <SelectItem value="none">Sin año</SelectItem>
           {years.map((n) => (
             <SelectItem key={n} value={String(n)}>

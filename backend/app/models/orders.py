@@ -60,10 +60,24 @@ class DiningTable(IdMixin, TimestampMixin, Base):
     pos_y: Mapped[int | None]
     width: Mapped[int] = mapped_column(default=4, server_default="4")
     height: Mapped[int] = mapped_column(default=4, server_default="4")
-    shape: Mapped[str] = mapped_column(String(8), default="square", server_default="square")  # square|round|rect
+    # rect|round (migration 0030 turned the old `square` into `rect`: a rectangle with equal sides is a square)
+    shape: Mapped[str] = mapped_column(String(8), default="rect", server_default="rect")
     seats: Mapped[int] = mapped_column(default=4, server_default="4")
     # Secret printed in the table's QR (rotatable): without it nobody can order for this table.
     token: Mapped[str] = mapped_column(String(32), unique=True)
+
+
+class FloorItem(IdMixin, Base):
+    """A reference drawn on the floor map (counter, door, bathroom…). Not orderable and never part of a sale:
+    it only helps to find your way around the plan. Position and size are in grid cells, like the tables."""
+
+    __tablename__ = "floor_items"
+    kind: Mapped[str] = mapped_column(String(12))  # counter|bar|cashier|kitchen|door|bathroom|stairs|plant|wall
+    label: Mapped[str | None] = mapped_column(String(40))
+    pos_x: Mapped[int]
+    pos_y: Mapped[int]
+    width: Mapped[int] = mapped_column(default=4, server_default="4")
+    height: Mapped[int] = mapped_column(default=2, server_default="2")
 
 
 class TableTab(IdMixin, Base):

@@ -261,6 +261,7 @@ export function AppShell() {
       </Sidebar>
       <SidebarInset className="min-w-0">
         <header
+          data-shell-header
           className={cn(
             'sticky top-0 z-20 flex h-14 items-center gap-2 border-b bg-background/80 px-4 backdrop-blur select-none',
             desktop.api && 'pr-0',
