@@ -55,6 +55,10 @@ if EDITION == "pro":
     # Imports used only by the (compiled, hence opaque) Pro modules.
     hiddenimports += ["csv", "unicodedata", "openpyxl"] + collect_submodules("fastapi") + collect_submodules("starlette")
     datas += collect_data_files("bloom_pro")  # JSON data, public key
+    # Public holidays (staff module): the `holidays` library loads each country lazily and ships translations as
+    # data, and the compiled Pro module hides the import from PyInstaller.
+    hiddenimports += collect_submodules("holidays")
+    datas += collect_data_files("holidays")
 print(f"Bloom build: edition={EDITION} pro_path={PRO_PATH or '-'}")
 
 a = Analysis(  # noqa: F821

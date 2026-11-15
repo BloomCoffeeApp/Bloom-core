@@ -8,7 +8,7 @@ license = "MIT"
 # enough; httptools/websockets/PyYAML/python-dotenv only made the installer bigger.
 dependencies = [
   "fastapi", "uvicorn", "sqlalchemy>=2.0", "alembic", "pydantic>=2", "argon2-cffi", "cryptography",
-  "openpyxl", "pillow", "pywebview", "qrcode[pil]", "tzdata",
+  "openpyxl", "pillow", "pywebview", "qrcode[pil]", "tzdata", "holidays",
 ]
 
 [project.optional-dependencies]

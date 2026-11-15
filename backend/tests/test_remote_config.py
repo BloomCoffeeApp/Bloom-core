@@ -195,3 +195,15 @@ def test_endpoint_for_the_ui(seeded, monkeypatch):
     assert body["announcements"][0]["title"] == "Mantenimiento"
     assert body["support"]["whatsapp"] == "+54 9 11 0000-0000"
     assert body["release_notes_url"] == "https://example.com/novedades"
+
+
+def test_signed_holidays_are_read_per_country_and_year_and_never_raise(monkeypatch):
+    rows = [{"date": "2026-11-27", "name": "Día decretado", "kind": "national"}, "basura", 7]
+    serve(monkeypatch, envelope(holidays={"AR": {"2026": rows, "2027": "no es una lista"}, "uy": {"2026": []}}))
+    assert remote_config.holidays("AR", 2026) is None  # nothing fetched yet
+    assert remote_config.fetch()["holidays"]["AR"]["2026"] == rows
+    assert remote_config.holidays("AR", 2026) == [rows[0]]  # only the dict entries survive
+    assert remote_config.holidays("ar", 2026) == [rows[0]]  # the country code is case-insensitive
+    assert remote_config.holidays("AR", 2027) is None  # malformed year list: ignored
+    assert remote_config.holidays("AR", 2030) is None  # the vendor published nothing for that year
+    assert remote_config.holidays("CL", 2026) is None

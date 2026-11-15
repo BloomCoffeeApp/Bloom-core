@@ -168,6 +168,16 @@ def free_limits() -> dict:
     return _section("free_limits")
 
 
+def holidays(country: str, year: int) -> list[dict] | None:
+    """Public holidays published by the vendor for `country` (ISO code) and `year`, or None when it publishes
+    none for that year (the app then uses its bundled library). Shape inside the signed payload:
+    `{"holidays": {"AR": {"2026": [{"date": "2026-11-09", "name": "…", "kind": "national|bridge|provincial"}]}}}`.
+    This is how a decree reaches every shop without a new release; the Pro `staff` module validates each entry."""
+    by_year = _section("holidays").get(str(country).upper())
+    rows = by_year.get(str(year)) if isinstance(by_year, dict) else None
+    return [r for r in rows if isinstance(r, dict)] if isinstance(rows, list) else None
+
+
 def manifest_url() -> str | None:
     return _str(_section("updates").get("manifest_url"))
 
