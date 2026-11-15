@@ -21,6 +21,7 @@ def isolated_db(tmp_path, monkeypatch):
     monkeypatch.setattr(migrate, "DB_PATH", db)
     monkeypatch.setattr(backup_svc, "DB_PATH", db)
     monkeypatch.setattr(backup_svc, "BACKUP_DIR", tmp_path / "backups")
+    monkeypatch.setattr(migrate, "last_recovery", None)
     return db
 
 
@@ -80,3 +81,69 @@ def test_is_healthy_detects_a_corrupt_file(tmp_path):
     bad = tmp_path / "bad.db"
     bad.write_bytes(b"SQLite format 3\x00" + b"\xff" * 4096)
     assert not migrate.is_healthy(bad)
+
+
+def _healthy_copy(isolated_db: Path, name: str, value: str) -> Path:
+    backups = isolated_db.parent / "backups"
+    backups.mkdir(exist_ok=True)
+    dest = backups / name
+    with closing(sqlite3.connect(dest)) as con:
+        con.execute("CREATE TABLE t (v TEXT)")
+        con.execute("INSERT INTO t VALUES (?)", (value,))
+        con.commit()
+    return dest
+
+
+def test_backup_failing_on_a_damaged_database_recovers_from_the_newest_healthy_backup(isolated_db, monkeypatch):
+    """15/11: a damaged database made the pre-migration backup raise before any check, so the server died
+    («127.0.0.1 rechazó la conexión») instead of recovering."""
+    _healthy_copy(isolated_db, "cafeteria-20261101-100000-auto.db", "older")
+    _healthy_copy(isolated_db, "cafeteria-20261102-100000-auto.db", "newest")
+    isolated_db.write_bytes(b"SQLite format 3\x00" + b"\xff" * 4096)  # damaged main file
+
+    def failing_backup():
+        raise sqlite3.DatabaseError("database disk image is malformed")
+
+    monkeypatch.setattr(backup_svc, "backup_before_migration", failing_backup)
+    monkeypatch.setattr(migrate.command, "upgrade", lambda cfg, rev: None)
+    migrate.upgrade_db()
+    assert _value(isolated_db) == "newest"
+    assert len(list(isolated_db.parent.glob("data.db.danada-*"))) == 1  # the damaged file is kept aside
+    assert migrate.last_recovery and migrate.last_recovery["backup"] == "cafeteria-20261102-100000-auto.db"
+
+
+def test_damaged_backups_are_skipped(isolated_db, monkeypatch):
+    _healthy_copy(isolated_db, "cafeteria-20261101-100000-auto.db", "good")
+    bad = isolated_db.parent / "backups" / "cafeteria-20261102-100000-auto.db"
+    bad.write_bytes(b"SQLite format 3\x00" + b"\xff" * 4096)
+    assert migrate.latest_healthy_backup().name == "cafeteria-20261101-100000-auto.db"
+
+
+def test_no_healthy_copy_anywhere_stops_without_touching_anything(isolated_db, monkeypatch):
+    isolated_db.write_bytes(b"SQLite format 3\x00" + b"\xff" * 4096)
+
+    def failing_backup():
+        raise sqlite3.DatabaseError("database disk image is malformed")
+
+    monkeypatch.setattr(backup_svc, "backup_before_migration", failing_backup)
+    with pytest.raises(migrate.DatabaseDamaged):
+        migrate.upgrade_db()
+    assert not list(isolated_db.parent.glob("data.db.danada-*"))
+
+
+def test_close_cleanly_folds_the_wal_into_the_main_file(tmp_path, monkeypatch):
+    from sqlalchemy import create_engine, text
+
+    from app import db as db_mod
+
+    path = tmp_path / "wal.db"
+    engine = db_mod.configure_sqlite(create_engine(f"sqlite:///{path.as_posix()}"))
+    with engine.begin() as con:
+        con.execute(text("CREATE TABLE t (v TEXT)"))
+        con.execute(text("INSERT INTO t VALUES ('x')"))
+    wal = Path(f"{path}-wal")
+    assert wal.exists() and wal.stat().st_size > 0
+    monkeypatch.setattr(db_mod, "engine", engine)
+    db_mod.close_cleanly()
+    assert not wal.exists() or wal.stat().st_size == 0
+    assert migrate.is_healthy(path)

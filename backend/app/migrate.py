@@ -47,18 +47,64 @@ def _replace_with(backup: Path) -> None:
     shutil.copy2(backup, db)
 
 
+def latest_healthy_backup(exclude: Path | None = None) -> Path | None:
+    """The newest backup that passes SQLite's check (newest first; a damaged copy is skipped)."""
+    from app.services.backup import list_backups
+
+    for candidate in list_backups():
+        if exclude is not None and candidate == exclude:
+            continue
+        if is_healthy(candidate):
+            return candidate
+    return None
+
+
+def _recover(reason: str, fresh: Path | None) -> Path:
+    """Replaces a damaged database with the best healthy copy: the one just taken (it reads through
+    the WAL, so it can be fine when the main file isn't) or else the newest healthy backup."""
+    candidates = [c for c in (fresh,) if c is not None and is_healthy(c)]
+    copy = candidates[0] if candidates else latest_healthy_backup(exclude=fresh)
+    if copy is None:
+        raise DatabaseDamaged(f"La base de datos {DB_PATH} está dañada y no hay una copia de seguridad sana.")
+    log.warning("Damaged database (%s): restored the backup %s", reason, copy.name)
+    _replace_with(copy)
+    global last_recovery
+    last_recovery = {"backup": copy.name, "reason": reason, "at": datetime.now().isoformat(timespec="seconds")}
+    return copy
+
+
+last_recovery: dict | None = None  # set when this start had to restore a backup (shown by /api/system/info)
+
+
+def describe_files() -> str:
+    """Sizes of the database files, for the log (helps trace a damaged database)."""
+    db = Path(DB_PATH)
+    parts = []
+    for suffix in ("", "-wal", "-shm"):
+        f = Path(f"{db}{suffix}")
+        parts.append(f"{f.name}={f.stat().st_size if f.exists() else '-'}")
+    return " ".join(parts)
+
+
 def upgrade_db() -> None:
-    """Backup, check, migrate. A damaged database is replaced by the consistent copy just taken (the
-    backup API reads through the WAL, so it can be healthy when the main file isn't), and a migration
-    that fails halfway is rolled back to that copy instead of leaving a half-migrated database."""
+    """Check, backup, migrate. The health check runs FIRST: a damaged database can make the backup itself
+    fail, and then nothing else would run. A damaged database is replaced by the consistent copy just taken
+    (the backup API reads through the WAL, so it can be healthy when the main file isn't) or, if that copy
+    can't be taken or is damaged too, by the newest healthy backup. A migration that fails halfway is rolled
+    back to the pre-migration copy instead of leaving a half-migrated database. Nothing is ever deleted."""
     from app.services.backup import backup_before_migration
 
-    backup = backup_before_migration()
-    if backup is not None and not is_healthy(Path(DB_PATH)):
-        if not is_healthy(backup):
-            raise DatabaseDamaged(f"La base de datos {DB_PATH} está dañada y la copia de seguridad también.")
-        log.warning("Damaged database: restored the copy taken just before migrating (%s)", backup.name)
-        _replace_with(backup)
+    db = Path(DB_PATH)
+    log.info("Starting with %s", describe_files())
+    healthy = not db.exists() or db.stat().st_size == 0 or is_healthy(db)
+    try:
+        backup = backup_before_migration()
+    except sqlite3.DatabaseError as e:
+        log.warning("Pre-migration backup failed: %s", e)
+        backup = None
+        healthy = False
+    if not healthy or (backup is not None and not is_healthy(db)):
+        backup = _recover("startup check", backup)
     try:
         command.upgrade(alembic_config(), "head")
     except Exception:

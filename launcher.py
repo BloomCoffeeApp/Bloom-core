@@ -61,15 +61,64 @@ def is_our_server(port: int) -> bool:
         return False
 
 
-def pick_port() -> tuple[int, bool]:
-    """Returns (port, already_running). Skips ports taken by other local apps."""
+def pick_port() -> int:
+    """A free port, from PORT up. Ports answered by another Bloom are skipped too: holding the data-folder
+    lock means that server belongs to a different data folder (e.g. the free and Pro test copies)."""
     for port in range(PORT, PORT + 20):
         if not port_in_use(port):
-            return port, False
-        if is_our_server(port):
-            return port, True
+            return port
         log.warning("Port %s is used by another application, trying the next one", port)
     raise RuntimeError("No free port found")
+
+
+_instance_lock = None  # open file whose first byte is locked while this process serves DATA_DIR
+
+
+def acquire_instance_lock() -> bool:
+    """One server per data folder. Two processes migrating and writing the same SQLite file (one still
+    starting, another launched meanwhile on the next port) is how a database gets damaged. Windows releases
+    the lock when the process ends, even if it crashes."""
+    global _instance_lock
+    path = DATA_DIR / "instance.lock"
+    try:
+        f = open(path, "a+b")  # noqa: SIM115 - kept open for the whole process lifetime
+    except OSError:
+        log.exception("Could not open %s", path)
+        return True  # never block the app over the lock file itself
+    try:
+        if sys.platform == "win32":
+            import msvcrt
+
+            f.seek(0)
+            msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+
+            fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        f.close()
+        return False
+    _instance_lock = f
+    return True
+
+
+def _instance_file() -> Path:
+    return DATA_DIR / "instance.json"
+
+
+def write_instance_port(port: int) -> None:
+    try:
+        _instance_file().write_text(json.dumps({"port": port, "pid": os.getpid()}), encoding="utf-8")
+    except OSError:
+        log.exception("Could not write %s", _instance_file())
+
+
+def running_instance_port() -> int | None:
+    """Port of the process that holds this data folder (it may still be starting)."""
+    try:
+        return int(json.loads(_instance_file().read_text(encoding="utf-8"))["port"])
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
 
 
 def run_server(host: str, port: int) -> None:
@@ -119,14 +168,25 @@ def main() -> None:
 
     hold_running_mutex()
 
-    port, running = pick_port()
-    config.PORT = port  # so LAN URL / QR show the real port
+    running = not acquire_instance_lock()
     if running:
-        log.info("%s already running on %s; opening a window only", APP_DISPLAY_NAME, port)
+        # Another copy already serves this data folder: just open a window to it (never a second server).
+        port = None
+        deadline = time.time() + 90
+        while time.time() < deadline and port is None:
+            port = running_instance_port()
+            if port is None:
+                time.sleep(0.5)
+        port = port or PORT
+        log.info("%s already running for %s on %s; opening a window only", APP_DISPLAY_NAME, DATA_DIR, port)
+        ready = wait_ready(port, timeout=90)
     else:
-        # Always on this PC; LAN mode adds a network listener that can be switched on/off live.
+        port = pick_port()
+        write_instance_port(port)
         threading.Thread(target=run_server, args=("127.0.0.1", port), daemon=True).start()
-    if not wait_ready(port):
+        ready = wait_ready(port, timeout=90)
+    config.PORT = port  # so LAN URL / QR show the real port
+    if not ready:
         log.error("Server did not start in time")
     elif not running:
         from app import lan
@@ -138,9 +198,10 @@ def main() -> None:
     # Frameless: the UI draws its own title bar (drag, minimize, maximize, close).
     min_size = (1024, 680)
     api = WindowApi(DATA_DIR / "window.json", min_size)
+    page = {"url": f"http://127.0.0.1:{port}"} if ready else {"html": startup_error_html()}
     window = webview.create_window(
         APP_DISPLAY_NAME,
-        f"http://127.0.0.1:{port}",
+        **page,
         **api._initial_geometry(1400, 900),
         min_size=min_size,
         text_select=True,
@@ -157,7 +218,62 @@ def main() -> None:
 
         updates.set_exit_handler(lambda: quit_app(window))
     webview.start(private_mode=False, storage_path=str(DATA_DIR / "webview"))
+    if not running:
+        shutdown_server()
     os._exit(0)
+
+
+def shutdown_server(timeout: float = 8.0) -> None:
+    """Stops the background jobs and closes the database cleanly (WAL folded in) before the process ends.
+    Bounded: a stuck job never keeps the app from closing."""
+
+    def _close() -> None:
+        try:
+            from app.jobs import stop_jobs
+
+            stop_jobs()
+        except Exception:
+            log.exception("Could not stop the jobs")
+        from app.db import close_cleanly
+
+        close_cleanly()
+
+    t = threading.Thread(target=_close, daemon=True)
+    t.start()
+    t.join(timeout)
+    if t.is_alive():
+        log.warning("Closing the database took more than %s s; exiting anyway", timeout)
+
+
+def startup_error_html() -> str:
+    """Shown instead of the browser's «connection refused» page when the local server didn't start."""
+    from html import escape
+
+    log_path = escape(str(DATA_DIR / "app.log"))
+    folder = escape(str(DATA_DIR))
+    backups = escape(str(DATA_DIR / "backups"))
+    return f"""<!doctype html><html lang="es"><meta charset="utf-8"><title>{escape(APP_DISPLAY_NAME)}</title>
+<style>
+:root {{ color-scheme: light dark; --bg:#FAF7F2; --fg:#2b2118; --muted:#6b5d50; --card:#fff; --line:#e7ded3; --accent:#8B5A2B; }}
+@media (prefers-color-scheme: dark) {{ :root {{ --bg:#1c1814; --fg:#f3ece4; --muted:#b9ab9c; --card:#26201a; --line:#3a3128; --accent:#C8874A; }} }}
+body {{ margin:0; min-height:100vh; display:grid; place-items:center; background:var(--bg); color:var(--fg);
+  font:15px/1.5 "Segoe UI", system-ui, sans-serif; }}
+main {{ max-width:560px; margin:24px; padding:28px; background:var(--card); border:1px solid var(--line); border-radius:16px; }}
+h1 {{ font-size:22px; margin:0 0 8px; }} p {{ margin:8px 0; color:var(--muted); }}
+code {{ display:block; margin-top:4px; padding:8px 10px; border-radius:8px; background:var(--bg); color:var(--fg);
+  font:13px Consolas, monospace; overflow-wrap:anywhere; }}
+ol {{ padding-left:20px; color:var(--muted); }} strong {{ color:var(--fg); }}
+</style>
+<main role="alert">
+<h1>Bloom no pudo arrancar</h1>
+<p>El servidor interno de Bloom no se inició. Tus datos no se borraron.</p>
+<ol>
+<li>Cerrá esta ventana y volvé a abrir Bloom.</li>
+<li>Si vuelve a pasar, mandale a soporte el registro de la app:<code>{log_path}</code></li>
+<li>Las copias de seguridad están en:<code>{backups}</code></li>
+</ol>
+<p>Carpeta de datos: <code>{folder}</code></p>
+</main></html>"""
 
 
 def quit_app(window) -> None:

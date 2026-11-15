@@ -49,3 +49,20 @@ def lock_writes(db: Session) -> None:
     requests read the same maximum and the second one fails on the unique constraint. The statement matches no
     row, but any write statement starts the write transaction, which lasts until commit/rollback."""
     db.execute(text("UPDATE settings SET value = value WHERE 0"))
+
+
+def close_cleanly() -> None:
+    """On exit: fold the WAL into the main file and close every pooled connection, so no `-wal` is left
+    behind for the next start (a leftover WAL is how a database ends up paired with the wrong file).
+    Best effort: never raises (the app is closing anyway)."""
+    import logging
+
+    try:
+        with engine.connect() as con:
+            con.exec_driver_sql("PRAGMA wal_checkpoint(TRUNCATE)")
+    except Exception:
+        logging.getLogger("cafeteria.db").exception("Final WAL checkpoint failed")
+    try:
+        engine.dispose()
+    except Exception:
+        logging.getLogger("cafeteria.db").exception("Could not close the database connections")

@@ -483,6 +483,8 @@ Cada fase termina con: tests pasando, app levantando sin errores de consola, com
   - **Avisos**: el motor de alertas del core tiene un punto de extensión `alerts_engine.register_rule(key, fn, types, permission)` (los tipos registrados se auto-resuelven y quedan ocultos a quien no tenga el permiso; reemplaza el ocultamiento fijo de `expense_due`). Pro registra `staff_late` / `staff_absent` (una alerta por turno, `staff_shift:<id>`, solo `staff.manage`).
   - **Bloom Equipo**: `GET /api/staff/shifts/me` (cualquier sesión vinculada a un empleado): próximos 7 días, próximo turno y recordatorio «tu turno empezó y no fichaste» (solo avisa, nunca ficha solo).
 
+- **Arranque y cierre de la base (15/11)**: `upgrade_db` chequea la salud **antes** del respaldo previo (con la base dañada ese respaldo fallaba y el servidor no arrancaba); si el respaldo no se puede tomar o está dañado, restaura la copia sana más nueva de `backups/` (`latest_healthy_backup`), deja lo dañado como `.danada-*` y lo registra en la Auditoría (`recover`, `database`). El launcher toma un candado por carpeta de datos (`instance.lock`, `msvcrt.locking`; el puerto en `instance.json`): una segunda apertura solo abre otra ventana, nunca un segundo servidor sobre el mismo archivo. Al cerrar la ventana, `shutdown_server` frena los jobs y `db.close_cleanly` hace `wal_checkpoint(TRUNCATE)` + `dispose` (máx. 8 s) antes de `os._exit`. Si el servidor no arranca, la ventana muestra `startup_error_html` en vez de la página de error del navegador.
+
 ## 10. Preguntas abiertas para el dueño
 - ¿Cuántas PCs/cajas? ¿Se usará tablet en la barra? (define si “modo red local” es prioridad).
 - ¿Hace falta facturación electrónica desde el día 1 o alcanza con ticket no fiscal?

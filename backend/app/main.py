@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
@@ -45,6 +46,23 @@ ROUTER_MODULES = (
 EDITION = "pro" if bloom_pro else "free"
 
 
+def _audit_recovery() -> None:
+    """If this start had to restore a backup over a damaged database, leave it in the audit log."""
+    from app import migrate
+
+    if not migrate.last_recovery:
+        return
+    from app.db import SessionLocal
+    from app.services import audit
+
+    try:
+        with SessionLocal() as db:
+            audit.log(db, None, "recover", "database", None, migrate.last_recovery)
+            db.commit()
+    except Exception:
+        logging.getLogger("cafeteria.migrate").exception("Could not audit the database recovery")
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     from app.jobs import start_jobs, stop_jobs
@@ -56,6 +74,7 @@ async def lifespan(_app: FastAPI):
         demo.manager().shutdown()
         return
     upgrade_db()
+    _audit_recovery()
     start_jobs()
     yield
     stop_jobs()
