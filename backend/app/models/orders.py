@@ -54,6 +54,20 @@ class FloorZone(IdMixin, TimestampMixin, Base):
     width: Mapped[int] = mapped_column(default=12, server_default="12")
     height: Mapped[int] = mapped_column(default=8, server_default="8")
     color: Mapped[str] = mapped_column(String(10), default="sand", server_default="sand")
+    # Migration 0033: a sub-zone sits inside another zone and inherits its waiter; the extra pieces (`zone_pieces`)
+    # make a zone any shape made of rectangles (an L is two).
+    parent_id: Mapped[int | None] = mapped_column(ForeignKey("floor_zones.id"))
+
+
+class ZonePiece(IdMixin, Base):
+    """An extra rectangle of a zone (the zone's own position/size is its first piece), in grid cells."""
+
+    __tablename__ = "zone_pieces"
+    zone_id: Mapped[int] = mapped_column(ForeignKey("floor_zones.id"), index=True)
+    pos_x: Mapped[int]
+    pos_y: Mapped[int]
+    width: Mapped[int]
+    height: Mapped[int]
 
 
 class DiningTable(IdMixin, TimestampMixin, Base):

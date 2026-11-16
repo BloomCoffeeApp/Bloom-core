@@ -707,7 +707,9 @@ def effective_waiter(db: Session, table_id: int | None, tab_id: int | None = Non
     ]
     if table is not None and table.zone_id is not None:
         zone = db.get(FloorZone, table.zone_id)
-        candidates.append(zone.waiter_employee_id if zone else None)
+        while zone is not None:  # a sub-zone without its own waiter follows the zone it sits in
+            candidates.append(zone.waiter_employee_id)
+            zone = db.get(FloorZone, zone.parent_id) if zone.parent_id else None
     for emp_id in candidates:
         if emp_id is None:
             continue
