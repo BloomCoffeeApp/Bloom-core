@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.models import (
     Customer,
     CustomerAccountMovement,
+    DiningTable,
     LoyaltyTransaction,
     Modifier,
     ModifierGroup,
@@ -359,6 +360,9 @@ def _create_sale(db: Session, data: SaleIn, user: User) -> Sale:
     sale.payments = payments
     if tab is not None and not sale.table_label:
         sale.table_label = tab_label(db, tab)
+    if tab is not None:
+        table = db.get(DiningTable, tab.table_id)
+        sale.table_code = table.code if table is not None else None
     db.add(sale)
     db.flush()
 
@@ -613,6 +617,7 @@ def serialize(sale: Sale, unames: dict[int, str], cnames: dict[int, str], cfg: d
         "channel": sale.channel,
         "table_label": sale.table_label,
         "table_id": sale.table_id,
+        "table_code": sale.table_code,
         "waiter_employee_id": sale.waiter_employee_id,
         "waiter_name": wnames.get(sale.waiter_employee_id) if sale.waiter_employee_id else None,
         "cash_session_id": sale.cash_session_id,

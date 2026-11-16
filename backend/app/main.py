@@ -58,9 +58,31 @@ def _audit_recovery() -> None:
     try:
         with SessionLocal() as db:
             audit.log(db, None, "recover", "database", None, migrate.last_recovery)
+            _recovery_alert(db, migrate.last_recovery)
             db.commit()
     except Exception:
         logging.getLogger("cafeteria.migrate").exception("Could not audit the database recovery")
+
+
+def _recovery_alert(db, recovery: dict) -> None:
+    """A notice in the bell / Avisos for who manages backups: «Restauramos la copia del día X». It stays until read."""
+    import re
+
+    from app.models import Alert
+
+    name = str(recovery.get("backup") or "")
+    m = re.match(r"cafeteria-(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})", name)
+    when = f"{m[3]}/{m[2]} a las {m[4]}:{m[5]}" if m else "más reciente"
+    key = f"db_recovered:{name}:{recovery.get('at')}"[:120]
+    if db.query(Alert).filter(Alert.dedupe_key == key).first() is not None:
+        return
+    db.add(Alert(
+        type="db_recovered", severity="critical", title=f"Restauramos la copia del {when}"[:160],
+        message=("La base de datos estaba dañada al abrir Bloom y se recuperó sola con una copia de seguridad: lo que se "
+                 "cargó después de ese momento puede faltar. Revisá las ventas y la caja de hoy. Los archivos dañados "
+                 "quedaron aparte (data.db.danada-…) por si hay que analizarlos."),
+        link="/configuracion", dedupe_key=key, status="open",
+    ))
 
 
 @asynccontextmanager

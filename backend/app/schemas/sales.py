@@ -230,6 +230,7 @@ class SaleOut(BaseModel):
     channel: str
     table_label: str | None
     table_id: int | None = None
+    table_code: str | None = None  # PB-SALON-01 as it was when charged
     waiter_employee_id: int | None = None
     waiter_name: str | None = None
     cash_session_id: int | None

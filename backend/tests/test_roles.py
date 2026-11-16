@@ -20,7 +20,7 @@ def _user(client, h, name: str, role: str, pin: str = "4321") -> dict[str, str]:
 
 def test_builtin_roles_keep_their_historical_permissions():
     # tables.serve / kitchen.use are the old "any logged user may move orders" made explicit.
-    sell = {"pos.sell", "pos.courtesy", "cash.open_close", "cash.movements", "customers.edit",
+    sell = {"pos.sell", "pos.courtesy", "tables.send", "cash.open_close", "cash.movements", "customers.edit",
             "tables.serve", "kitchen.use"}
     assert BUILTIN_ROLES["admin"]["permissions"] == ALL
     assert BUILTIN_ROLES["cajero"]["permissions"] == sell

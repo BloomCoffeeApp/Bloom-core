@@ -2,6 +2,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { toast } from 'sonner'
 
 import { api, tokenStore } from '@/lib/api'
+import { idempotencyKeyFor, releaseIdempotencyKey } from '@/lib/idempotency'
 
 import type {
   Expense,
@@ -69,8 +70,9 @@ export function useSaveExpense() {
   const invalidate = useInvalidate()
   return useMutation({
     mutationFn: ({ id, body }: { id?: number; body: Partial<ExpenseInput> }) =>
-      id ? api.patch<Expense>(`/expenses/${id}`, body) : api.post<Expense>('/expenses', body),
+      id ? api.patch<Expense>(`/expenses/${id}`, body) : api.post<Expense>('/expenses', body, { idempotencyKey: idempotencyKeyFor('expense', body) }),
     onSuccess: (_e, v) => {
+      if (!v.id) releaseIdempotencyKey('expense')
       invalidate()
       toast.success(v.id ? 'Gasto actualizado' : 'Gasto cargado')
     },
@@ -91,8 +93,9 @@ export function usePayExpense() {
         amount_cents?: number
         from_cash?: boolean
       }
-    }) => api.post<Expense>(`/expenses/${id}/pay`, body),
-    onSuccess: () => {
+    }) => api.post<Expense>(`/expenses/${id}/pay`, body, { idempotencyKey: idempotencyKeyFor(`expense-pay:${id}`, body) }),
+    onSuccess: (_e, v) => {
+      releaseIdempotencyKey(`expense-pay:${v.id}`)
       invalidate()
       toast.success('Gasto pagado')
     },

@@ -221,6 +221,8 @@ def ticket(data: dict[str, Any], layout: Layout, *, open_drawer: bool = False, d
     if sale.get("table_label"):
         label = str(sale["table_label"])
         where += f" · {label if label.lower().startswith('mesa') else 'Mesa ' + label}"
+        if sale.get("table_code"):
+            where += f" ({sale['table_code']})"
     d.row(where, sale.get("user_name") or "")
     if sale.get("customer"):
         d.text(f"Cliente: {sale['customer']['name']}")
@@ -342,6 +344,8 @@ def comanda(o: dict[str, Any], station_name: str | None, layout: Layout) -> byte
     d = Doc(layout)
     d.text(f"PEDIDO #{o['number']}", align="center", bold=True, w=2, h=2)
     where = o.get("table_label") or CHANNEL_LABEL.get(o["channel"], o["channel"])
+    if o.get("table_label") and o.get("table_code"):
+        where += f" ({o['table_code']})"
     d.text(where + (f" · {station_name}" if station_name else ""), align="center", bold=True)
     d.text(f"{time_of(o.get('received_at') or o['created_at'])} · objetivo {o['target_minutes']} min", align="center")
     d.rule()

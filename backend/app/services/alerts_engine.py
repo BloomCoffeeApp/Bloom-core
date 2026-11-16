@@ -277,7 +277,7 @@ ENGINE_TYPES = {
 }
 
 # Alert type -> permission needed to see it (amounts like salaries are for managers only).
-PERMISSION_TYPES: dict[str, str] = {"expense_due": "expenses.manage"}
+PERMISSION_TYPES: dict[str, str] = {"expense_due": "expenses.manage", "db_recovered": "system.manage"}
 
 
 def register_rule(key: str, fn: Callable[[Session, dict[str, Any]], list[Spec]], types: set[str],

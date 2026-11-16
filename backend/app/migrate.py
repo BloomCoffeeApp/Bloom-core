@@ -73,7 +73,7 @@ def _recover(reason: str, fresh: Path | None) -> Path:
     return copy
 
 
-last_recovery: dict | None = None  # set when this start had to restore a backup (shown by /api/system/info)
+last_recovery: dict | None = None  # set when this start had to restore a backup (Auditoría + a notice in the bell)
 
 
 def describe_files() -> str:

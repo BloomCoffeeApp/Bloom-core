@@ -8,8 +8,10 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/compone
 import { fmtMoney } from '@/lib/format'
 import { useModules } from '@/features/business/api'
 import { useHasFeature } from '@/features/license/api'
-import type { StampReward } from '@/pro-modules'
+import type { MoveTarget, SendLine, StampReward } from '@/pro-modules'
 import { proModules } from '@pro'
+
+import { useAuth } from '@/lib/auth'
 
 import { useCurrentCash } from '../cash/api'
 import { OpenCashDialog } from '../cash/dialogs'
@@ -91,6 +93,10 @@ function PosPage() {
   const [done, setDone] = useState<SaleDetail | null>(null)
   const [openCash, setOpenCash] = useState(false)
   const [tabsOpen, setTabsOpen] = useState(false)
+  const [sendOpen, setSendOpen] = useState(false)
+  const [moving, setMoving] = useState<MoveTarget | null>(null)
+  const { can } = useAuth()
+  const tablesPro = useHasFeature('public_menu') === true
   const [tip, setTip] = useState(0) // optional tip of the checkout in progress (QR/Point charge include it)
   const [collectReq, setCollectReq] = useState<{ sale: SaleIn; method: CollectMethod } | null>(null)
   const collect = useCollectStatus()
@@ -184,6 +190,23 @@ function PosPage() {
     return () => window.removeEventListener('keydown', onKey)
   }, [checkout, modProduct, done, startCheckout])
 
+  // Pro «Enviar a mesa»: the lines that haven't reached the bar yet, as the backend takes them.
+  const canSend = tablesPro && sections.tables && !!proModules.SendToTableDialog && can('tables.send')
+  const canMove = tablesPro && !!proModules.MoveTableDialog && can('tables.send', 'tables.serve', 'orders.manage')
+  const sendLines = useMemo<SendLine[]>(
+    () =>
+      cartApi.cart.lines
+        .filter((l) => l.to_bar !== false && !l.reward)
+        .map((l) => ({
+          product_id: l.product_id,
+          size_id: l.size?.size_id ?? null,
+          qty: l.qty,
+          modifier_ids: l.modifiers.map((m) => m.id),
+          notes: l.notes || null,
+        })),
+    [cartApi.cart.lines],
+  )
+
   const listTotal = useMemo(() => cartApi.cart.lines.reduce((a, l) => a + l.unit_cents * l.qty, 0), [cartApi.cart.lines])
 
   const confirm: CheckoutConfirm = (payments, courtesy, tipCents = 0, waiterId = null) => {
@@ -254,6 +277,7 @@ function PosPage() {
           quote={quoteLines}
           pricing={pricing}
           sections={sections}
+          onSendToTable={canSend ? () => (sendLines.length ? setSendOpen(true) : undefined) : undefined}
           customerExtras={
             stampsOn && cartApi.cart.customer && proModules.PosStampCards ? (
               <Suspense fallback={null}>
@@ -325,7 +349,36 @@ function PosPage() {
           if (missing.length) toast.warning(`No están en el catálogo: ${missing.join(', ')}`)
           setTabsOpen(false)
         }}
+        onMove={
+          canMove
+            ? (tab) => {
+                setTabsOpen(false)
+                setMoving({ kind: 'tab', id: tab.id, table_id: tab.table_id, label: tab.table_label })
+              }
+            : undefined
+        }
       />
+      {proModules.SendToTableDialog && sendOpen && (
+        <Suspense fallback={null}>
+          <proModules.SendToTableDialog
+            open={sendOpen}
+            onOpenChange={setSendOpen}
+            lines={sendLines}
+            tableId={cartApi.cart.tab?.table_id ?? null}
+            onSent={({ table_label }) => {
+              setSendOpen(false)
+              toast.success(`Pedido enviado a Mesa ${table_label}: queda en su cuenta, sin cobrar.`)
+              if (cartApi.cart.tab) cartApi.markSent()
+              else cartApi.clear()
+            }}
+          />
+        </Suspense>
+      )}
+      {proModules.MoveTableDialog && moving && (
+        <Suspense fallback={null}>
+          <proModules.MoveTableDialog target={moving} onClose={() => setMoving(null)} />
+        </Suspense>
+      )}
     </div>
   )
 }

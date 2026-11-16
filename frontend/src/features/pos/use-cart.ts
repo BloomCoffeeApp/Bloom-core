@@ -207,13 +207,22 @@ export function useCart() {
         to_bar: false,
       })
     }
-    setCart({ ...EMPTY, lines, channel: 'salon', table_label: tab.table_label, tab: { id: tab.id, label: tab.table_label, prepaid_cents: tab.prepaid_cents ?? 0 } })
+    setCart({
+      ...EMPTY, lines, channel: 'salon', table_label: tab.table_label,
+      tab: { id: tab.id, label: tab.table_label, table_id: tab.table_id, code: tab.table_code ?? null, prepaid_cents: tab.prepaid_cents ?? 0 },
+    })
     return missing
   }, [])
 
+  /** Lines left on the table's account (not charged): they stay in the cart as «already sent to the bar». */
+  const markSent = useCallback(
+    () => setCart((c) => ({ ...c, lines: c.lines.map((l) => ({ ...l, to_bar: false })) })),
+    [],
+  )
+
   return useMemo(
-    () => ({ cart, add, addReward, setReward, setQty, updateLine, remove, setChannel, setTable, setCustomer, setDiscount, setPoints, clear, loadTab }),
-    [cart, add, addReward, setReward, setQty, updateLine, remove, setChannel, setTable, setCustomer, setDiscount, setPoints, clear, loadTab],
+    () => ({ cart, add, addReward, setReward, setQty, updateLine, remove, setChannel, setTable, setCustomer, setDiscount, setPoints, clear, loadTab, markSent }),
+    [cart, add, addReward, setReward, setQty, updateLine, remove, setChannel, setTable, setCustomer, setDiscount, setPoints, clear, loadTab, markSent],
   )
 }
 

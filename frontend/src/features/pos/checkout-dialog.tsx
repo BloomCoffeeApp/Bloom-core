@@ -88,7 +88,8 @@ function CourtesyBody({
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Enter' && !(e.target instanceof HTMLTextAreaElement)) {
+      // Not while an IME is composing (Enter picks a candidate) nor on a held key (it would confirm twice).
+      if (e.key === 'Enter' && !e.isComposing && !e.repeat && !(e.target instanceof HTMLTextAreaElement)) {
         e.preventDefault()
         confirm()
       }
@@ -222,7 +223,8 @@ function CheckoutBody({
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Enter' && !(e.target instanceof HTMLTextAreaElement)) {
+      // Not while an IME is composing (Enter picks a candidate) nor on a held key (it would confirm twice).
+      if (e.key === 'Enter' && !e.isComposing && !e.repeat && !(e.target instanceof HTMLTextAreaElement)) {
         e.preventDefault()
         confirm()
       }
@@ -325,7 +327,10 @@ function CheckoutBody({
             return (
               <div
                 key={r.method}
-                onClick={() => setActive(i)}
+                role="group"
+                aria-label={m?.name ?? r.method}
+                onPointerDownCapture={() => setActive(i)}
+                onFocusCapture={() => setActive(i)}
                 className={cn('flex items-center gap-2 rounded-xl border p-2', i === active && 'border-primary ring-2 ring-primary/20')}
               >
                 <Icon className="ml-1 size-5 shrink-0 text-muted-foreground" />

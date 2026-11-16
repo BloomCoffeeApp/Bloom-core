@@ -15,6 +15,7 @@ ADMIN = "admin"
 PERMISSIONS: dict[str, tuple[str, str, str]] = {
     # Punto de venta y caja
     "pos.sell": ("Ventas y caja", "Vender en el POS", "Cobrar, ver ventas, cuentas abiertas e imprimir tickets"),
+    "tables.send": ("Ventas y caja", "Enviar pedidos a una mesa", "Cargar un pedido en la caja y dejarlo en la cuenta de una mesa, sin cobrar; pasar cuentas y pedidos de una mesa a otra"),
     "pos.discount": ("Ventas y caja", "Aplicar descuentos", "Descuentos por línea o sobre el total"),
     "pos.courtesy": ("Ventas y caja", "Registrar cortesías", "Ventas sin cargo (quedan auditadas)"),
     "sales.void": ("Ventas y caja", "Anular ventas", "Anula la venta y devuelve el stock"),
@@ -52,7 +53,7 @@ PERMISSIONS: dict[str, tuple[str, str, str]] = {
 
 ALL = frozenset(PERMISSIONS)
 
-_SELL = {"pos.sell", "pos.courtesy", "cash.open_close", "cash.movements", "customers.edit", "tables.serve", "kitchen.use"}
+_SELL = {"pos.sell", "pos.courtesy", "tables.send", "cash.open_close", "cash.movements", "customers.edit", "tables.serve", "kitchen.use"}
 _MANAGE = {
     "pos.discount", "sales.void", "catalog.edit", "prices.edit", "stock.view", "stock.edit", "stock.adjust", "stock.count",
     "purchases.manage", "customers.manage", "promos.manage", "orders.manage", "notices.manage",
@@ -77,6 +78,7 @@ BUILTIN_ROLES: dict[str, dict] = {
 REQUIRES: dict[str, str] = {
     "pos.discount": "pos.sell",
     "pos.courtesy": "pos.sell",
+    "tables.send": "pos.sell",
     "sales.void": "pos.sell",
     "stock.edit": "stock.view",
     "stock.adjust": "stock.view",

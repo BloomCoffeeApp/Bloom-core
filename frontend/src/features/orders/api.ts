@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 
 import { api } from '@/lib/api'
 
+import { printKitchenTicket } from './print'
 import type { Board, Order, OrderStatus, OrdersSettings, Tab } from './types'
 
 export const ordersKeys = {
@@ -59,6 +60,24 @@ export function useSaveOrdersSettings() {
       toast.success('Pantalla de pedidos guardada')
     },
     onError: (e: Error) => toast.error(e.message),
+  })
+}
+
+/**
+ * «Imprimir / reimprimir comanda»: the thermal printer of its station (or the cashier's) through the backend; when
+ * there is none (or it fails) the browser's print dialog gets the kitchen ticket instead.
+ */
+export function useReprintComanda() {
+  return useMutation({
+    mutationFn: async (o: Order) => {
+      try {
+        await api.post(`/printing/orders/${o.id}/comanda`)
+        toast.success(`Comanda #${o.number} enviada a la impresora`)
+      } catch (e) {
+        toast.info(`${(e as Error).message} Se abre el diálogo de impresión.`, { duration: 6000 })
+        printKitchenTicket(o, null)
+      }
+    },
   })
 }
 

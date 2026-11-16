@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Header, Response
 from sqlalchemy.orm import Session
 
 from app.auth import Perm
@@ -25,7 +25,7 @@ from app.schemas.stock import (
     SuggestionGroup,
     WasteIn,
 )
-from app.services import free_plan
+from app.services import free_plan, idempotency
 from app.services import stock_ops as svc
 
 router = APIRouter(prefix="/api", tags=["stock"])
@@ -113,15 +113,27 @@ def item_movements(
 
 
 # ---- Adjust / waste
+def _once(response: Response, db: Session, raw_key: str | None, scope: str, me: User, payload, run, load):
+    """Runs the operation once per `Idempotency-Key` (a double tap or a retry doesn't repeat it)."""
+    out, repeated = idempotency.once(db, idempotency.clean_key(raw_key), scope, me, payload, run, load)
+    if repeated:
+        response.headers["Idempotent-Replay"] = "true"
+    return out
+
+
 @router.post("/stock/adjust", response_model=StockItemOut)
-def adjust(data: AdjustIn, db: Session = Depends(get_db), me: User = Adjuster) -> StockItemOut:
-    return svc.adjust(db, data, me)
+def adjust(data: AdjustIn, response: Response, db: Session = Depends(get_db), me: User = Adjuster,
+           idempotency_key: str | None = Header(default=None, alias="Idempotency-Key")) -> StockItemOut:
+    return _once(response, db, idempotency_key, "stock_adjust", me, data, lambda k: svc.adjust(db, data, me, k),
+                 lambda i: svc.get_item(db, i))
 
 
 @router.post("/stock/waste", response_model=StockItemOut)
-def waste(data: WasteIn, db: Session = Depends(get_db), me: User = Adjuster) -> StockItemOut:
+def waste(data: WasteIn, response: Response, db: Session = Depends(get_db), me: User = Adjuster,
+          idempotency_key: str | None = Header(default=None, alias="Idempotency-Key")) -> StockItemOut:
     """Descartar: a quantity, N packages or everything left (optionally of one lot), with a reason."""
-    return svc.waste(db, data, me)
+    return _once(response, db, idempotency_key, "stock_waste", me, data, lambda k: svc.waste(db, data, me, _key=k),
+                 lambda i: svc.get_item(db, i))
 
 
 # Quick discard of small spills from the POS / barista (people who sell or prepare, not only stock managers).
@@ -156,8 +168,10 @@ def list_counts(db: Session = Depends(get_db), _: User = Reader):
 
 
 @router.post("/stock/counts", response_model=CountOut)
-def create_count(data: CountCreate, db: Session = Depends(get_db), me: User = Counter) -> CountOut:
-    return svc.create_count(db, data, me)
+def create_count(data: CountCreate, response: Response, db: Session = Depends(get_db), me: User = Counter,
+                 idempotency_key: str | None = Header(default=None, alias="Idempotency-Key")) -> CountOut:
+    return _once(response, db, idempotency_key, "stock_count_create", me, data, lambda k: svc.create_count(db, data, me, k),
+                 lambda i: svc.get_count(db, i))
 
 
 @router.get("/stock/counts/{count_id}", response_model=CountOut)
@@ -178,8 +192,10 @@ def patch_count_item(
 
 
 @router.post("/stock/counts/{count_id}/apply", response_model=CountOut)
-def apply_count(count_id: int, db: Session = Depends(get_db), me: User = Adjuster) -> CountOut:
-    return svc.apply_count(db, count_id, me)
+def apply_count(count_id: int, response: Response, db: Session = Depends(get_db), me: User = Adjuster,
+                idempotency_key: str | None = Header(default=None, alias="Idempotency-Key")) -> CountOut:
+    return _once(response, db, idempotency_key, "stock_count_apply", me, {"count_id": count_id},
+                 lambda k: svc.apply_count(db, count_id, me, k), lambda i: svc.get_count(db, i))
 
 
 @router.post("/stock/counts/{count_id}/cancel", response_model=CountOut)

@@ -23,6 +23,10 @@ export interface ProModules {
   FloorPlanPage?: Lazy
   /** Checkout of a table's account: pick the waiter who served it (public_menu). */
   CheckoutWaiter?: Lazy<{ tabId: number; value: number | null; onChange: (employeeId: number | null) => void }>
+  /** POS «Enviar a mesa»: leaves the cart's new lines on a table's account without charging (public_menu). */
+  SendToTableDialog?: Lazy<SendToTableProps>
+  /** «Cambiar de mesa»: passes an account or one order to another table (public_menu). */
+  MoveTableDialog?: Lazy<{ target: MoveTarget | null; onClose: () => void }>
   /** Configuración → Pedidos: stations and pickup screen (orders_pro). */
   OrdersStationsSettings?: Lazy
   /** Configuración → Pedidos online: take away / delivery from the online menu (online_orders). */
@@ -48,6 +52,30 @@ export interface ProModules {
   /** Configuración → Cobros: «Conectar Mercado Pago», the store/POS for the QR and the Point device (payments). */
   MercadoPagoConnect?: Lazy
 }
+
+/** A cart line as the backend takes it when an order is left on a table. */
+export interface SendLine {
+  product_id: number
+  size_id: number | null
+  qty: number
+  modifier_ids: number[]
+  notes: string | null
+}
+
+export interface SendToTableProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  lines: SendLine[]
+  /** The table preselected (the cart is charging that table's account). */
+  tableId?: number | null
+  /** The order was left on the table: the POS empties what was sent. */
+  onSent: (info: { table_label: string; order_id: number }) => void
+}
+
+/** What «Cambiar de mesa» moves: a whole account or one order. */
+export type MoveTarget =
+  | { kind: 'tab'; id: number; table_id: number; label: string }
+  | { kind: 'order'; id: number; table_id: number | null; label: string }
 
 /** A stamp-card reward the POS adds to the cart. */
 export type StampReward =

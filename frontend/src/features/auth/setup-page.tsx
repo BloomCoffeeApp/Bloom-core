@@ -134,16 +134,17 @@ export function SetupPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
                     <Label htmlFor="pin">PIN (4 a 6 números)</Label>
-                    <Input id="pin" type="password" inputMode="numeric" maxLength={6} value={pin}
+                    <Input id="pin" type="password" inputMode="numeric" autoComplete="new-password" maxLength={6} value={pin}
                       onChange={(e) => setPin(digits(e.target.value))} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="pin2">Repetir PIN</Label>
-                    <Input id="pin2" type="password" inputMode="numeric" maxLength={6} value={pin2}
+                    <Input id="pin2" type="password" inputMode="numeric" autoComplete="new-password" maxLength={6} value={pin2}
+                      aria-invalid={!!pin2 && pin !== pin2} aria-describedby={pin2 && pin !== pin2 ? 'pin-mismatch' : undefined}
                       onChange={(e) => setPin2(digits(e.target.value))} />
                   </div>
                 </div>
-                {pin2 && pin !== pin2 && <p className="text-sm text-destructive">Los PIN no coinciden</p>}
+                {pin2 && pin !== pin2 && <p id="pin-mismatch" role="alert" className="text-sm text-destructive">Los PIN no coinciden</p>}
                 <label className="flex items-start gap-3 rounded-xl border bg-muted/40 p-3">
                   <Switch checked={demo} onCheckedChange={setDemo} className="mt-0.5" />
                   <span className="text-sm">

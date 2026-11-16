@@ -33,7 +33,7 @@ from app.models import (
     User,
     utcnow,
 )
-from app.services import audit
+from app.services import audit, idempotency
 from app.services.timeutil import local_today, range_bounds_utc, to_utc_naive
 
 CASH = "efectivo"
@@ -202,7 +202,7 @@ def _get(db: Session, expense_id: int) -> Expense:
     return e
 
 
-def create_expense(db: Session, data: dict[str, Any], user: User) -> Expense:
+def create_expense(db: Session, data: dict[str, Any], user: User, _key: idempotency.KeyHash | None = None) -> Expense:
     cat = _category(db, data["category_id"])
     status = data.get("status") or "paid"
     when = data.get("date") or local_today()
@@ -230,6 +230,7 @@ def create_expense(db: Session, data: dict[str, Any], user: User) -> Expense:
         raise HTTPException(400, "Un gasto pendiente todavía no sale de la caja")
     audit.log(db, user.id, "create", "expense", e.id, {"amount_cents": e.amount_cents, "status": status,
                                                        "from_cash": e.cash_movement_id is not None})
+    idempotency.record_if(db, _key, "expense_create", user, e.id)
     db.commit()
     return e
 
@@ -273,7 +274,7 @@ def update_expense(db: Session, expense_id: int, changes: dict[str, Any], user: 
     return e
 
 
-def pay_expense(db: Session, expense_id: int, data: dict[str, Any], user: User) -> Expense:
+def pay_expense(db: Session, expense_id: int, data: dict[str, Any], user: User, _key: idempotency.KeyHash | None = None) -> Expense:
     e = _get(db, expense_id)
     if e.status == "paid":
         raise HTTPException(409, "Este gasto ya está pagado")
@@ -285,6 +286,7 @@ def pay_expense(db: Session, expense_id: int, data: dict[str, Any], user: User) 
     if data.get("from_cash"):
         _cash_out(db, e, user)
     audit.log(db, user.id, "pay", "expense", e.id, {"amount_cents": e.amount_cents, "from_cash": bool(data.get("from_cash"))})
+    idempotency.record_if(db, _key, "expense_pay", user, e.id)
     db.commit()
     return e
 

@@ -1,4 +1,5 @@
 import {
+  ArrowRightLeft,
   Banknote,
   Bike,
   Check,
@@ -12,6 +13,7 @@ import {
   MessageCircle,
   MoreVertical,
   Phone,
+  Printer,
   QrCode,
   Receipt,
   RefreshCw,
@@ -67,8 +69,15 @@ export interface CardActions {
   onAction: (o: Order, a: OrderAction) => void
   onWhatsApp?: (o: Order) => void
   onOnline?: (o: Order, action: 'check-payment' | 'register-sale' | 'update-customer') => void
+  /** «Reimprimir comanda»: the kitchen ticket again (thermal printer, or the browser's dialog). */
+  onReprint?: (o: Order) => void
+  /** «Cambiar de mesa» (Pro): passes this order to another table's account. */
+  onMove?: (o: Order) => void
   busy?: boolean
 }
+
+/** A table's order that is on its open account and can still change table. */
+const MOVABLE = new Set(['received', 'accepted', 'preparing', 'ready', 'delivered'])
 
 function ActionIcon({ name }: { name: string | null }) {
   const Icon = name ? ICONS[name] : undefined
@@ -170,6 +179,9 @@ export function OrderCard({ order: o, elapsed, level, actions }: { order: Order;
   const waiting = o.received_at == null
   const main = o.actions.filter((a) => a.place === 'main')
   const menu = o.actions.filter((a) => a.place === 'menu')
+  const canReprint = !!actions.onReprint && !waiting && !o.online
+  const canMove = !!actions.onMove && o.source === 'table' && o.table_id != null && MOVABLE.has(o.status)
+  const hasMenu = menu.length > 0 || canReprint || canMove
   return (
     <article
       data-testid="order-card"
@@ -234,7 +246,7 @@ export function OrderCard({ order: o, elapsed, level, actions }: { order: Order;
         </p>
       )}
 
-      {(main.length > 0 || menu.length > 0) && (
+      {(main.length > 0 || hasMenu) && (
         <footer className="mt-auto flex gap-2">
           {main.map((a) => {
             const t = TONE[a.tone]
@@ -250,7 +262,7 @@ export function OrderCard({ order: o, elapsed, level, actions }: { order: Order;
               </Button>
             )
           })}
-          {menu.length > 0 && (
+          {hasMenu && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="size-12" aria-label={`Más opciones del pedido ${o.number}`}>
@@ -266,6 +278,16 @@ export function OrderCard({ order: o, elapsed, level, actions }: { order: Order;
                     </DropdownMenuItem>
                   </div>
                 ))}
+                {canReprint && (
+                  <DropdownMenuItem onSelect={() => actions.onReprint!(o)} data-testid="order-reprint">
+                    <Printer /> Reimprimir comanda
+                  </DropdownMenuItem>
+                )}
+                {canMove && (
+                  <DropdownMenuItem onSelect={() => actions.onMove!(o)} data-testid="order-move">
+                    <ArrowRightLeft /> Cambiar de mesa
+                  </DropdownMenuItem>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           )}

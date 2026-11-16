@@ -185,12 +185,23 @@ function SalesPage() {
             </TableHeader>
             <TableBody>
               {data.items.map((s) => (
-                <TableRow key={s.id} className="h-12 cursor-pointer" onClick={() => setSelected(s.id)}>
+                <TableRow
+                  key={s.id}
+                  className="h-12 cursor-pointer"
+                  tabIndex={0}
+                  onClick={() => setSelected(s.id)}
+                  onKeyDown={(e) => {
+                    if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) {
+                      e.preventDefault()
+                      setSelected(s.id)
+                    }
+                  }}
+                >
                   <TableCell className="tabular font-medium">#{s.number}</TableCell>
                   <TableCell className="tabular text-muted-foreground">{fmtDateTime(s.ts)}</TableCell>
                   <TableCell>
                     {CHANNEL_LABEL[s.channel]}
-                    {s.table_label && <span className="text-muted-foreground"> · M{s.table_label}</span>}
+                    {s.table_label && <span className="text-muted-foreground"> · M{s.table_label}{s.table_code ? ` (${s.table_code})` : ''}</span>}
                   </TableCell>
                   <TableCell className="max-w-40 truncate">{s.customer_name ?? <span className="text-muted-foreground">—</span>}</TableCell>
                   <TableCell>

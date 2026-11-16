@@ -1,7 +1,7 @@
 """Gestión de gastos (core, Free): categories, expenses, monthly fixed expenses, receipt photo and the
 month's "ganancia real". The full month-by-month result report is Pro (`/api/reports/profit`)."""
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
@@ -25,6 +25,7 @@ from app.schemas.expenses import (
     RecurringUpdate,
 )
 from app.services import expenses as svc
+from app.services import idempotency
 from app.services.product_images import MAX_UPLOAD_BYTES
 
 router = APIRouter(prefix="/api/expenses", tags=["expenses"])
@@ -86,8 +87,16 @@ def list_expenses(
 
 
 @router.post("", response_model=ExpenseOut)
-def create_expense(data: ExpenseIn, db: Session = Depends(get_db), user: User = Manager) -> dict:
-    e = svc.create_expense(db, data.model_dump(), user)
+def create_expense(
+    data: ExpenseIn, response: Response, db: Session = Depends(get_db), user: User = Manager,
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+) -> dict:
+    """With an `Idempotency-Key` a double tap or a retry loads the expense once."""
+    body = data.model_dump()
+    e, repeated = idempotency.once(db, idempotency.clean_key(idempotency_key), "expense_create", user, body,
+                                   lambda k: svc.create_expense(db, body, user, k), lambda i: svc._get(db, i))
+    if repeated:
+        response.headers["Idempotent-Replay"] = "true"
     return svc.get_expense(db, e.id)
 
 
@@ -98,8 +107,16 @@ def update_expense(expense_id: int, data: ExpenseUpdate, db: Session = Depends(g
 
 
 @router.post("/{expense_id}/pay", response_model=ExpenseOut)
-def pay_expense(expense_id: int, data: ExpensePayIn, db: Session = Depends(get_db), user: User = Manager) -> dict:
-    svc.pay_expense(db, expense_id, data.model_dump(), user)
+def pay_expense(
+    expense_id: int, data: ExpensePayIn, response: Response, db: Session = Depends(get_db), user: User = Manager,
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+) -> dict:
+    body = data.model_dump()
+    _, repeated = idempotency.once(db, idempotency.clean_key(idempotency_key), "expense_pay", user,
+                                   {"expense_id": expense_id, **body}, lambda k: svc.pay_expense(db, expense_id, body, user, k),
+                                   lambda i: svc._get(db, i))
+    if repeated:
+        response.headers["Idempotent-Replay"] = "true"
     return svc.get_expense(db, expense_id)
 
 

@@ -16,7 +16,7 @@ export function printKitchenTicket(o: Order, stationName: string | null) {
     .join('<hr>')
   const body = `
     <h1>Pedido #${o.number}</h1>
-    <p class="c b">${esc(o.table_label || CHANNEL_LABEL[o.channel])}${stationName ? ` · ${esc(stationName)}` : ''}</p>
+    <p class="c b">${esc(o.table_label || CHANNEL_LABEL[o.channel])}${o.table_label && o.table_code ? ` (${esc(o.table_code)})` : ''}${stationName ? ` · ${esc(stationName)}` : ''}</p>
     <p class="c s">${esc(fmtTime(o.received_at ?? o.created_at))} · objetivo ${o.target_minutes} min</p>
     <hr>${items}
     ${o.note ? `<hr><p class="b">“${esc(o.note)}”</p>` : ''}`

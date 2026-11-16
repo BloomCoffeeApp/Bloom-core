@@ -64,6 +64,8 @@ export interface Sale {
   courtesy_reason: string | null
   channel: Channel
   table_label: string | null
+  /** PB-SALON-01, as it was when the table was charged. */
+  table_code?: string | null
   /** Snapshot taken when a table account was charged. */
   table_id?: number | null
   waiter_employee_id?: number | null

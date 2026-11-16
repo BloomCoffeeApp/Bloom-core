@@ -19,7 +19,9 @@ import { cn } from '@/lib/utils'
 
 import { useHasFeature } from '../license/api'
 import { TeamAccessDialog } from '../team/team-access-dialog'
-import { useBoard, useOnlineOrderAction, useResolveCall, useSetOrderStatus, whatsappLink } from './api'
+import type { MoveTarget } from '@/pro-modules'
+
+import { useBoard, useOnlineOrderAction, useReprintComanda, useResolveCall, useSetOrderStatus, whatsappLink } from './api'
 import { OrderCard } from './order-card'
 import { printKitchenTicket } from './print'
 import { audioReady, loadPrefs, notify, playAlert, savePrefs, type SoundPrefs, unlockAudio } from './sound'
@@ -68,7 +70,7 @@ const waKind = (o: Order) =>
 const withCode = (label: string | null | undefined, code?: string | null) => `${label ?? ''}${code ? ` (${code})` : ''}`
 const describe = (o: Order) => `${withCode(o.table_label, o.table_code)}${o.table_label ? ' · ' : ''}${o.items.reduce((a, i) => a + i.qty, 0)} productos`
 const callText = (c: WaiterCall) =>
-  c.kind === 'bill' ? `Mesa ${withCode(c.table_label, c.table_code)} pide la cuenta` : c.kind === 'invoice' ? `Mesa ${withCode(c.table_label, c.table_code)} pide factura` : `Mesa ${c.table_label} llama al mozo`
+  c.kind === 'bill' ? `Mesa ${withCode(c.table_label, c.table_code)} pide la cuenta` : c.kind === 'invoice' ? `Mesa ${withCode(c.table_label, c.table_code)} pide factura` : `Mesa ${withCode(c.table_label, c.table_code)} llama al mozo`
 
 function OrdersPage() {
   const [station, setStationState] = useState<number | null>(loadStation)
@@ -79,7 +81,10 @@ function OrdersPage() {
   const [eta, setEta] = useState(20)
   const [waNotify, setWaNotify] = useState(true)
   const [teamQr, setTeamQr] = useState(false)
+  const [moving, setMoving] = useState<MoveTarget | null>(null)
   const { can } = useAuth()
+  const reprint = useReprintComanda()
+  const tablesFeature = useHasFeature('public_menu') === true
   const rootRef = useRef<HTMLDivElement>(null)
 
   const proFeature = useHasFeature('orders_pro')
@@ -210,6 +215,11 @@ function OrdersPage() {
     },
     onWhatsApp: (o: Order) => void openWhatsApp(o, waKind(o)),
     onOnline: (o: Order, action: 'check-payment' | 'register-sale' | 'update-customer') => online.mutate({ id: o.id, action }),
+    onReprint: (o: Order) => reprint.mutate(o),
+    onMove:
+      tablesFeature && proModules.MoveTableDialog && can('tables.send', 'tables.serve', 'orders.manage')
+        ? (o: Order) => setMoving({ kind: 'order', id: o.id, table_id: o.table_id, label: o.table_label ?? '' })
+        : undefined,
   }
   const confirmAsk = () => {
     if (!asking) return
@@ -455,6 +465,11 @@ function OrdersPage() {
         )}
       </ConfirmDialog>
       {proModules.TeamApp && <TeamAccessDialog open={teamQr} onOpenChange={setTeamQr} />}
+      {proModules.MoveTableDialog && moving && (
+        <Suspense fallback={null}>
+          <proModules.MoveTableDialog target={moving} onClose={() => setMoving(null)} />
+        </Suspense>
+      )}
     </div>
   )
 }

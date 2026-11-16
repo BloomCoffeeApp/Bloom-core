@@ -260,6 +260,23 @@ def test_kitchen_tickets_without_printer_keep_the_screen_printing(seeded, db, fa
     assert {s["name"]: s["direct_print"] for s in board["stations"]} == {"Barra": False, "Cocina": False}
 
 
+def test_reprinting_a_comanda_works_without_stations_and_needs_a_printer(seeded, db, fake):
+    client, admin = seeded
+    sale = _sale(client, admin, db)
+    board = client.get("/api/orders/board", headers=admin).json()["orders"]
+    order = next(o for o in board if o["sale_id"] == sale["id"])
+    # Nowhere to print: 409, so the screen prints it from the browser.
+    assert client.post(f"/api/printing/orders/{order['id']}/comanda", headers=admin).status_code == 409
+    _configure(client, admin)  # cashier printer only, no stations
+    fake.jobs.clear()
+    r = client.post(f"/api/printing/orders/{order['id']}/comanda", headers=admin)
+    assert r.status_code == 200, r.text
+    assert [(n, d.split(" ")[0]) for n, _, d in fake.jobs] == [("Caja", "Comanda")]
+    assert b"Latte" in fake.jobs[0][1]
+    assert client.post("/api/printing/orders/999999/comanda", headers=admin).status_code == 404
+    assert client.post(f"/api/printing/orders/{order['id']}/comanda", headers=login(client, "Caja Demo", "1111")).status_code == 200
+
+
 def test_raw_tcp_transport_against_a_local_socket():
     srv = socket.socket()
     srv.bind(("127.0.0.1", 0))

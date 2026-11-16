@@ -183,6 +183,7 @@ const ACTION_LABEL: Record<string, string> = {
   delete: 'Eliminó',
   void: 'Anuló',
   restore: 'Restauró',
+  recover: 'Recuperó la base',
   login: 'Ingresó',
   open: 'Abrió',
   close: 'Cerró',

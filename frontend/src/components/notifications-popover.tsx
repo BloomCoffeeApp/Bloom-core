@@ -6,8 +6,10 @@ import { Link, useNavigate } from 'react-router'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { useAlertSummary, useAlerts, useReadAlert, useReadAll } from '@/features/alerts/api'
 import type { Alert } from '@/features/alerts/types'
+import { useIsMobile } from '@/hooks/use-mobile'
 import { api } from '@/lib/api'
 import { fmtRelative } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -39,6 +41,7 @@ const MAX_ALERTS = 8
 /** The header bell: «Ahora» (orders and tables waiting for you) and the latest alerts, in a popup. */
 export function NotificationsPopover() {
   const navigate = useNavigate()
+  const isMobile = useIsMobile()
   const [open, setOpen] = useState(false)
   const summary = useAlertSummary()
   const urgent = useQuery({
@@ -65,19 +68,19 @@ export function NotificationsPopover() {
     go(a.link || '/avisos')
   }
 
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative" data-tour="alerts" aria-label={total ? `Notificaciones: ${total}` : 'Notificaciones'}>
-          {urgentItems.length ? <BellRing /> : <Bell />}
-          {!!total && (
-            <Badge className={cn('absolute -top-1 -right-1 h-4 min-w-4 rounded-full px-1 text-[10px]', critical ? 'bg-destructive text-white' : '')}>
-              {total > 99 ? '99+' : total}
-            </Badge>
-          )}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent align="end" className="w-[min(24rem,calc(100vw-1.5rem))] gap-0 p-0" data-testid="notifications-popover">
+  const trigger = (
+    <Button variant="ghost" size="icon" className="relative" data-tour="alerts" aria-label={total ? `Notificaciones: ${total}` : 'Notificaciones'}>
+      {urgentItems.length ? <BellRing /> : <Bell />}
+      {!!total && (
+        <Badge className={cn('absolute -top-1 -right-1 h-4 min-w-4 rounded-full px-1 text-[10px]', critical ? 'bg-destructive text-white' : '')}>
+          {total > 99 ? '99+' : total}
+        </Badge>
+      )}
+    </Button>
+  )
+
+  const body = (
+    <>
         <div className="flex items-center justify-between gap-2 px-3 py-2.5">
           <p className="font-heading text-base font-semibold">Notificaciones</p>
           {openAlerts > 0 && (
@@ -145,6 +148,29 @@ export function NotificationsPopover() {
             <Link to="/avisos">Ver todas</Link>
           </Button>
         </div>
+    </>
+  )
+
+  // On a phone the list is a sheet from the bottom (within thumb reach); on a computer, the usual popup.
+  if (isMobile) {
+    return (
+      <Sheet open={open} onOpenChange={setOpen}>
+        <SheetTrigger asChild>{trigger}</SheetTrigger>
+        <SheetContent side="bottom" className="max-h-[88svh] gap-0 rounded-t-3xl p-0 pb-[env(safe-area-inset-bottom)]" data-testid="notifications-popover">
+          <SheetHeader className="sr-only">
+            <SheetTitle>Notificaciones</SheetTitle>
+            <SheetDescription>Lo que espera tu atención y las últimas alertas.</SheetDescription>
+          </SheetHeader>
+          {body}
+        </SheetContent>
+      </Sheet>
+    )
+  }
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+      <PopoverContent align="end" className="w-[min(24rem,calc(100vw-1.5rem))] gap-0 p-0" data-testid="notifications-popover">
+        {body}
       </PopoverContent>
     </Popover>
   )

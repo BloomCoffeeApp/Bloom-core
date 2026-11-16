@@ -86,7 +86,7 @@ export function CustomerPicker({
                 inputMode="tel"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && submit()}
+                onKeyDown={(e) => e.key === 'Enter' && !e.nativeEvent.isComposing && submit()}
               />
             </div>
             <div className="flex justify-end gap-2 pt-2">
@@ -110,7 +110,7 @@ export function CustomerPicker({
                 className="h-12 pl-9 text-base"
                 onKeyDown={(e) => {
                   const first = data?.find((c) => !c.locked)
-                  if (e.key === 'Enter' && first) pick(first)
+                  if (e.key === 'Enter' && !e.nativeEvent.isComposing && first) pick(first)
                 }}
               />
             </div>

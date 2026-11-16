@@ -47,7 +47,7 @@ export function ProductGrid({
   }, [catalog, q, cat])
 
   const onSearchKey = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && products.length > 0 && q.trim()) {
+    if (e.key === 'Enter' && !e.nativeEvent.isComposing && products.length > 0 && q.trim()) {
       onPick(products[0])
       setQ('')
     } else if (e.key === 'Escape' && q) {

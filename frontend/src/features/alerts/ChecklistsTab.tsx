@@ -347,7 +347,7 @@ function ChecklistFormDialog({
                 onChange={(e) => setNewText(e.target.value)}
                 placeholder="Agregá una tarea y apretá Enter"
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
+                  if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
                     e.preventDefault()
                     add()
                   }

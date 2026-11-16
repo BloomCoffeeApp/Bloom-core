@@ -60,7 +60,7 @@ export function SaleDetailSheet({ id, onOpenChange }: { id: number | null; onOpe
             {s?.status === 'voided' && <Badge variant="destructive">Anulado</Badge>}
           </SheetTitle>
           <SheetDescription>
-            {s ? `${fmtDateTime(s.ts)} · ${CHANNEL_LABEL[s.channel]}${s.table_label ? ` · Mesa ${s.table_label}` : ''}${s.waiter_name ? ` · Mozo: ${s.waiter_name}` : ''} · ${s.user_name ?? '—'}` : ' '}
+            {s ? `${fmtDateTime(s.ts)} · ${CHANNEL_LABEL[s.channel]}${s.table_label ? ` · Mesa ${s.table_label}${s.table_code ? ` (${s.table_code})` : ''}` : ''}${s.waiter_name ? ` · Mozo: ${s.waiter_name}` : ''} · ${s.user_name ?? '—'}` : ' '}
           </SheetDescription>
         </SheetHeader>
         <div className="flex-1 overflow-y-auto px-4">

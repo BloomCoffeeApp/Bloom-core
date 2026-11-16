@@ -5,6 +5,7 @@ import {
   Gift,
   Minus,
   Plus,
+  Send,
   ShoppingBag,
   Star,
   StickyNote,
@@ -227,6 +228,7 @@ export function CartPanel({
   pricing = false,
   customerExtras,
   sections = ALL_SECTIONS,
+  onSendToTable,
 }: {
   cartApi: CartApi
   totals: CartTotals
@@ -244,6 +246,8 @@ export function CartPanel({
   customerExtras?: ReactNode
   /** What the business type shows (channels, tables, customers, loyalty). */
   sections?: PosSections
+  /** Pro «Enviar a mesa»: leave the new lines on a table's account without charging (needs `tables.send`). */
+  onSendToTable?: () => void
 }) {
   const totalBump = useBump(totals.total)
   const { cart } = cartApi
@@ -281,7 +285,9 @@ export function CartPanel({
           <div className="flex items-center gap-2 rounded-xl border border-info/40 bg-info/10 px-3 py-2 text-sm" data-testid="pos-tab-banner">
             <LayoutGrid className="size-4 shrink-0 text-info" />
             <span className="flex-1">
-              Cobrando <span className="font-semibold">Mesa {cart.tab.label}</span>: lo pedido ya está en la barra.
+              Cobrando <span className="font-semibold">Mesa {cart.tab.label}</span>
+              {cart.tab.code && <span className="ml-1 font-mono text-xs text-muted-foreground">({cart.tab.code})</span>}: lo pedido ya está
+              en la barra.
             </span>
             <button onClick={cartApi.clear} className="text-muted-foreground hover:text-foreground" aria-label="Dejar de cobrar la mesa">
               <X className="size-4" />
@@ -494,6 +500,17 @@ export function CartPanel({
           </div>
         </div>
         {totals.pointsEarned > 0 && <p className="text-right text-xs text-muted-foreground">Suma {totals.pointsEarned} puntos</p>}
+        {onSendToTable && sections.tables && (
+          <Button
+            variant="outline"
+            className="h-12 w-full text-base"
+            disabled={!cart.lines.some((l) => l.to_bar !== false) || !cashOpen}
+            onClick={onSendToTable}
+            data-testid="pos-send-to-table"
+          >
+            <Send /> Enviar a mesa sin cobrar
+          </Button>
+        )}
         <Button
           className="h-16 w-full rounded-2xl text-xl font-bold tracking-wide shadow-md"
           disabled={!cart.lines.length || !cashOpen || pricing}

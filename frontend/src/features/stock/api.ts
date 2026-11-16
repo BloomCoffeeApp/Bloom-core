@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
 import { api } from '@/lib/api'
+import { idempotencyKeyFor, releaseIdempotencyKey } from '@/lib/idempotency'
 
 import type {
   DiscardInput,
@@ -105,8 +106,9 @@ export function useAdjustStock() {
   const invalidate = useInvalidateStock()
   return useMutation({
     mutationFn: (body: { stock_item_id: number; new_qty?: number; delta?: number; reason: string }) =>
-      api.post<StockItem>('/stock/adjust', body),
+      api.post<StockItem>('/stock/adjust', body, { idempotencyKey: idempotencyKeyFor('stock-adjust', body) }),
     onSuccess: () => {
+      releaseIdempotencyKey('stock-adjust')
       invalidate()
       toast.success('Stock ajustado')
     },
@@ -117,8 +119,9 @@ export function useAdjustStock() {
 export function useRegisterWaste() {
   const invalidate = useInvalidateStock()
   return useMutation({
-    mutationFn: (body: DiscardInput) => api.post<StockItem>('/stock/waste', body),
+    mutationFn: (body: DiscardInput) => api.post<StockItem>('/stock/waste', body, { idempotencyKey: idempotencyKeyFor('stock-waste', body) }),
     onSuccess: () => {
+      releaseIdempotencyKey('stock-waste')
       invalidate()
       toast.success('Descarte registrado: quedó como merma')
     },
@@ -193,8 +196,12 @@ export function useDeleteStockCategory() {
 export function useCreateCount() {
   const invalidate = useInvalidateStock()
   return useMutation({
-    mutationFn: (body: { category_id: number | null; notes?: string }) => api.post<InventoryCount>('/stock/counts', body),
-    onSuccess: () => invalidate(),
+    mutationFn: (body: { category_id: number | null; notes?: string }) =>
+      api.post<InventoryCount>('/stock/counts', body, { idempotencyKey: idempotencyKeyFor('stock-count', body) }),
+    onSuccess: () => {
+      releaseIdempotencyKey('stock-count')
+      invalidate()
+    },
     onError,
   })
 }
@@ -212,8 +219,11 @@ export function useSetCounted(countId: number) {
 export function useCountAction(countId: number) {
   const invalidate = useInvalidateStock()
   return useMutation({
-    mutationFn: (action: 'apply' | 'cancel') => api.post<InventoryCount>(`/stock/counts/${countId}/${action}`),
+    mutationFn: (action: 'apply' | 'cancel') =>
+      api.post<InventoryCount>(`/stock/counts/${countId}/${action}`, undefined,
+        action === 'apply' ? { idempotencyKey: idempotencyKeyFor(`stock-count-apply:${countId}`, {}) } : undefined),
     onSuccess: (_d, action) => {
+      if (action === 'apply') releaseIdempotencyKey(`stock-count-apply:${countId}`)
       invalidate()
       toast.success(action === 'apply' ? 'Conteo aplicado: el stock quedó actualizado' : 'Conteo cancelado')
     },

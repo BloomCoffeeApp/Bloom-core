@@ -1,4 +1,4 @@
-import { ChefHat, LayoutGrid } from 'lucide-react'
+import { ArrowRightLeft, ChefHat, LayoutGrid } from 'lucide-react'
 
 import { EmptyState } from '@/components/empty-state'
 import { Button } from '@/components/ui/button'
@@ -13,11 +13,14 @@ export function TabsDialog({
   onOpenChange,
   tabs,
   onPick,
+  onMove,
 }: {
   open: boolean
   onOpenChange: (o: boolean) => void
   tabs: Tab[]
   onPick: (tab: Tab) => void
+  /** Pro «Cambiar de mesa»: pass the account to another table (the customers moved). */
+  onMove?: (tab: Tab) => void
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -51,6 +54,11 @@ export function TabsDialog({
                     Cobrar <span className="tabular">{fmtMoney(t.total_cents)}</span>
                   </Button>
                 </div>
+                {onMove && (
+                  <Button variant="ghost" size="sm" className="mt-2 -ml-2 text-muted-foreground" onClick={() => onMove(t)} data-testid="tab-move">
+                    <ArrowRightLeft /> Cambiar de mesa
+                  </Button>
+                )}
                 <ul className="mt-2 space-y-0.5 text-sm text-muted-foreground">
                   {t.lines.map((ln, i) => (
                     <li key={i}>

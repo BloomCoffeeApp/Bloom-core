@@ -46,7 +46,7 @@ from app.schemas.stock import (
     QuickItemOut,
     WasteIn,
 )
-from app.services import audit, free_plan
+from app.services import audit, free_plan, idempotency
 from app.services.stock import apply_movement
 
 CONSUMPTION_TYPES = ("sale", "internal", "waste")
@@ -272,7 +272,7 @@ def movements(db: Session, item_id: int, limit: int = 200, type: str | None = No
 
 
 # ---------------------------------------------------------------- adjust / waste
-def adjust(db: Session, data: AdjustIn, user: User) -> StockItemOut:
+def adjust(db: Session, data: AdjustIn, user: User, _key: idempotency.KeyHash | None = None) -> StockItemOut:
     item = _usable_item(db, data.stock_item_id)
     delta = data.delta if data.delta is not None else (data.new_qty or 0) - item.current_qty
     delta = round(delta, 4)
@@ -285,6 +285,7 @@ def adjust(db: Session, data: AdjustIn, user: User) -> StockItemOut:
         db, user.id, "stock_adjust", "stock_item", item.id,
         {"before": before, "after": item.current_qty, "delta": delta, "reason": data.reason, "movement_id": mv.id},
     )
+    idempotency.record_if(db, _key, "stock_adjust", user, item.id)
     db.commit()
     return get_item(db, item.id)
 
@@ -336,7 +337,7 @@ def discard_reason(code: str | None, note: str | None, free_text: str | None = N
     return " — ".join(parts)[:300]
 
 
-def waste(db: Session, data: WasteIn, user: User, *, quick: bool = False) -> StockItemOut:
+def waste(db: Session, data: WasteIn, user: User, *, quick: bool = False, _key: idempotency.KeyHash | None = None) -> StockItemOut:
     """Discard (merma) through apply_movement, so it shows in the losses reports. From a specific lot
     when given; otherwise lots are consumed FEFO."""
     item = _usable_item(db, data.stock_item_id)
@@ -353,6 +354,7 @@ def waste(db: Session, data: WasteIn, user: User, *, quick: bool = False) -> Sto
         {"qty": qty, "reason": reason, "lot_id": lot.id if lot else None, "value_cents": round(qty * item.avg_cost_cents),
          "movement_id": mv.id},
     )
+    idempotency.record_if(db, _key, "stock_waste", user, item.id)
     db.commit()
     return get_item(db, item.id)
 
@@ -477,7 +479,7 @@ def get_count(db: Session, count_id: int) -> CountOut:
     return _count_out(db, _get_count(db, count_id))
 
 
-def create_count(db: Session, data: CountCreate, user: User) -> CountOut:
+def create_count(db: Session, data: CountCreate, user: User, _key: idempotency.KeyHash | None = None) -> CountOut:
     q = select(StockItem).where(StockItem.active.is_(True)).order_by(StockItem.name)
     if data.category_id is not None:
         q = q.where(StockItem.category_id == data.category_id)
@@ -490,6 +492,7 @@ def create_count(db: Session, data: CountCreate, user: User) -> CountOut:
     db.add(c)
     db.flush()
     audit.log(db, user.id, "create", "inventory_count", c.id, {"category_id": data.category_id, "items": len(items)})
+    idempotency.record_if(db, _key, "stock_count_create", user, c.id)
     db.commit()
     return _count_out(db, c)
 
@@ -528,7 +531,7 @@ def set_counted_bulk(db: Session, count_id: int, rows: list[CountItemRow]) -> Co
     return _count_out(db, c)
 
 
-def apply_count(db: Session, count_id: int, user: User) -> CountOut:
+def apply_count(db: Session, count_id: int, user: User, _key: idempotency.KeyHash | None = None) -> CountOut:
     """Sets each counted item to the counted qty via 'count' movements (diff vs current stock)."""
     c = _open_count(db, count_id)
     if not any(ci.counted_qty is not None for ci in c.items):
@@ -551,6 +554,7 @@ def apply_count(db: Session, count_id: int, user: User) -> CountOut:
         applied.append({"stock_item_id": item.id, "diff": diff})
     c.status = "applied"
     audit.log(db, user.id, "count_apply", "inventory_count", c.id, {"adjustments": applied})
+    idempotency.record_if(db, _key, "stock_count_apply", user, c.id)
     db.commit()
     return _count_out(db, c)
 

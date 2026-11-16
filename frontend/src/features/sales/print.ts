@@ -87,7 +87,7 @@ export function ticketHtml({ business, sale, payment_names }: TicketData) {
     ${business.cuit ? `<div class="c s">CUIT ${esc(business.cuit)}</div>` : ''}
     <hr/>
     <div class="row b"><span>Ticket #${esc(sale.number)}</span><span>${esc(fmtDateTime(sale.ts))}</span></div>
-    <div class="row s"><span>${esc(CHANNEL_LABEL[sale.channel] ?? sale.channel)}${sale.table_label ? ` · ${/^mesa/i.test(sale.table_label) ? '' : 'Mesa '}${esc(sale.table_label)}` : ''}</span><span>${esc(sale.user_name ?? '')}</span></div>
+    <div class="row s"><span>${esc(CHANNEL_LABEL[sale.channel] ?? sale.channel)}${sale.table_label ? ` · ${/^mesa/i.test(sale.table_label) ? '' : 'Mesa '}${esc(sale.table_label)}${sale.table_code ? ` (${esc(sale.table_code)})` : ''}` : ''}</span><span>${esc(sale.user_name ?? '')}</span></div>
     ${sale.customer ? `<div class="s">Cliente: ${esc(sale.customer.name)}</div>` : ''}
     ${sale.status === 'voided' ? `<div class="void">ANULADO</div>` : ''}
     ${sale.is_courtesy ? `<div class="c b">CORTESÍA · INVITA LA CASA</div>${sale.courtesy_reason ? `<div class="c s">${esc(sale.courtesy_reason)}</div>` : ''}` : ''}

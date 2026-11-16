@@ -59,6 +59,12 @@ def open_drawer(sale_id: int, db: Session = Depends(get_db), _: User = Seller) -
     return svc.kick_drawer(db, sale_id)
 
 
+@router.post("/orders/{order_id}/comanda", response_model=PrintResult)
+def print_comanda(order_id: int, db: Session = Depends(get_db), _: User = Perm("pos.sell", "tables.serve", "tables.send", "kitchen.use", "orders.manage")) -> dict:
+    """«Imprimir comanda» / reimprimir: the kitchen ticket of an order on its station's printer."""
+    return svc.print_comanda(db, order_id)
+
+
 @router.post("/cash-sessions/{session_id}/z", response_model=PrintResult)
 def print_z(session_id: int, db: Session = Depends(get_db), _: User = Perm("cash.open_close")) -> dict:
     return svc.print_z(db, session_id)

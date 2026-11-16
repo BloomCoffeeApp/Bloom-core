@@ -266,6 +266,45 @@ def queue_comandas(db: Session, new_orders: list[Order]) -> None:
         log.exception("Could not prepare kitchen tickets")
 
 
+def print_comanda(db: Session, order_id: int) -> dict[str, Any]:
+    """«Imprimir comanda»: prints (or reprints) the kitchen ticket of an order, every station copy on its own
+    station's printer, or on the cashier's printer when a copy has none. Unlike the automatic print it works
+    without stations too. 409 when there is nowhere to print (the front prints from the browser instead)."""
+    from sqlalchemy import select
+
+    from app.services import orders
+
+    ok, reason = availability()
+    if not ok:
+        raise HTTPException(409, reason)
+    o = db.get(Order, order_id)
+    if o is None:
+        raise HTTPException(404, "Pedido no encontrado")
+    q = select(Order).where(Order.number == o.number, Order.source == o.source, Order.status != "cancelled")
+    q = q.where(Order.tab_id == o.tab_id) if o.tab_id is not None else q.where(Order.id == o.id)
+    copies = list(db.scalars(q.order_by(Order.id)))
+    cfg = get_cfg(db)
+    targets = station_printers(db)
+    stations = {st.id: st for st in orders.active_stations(db)}
+    fallback = _printer(cfg, cfg["cashier_printer"])
+    t = orders.now()
+    printed: list[str] = []
+    for c in copies:
+        st = stations.get(c.station_id) if c.station_id else None
+        p = targets.get(c.station_id) if c.station_id else None
+        p = p or fallback
+        if p is None:
+            continue
+        data = orders.serialize(c, t, 100, {}, {})
+        _send_or_502(p, escpos.comanda(data, st.name if st else None, layout(p)), f"Comanda {c.number}")
+        printed.append(p["name"])
+    if not printed:
+        raise HTTPException(409, "No hay una impresora configurada para la comanda (Configuración → Impresoras).")
+    audit.log(db, None, "print_comanda", "order", o.id, {"number": o.number, "copies": len(printed)})
+    db.commit()
+    return {"ok": True, "printer": printed[0], "drawer": False}
+
+
 def _run_jobs(jobs: list[tuple]) -> None:
     for order_id, station_id, p, payload, number in jobs:
         try:

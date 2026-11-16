@@ -39,7 +39,6 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     with op.batch_alter_table('floor_zones', schema=None) as batch_op:
-        batch_op.drop_constraint('fk_floor_zones_parent_id', type_='foreignkey')
-        batch_op.drop_column('parent_id')
+        batch_op.drop_column('parent_id')  # SQLite rebuilds the table: the foreign key goes with its column
     op.drop_index('ix_zone_pieces_zone_id', table_name='zone_pieces')
     op.drop_table('zone_pieces')

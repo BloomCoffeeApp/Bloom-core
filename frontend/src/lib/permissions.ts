@@ -3,6 +3,7 @@ export type Permission =
   | 'pos.sell'
   | 'pos.discount'
   | 'pos.courtesy'
+  | 'tables.send'
   | 'sales.void'
   | 'cash.open_close'
   | 'cash.movements'
