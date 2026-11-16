@@ -176,6 +176,41 @@ def test_recurring_generates_one_pending_expense_per_month(db, seeded):
     assert any(r["id"] == rid and r["active"] is False for r in listed)
 
 
+def test_several_requests_generating_the_same_month_at_once_make_it_once(db, seeded):
+    """Opening Gastos on two screens (or the periodic job and a screen) at the same moment: one expense, no errors."""
+    import threading
+
+    from fastapi.testclient import TestClient
+
+    from app.main import create_app
+
+    client, hh = seeded
+    cur = svc.period_of(local_today())
+    r = client.post("/api/expenses/recurring", json={"category_id": _cat(client, hh), "description": "Internet", "amount_cents": 5_000_00,
+                                                     "day_of_month": 10, "start_period": svc.add_months(cur, 1)}, headers=hh)
+    assert r.status_code == 200, r.text
+    rid = db.scalar(select(RecurringExpense.id).where(RecurringExpense.description == "Internet"))
+    tpl = db.get(RecurringExpense, rid)
+    tpl.start_period, tpl.last_period = cur, None  # as if this month still had to be generated
+    db.commit()
+    codes: list[int] = []
+    lock = threading.Lock()
+
+    def fire():
+        c = TestClient(create_app(run_lifespan=False))
+        h2 = login(c, "Admin", "0000")
+        res = c.get("/api/expenses/summary", headers=h2)
+        with lock:
+            codes.append(res.status_code)
+
+    threads = [threading.Thread(target=fire) for _ in range(8)]
+    [t.start() for t in threads]
+    [t.join(timeout=60) for t in threads]
+    assert codes == [200] * 8, codes
+    db.expire_all()
+    assert db.scalar(select(func.count(Expense.id)).where(Expense.recurring_id == rid)) == 1
+
+
 def test_period_helpers():
     assert svc.add_months("2026-12", 1) == "2027-01"
     assert svc.add_months("2026-01", -1) == "2025-12"

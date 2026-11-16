@@ -20,6 +20,7 @@ from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
 from app.config import DATA_DIR
+from app.db import lock_writes
 from app.models import (
     CashMovement,
     CashSession,
@@ -448,6 +449,14 @@ def update_recurring(db: Session, recurring_id: int, changes: dict[str, Any], us
     return r
 
 
+def _periods(first: str, last: str) -> list[str]:
+    """Every `YYYY-MM` from `first` to `last` (both included)."""
+    out = [first]
+    while out[-1] < last:
+        out.append(add_months(out[-1], 1))
+    return out
+
+
 def generate_recurring(db: Session, today: date | None = None) -> int:
     """Pending expense of every active monthly template for each month up to the current one that wasn't
     generated yet (`last_period`): a month deleted by hand is never generated again. Idempotent. Flushes,
@@ -455,11 +464,18 @@ def generate_recurring(db: Session, today: date | None = None) -> int:
     current = period_of(today or local_today())
     floor = add_months(current, -(MAX_CATCH_UP_MONTHS - 1))
     made = 0
+    locked = False
     for r in db.scalars(select(RecurringExpense).where(RecurringExpense.active.is_(True))):
         p = max(r.start_period, add_months(r.last_period, 1) if r.last_period else r.start_period, floor)
         if p > current:
             continue
         existing = set(db.scalars(select(Expense.period).where(Expense.recurring_id == r.id, Expense.period.is_not(None))))
+        if not locked and any(q not in existing for q in _periods(p, current)):
+            # Something is missing: take the write lock BEFORE writing, so two requests generating the same month at once
+            # take turns (the second one reads what the first one wrote instead of failing on the unique constraint).
+            lock_writes(db)
+            locked = True
+            existing = set(db.scalars(select(Expense.period).where(Expense.recurring_id == r.id, Expense.period.is_not(None))))
         while p <= current:
             if p not in existing:
                 due = due_date_in(p, r.day_of_month)
