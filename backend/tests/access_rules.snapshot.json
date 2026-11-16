@@ -377,6 +377,7 @@
  "POST /api/tables/tabs/{tab_id}/move": "perm:orders.manage|tables.send|tables.serve",
  "POST /api/tables/tabs/{tab_id}/release": "perm:orders.manage|tables.serve",
  "POST /api/tables/zones": "perm:orders.manage",
+ "POST /api/tables/zones/{zone_id}/merge": "perm:orders.manage",
  "POST /api/tables/{table_id}/orders": "perm:orders.manage|tables.serve",
  "POST /api/tables/{table_id}/request-bill": "perm:orders.manage|tables.serve",
  "POST /api/tables/{table_id}/rotate-token": "perm:orders.manage",
