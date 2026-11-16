@@ -4,10 +4,11 @@ Starts its OWN temporary server (own port, own empty database with demo data), s
 
     backend\.venv\Scripts\python scripts\loadtest.py                 # 8 cashiers, 20 s
     backend\.venv\Scripts\python scripts\loadtest.py -c 16 -d 60     # 16 cashiers, 60 s
+    backend\.venv\Scripts\python scripts\loadtest.py --seed-sales 200000   # a café with two years of history (~1 min to load)
     backend\.venv\Scripts\python scripts\loadtest.py --url http://localhost:8000 --pin 0000   # an already running server
 
 Prints requests, errors and p50/p95/p99 per operation and exits 1 if there is any server error (5xx / failed
-request) or a p95 over the budget (`--p95-ms`, default 1500). Plain `httpx` + threads: no extra tools needed.
+request) or a p95 over the budget of that operation (`BUDGETS`; `--p95-ms` sets one for all). Plain `httpx` + threads: no extra tools needed.
 """
 from __future__ import annotations
 
@@ -26,6 +27,10 @@ import httpx
 
 BACKEND = Path(__file__).resolve().parents[1] / "backend"
 PIN = "0000"
+# p95 budgets per operation (ms). Measured with 200,000 sales loaded (`--seed-sales 200000`), 8 cashiers + 2 screens:
+# sale 164, sales list 390, orders board 353, dashboard 627. About 3x of margin so a slower PC does not trip it, but a
+# lost index (the 0007 ones) or an accidental full scan does.
+BUDGETS = {"sale": 500, "sales list": 1200, "orders board": 1000, "dashboard": 1800}
 
 
 def spawn(port: int) -> tuple[subprocess.Popen, str]:
@@ -34,6 +39,7 @@ def spawn(port: int) -> tuple[subprocess.Popen, str]:
     py = BACKEND / ".venv" / "Scripts" / ("python.exe" if os.name == "nt" else "python")
     proc = subprocess.Popen([str(py if py.exists() else sys.executable), "-m", "uvicorn", "app.main:app", "--port", str(port), "--log-level", "warning"],
                             cwd=BACKEND, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    proc.env_used = env  # type: ignore[attr-defined]  # the seeder child process needs the same database
     url = f"http://127.0.0.1:{port}"
     for _ in range(100):
         try:
@@ -43,6 +49,45 @@ def spawn(port: int) -> tuple[subprocess.Popen, str]:
             time.sleep(0.3)
     proc.kill()
     raise SystemExit("the test server did not start")
+
+
+def seed_sales(n: int) -> None:
+    """Child-process mode (`--_seed N`): bulk-inserts N completed sales, 2 items and 1 payment each, spread over the last
+    two years, straight into the database the env points at. Runs before the cashiers start, so the p95 is measured
+    against a café with a long history (the indexes of migration 0007 were sized for 200k sales)."""
+    import random
+    from datetime import UTC, datetime, timedelta
+
+    sys.path.insert(0, str(BACKEND))
+    from sqlalchemy import func, insert, select
+
+    from app.db import SessionLocal
+    from app.models import Product, Sale, SaleItem, SalePayment
+
+    rnd = random.Random(7)
+    now = datetime.now(UTC).replace(tzinfo=None)  # the database keeps naive UTC
+    with SessionLocal() as db:
+        products = [(p.id, p.name, p.price_cents) for p in db.scalars(select(Product).where(Product.price_cents > 0).limit(30))]
+        first = (db.scalar(select(func.max(Sale.number))) or 0) + 1
+        base_id = db.scalar(select(func.max(Sale.id))) or 0
+        for start in range(0, n, 5000):
+            size = min(5000, n - start)
+            sales, items, pays = [], [], []
+            for k in range(size):
+                sid = base_id + start + k + 1
+                ts = now - timedelta(minutes=rnd.randint(1, 60 * 24 * 730))
+                picks = [rnd.choice(products) for _ in range(2)]
+                total = sum(p[2] * (1 + k % 3) for p in picks)
+                sales.append(dict(id=sid, number=first + start + k, channel="salon", subtotal_cents=total, discount_cents=0, total_cents=total,
+                                  cost_cents=total // 3, status="completed", ts=ts))
+                items += [dict(sale_id=sid, product_id=p[0], name_snapshot=p[1], qty=1 + k % 3, unit_price_cents=p[2], total_cents=p[2] * (1 + k % 3),
+                               cost_cents=p[2] // 3) for p in picks]
+                pays.append(dict(sale_id=sid, method=rnd.choice(["efectivo", "debito", "transferencia"]), amount_cents=total))
+            db.execute(insert(Sale), sales)
+            db.execute(insert(SaleItem), items)
+            db.execute(insert(SalePayment), pays)
+            db.commit()
+    print(f"seeded {n} sales")
 
 
 def login(c: httpx.Client, name: str = "Admin", pin: str = PIN) -> dict[str, str]:
@@ -105,10 +150,17 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("-c", "--cashiers", type=int, default=8)
     ap.add_argument("-d", "--seconds", type=int, default=20)
-    ap.add_argument("--p95-ms", type=float, default=1500)
+    ap.add_argument("--p95-ms", type=float, default=None, help="one p95 budget for every operation (default: BUDGETS per operation, 1500 for the rest)")
     ap.add_argument("--url")
     ap.add_argument("--pin", default=PIN)
+    ap.add_argument("--seed-sales", type=int, default=0, help="first load N completed sales into the temporary database (e.g. 200000)")
+    ap.add_argument("--_seed", type=int, help=argparse.SUPPRESS)
     a = ap.parse_args()
+    if a._seed:
+        seed_sales(a._seed)
+        return 0
+    if a.seed_sales and a.url:
+        raise SystemExit("--seed-sales only works with the temporary server (never loads fake sales into a running one)")
 
     proc = None
     if a.url:
@@ -117,6 +169,12 @@ def main() -> int:
         proc, url = spawn(48990)
         r = httpx.post(f"{url}/api/setup", json={"business_name": "Carga", "admin_name": "Admin", "admin_pin": PIN, "load_demo": True}, timeout=120)
         r.raise_for_status()
+        if a.seed_sales:
+            print(f"seeding {a.seed_sales} sales ...")
+            t0 = time.time()
+            subprocess.run([sys.executable if not (BACKEND / ".venv").exists() else str(BACKEND / ".venv" / "Scripts" / "python.exe"),
+                            str(Path(__file__).resolve()), "--_seed", str(a.seed_sales)], cwd=BACKEND, env=proc.env_used, check=True)  # type: ignore[attr-defined]
+            print(f"  done in {time.time() - t0:.0f}s")
     try:
         with httpx.Client(base_url=url, timeout=30) as c:
             headers = login(c, pin=a.pin)
@@ -139,8 +197,9 @@ def main() -> int:
     for op, lat in sorted(stats.lat.items()):
         errs = len(stats.errors.get(op, []))
         p95 = pct(lat, 95)
-        flag = " <-- over budget" if p95 > a.p95_ms else ""
-        bad |= errs > 0 or p95 > a.p95_ms
+        budget = a.p95_ms if a.p95_ms is not None else BUDGETS.get(op, 1500)  # an explicit --p95-ms applies to every operation
+        flag = f" <-- over budget ({budget:.0f})" if p95 > budget else ""
+        bad |= errs > 0 or p95 > budget
         print(f"{op:14}{len(lat):>10}{errs:>8}{pct(lat, 50):>9.0f}{p95:>9.0f}{pct(lat, 99):>9.0f}{flag}")
     for op, errs in stats.errors.items():
         print(f"  errors in {op}: {errs[:3]}")

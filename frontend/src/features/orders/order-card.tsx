@@ -213,7 +213,7 @@ export function OrderCard({ order: o, elapsed, level, actions }: { order: Order;
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
           <span
-            className={cn('flex items-center gap-1 rounded-xl px-2.5 py-1 font-heading text-xl font-semibold tabular-nums', ready ? 'bg-muted text-muted-foreground' : st.clock)}
+            className={cn('flex items-center gap-1 rounded-xl px-2.5 py-1 font-heading text-xl font-semibold tabular-nums', ready ? 'bg-muted text-foreground' : st.clock)}
             aria-label={`${ready ? 'Preparado en' : 'Tiempo'} ${fmtClock(elapsed)}${ready ? '' : ` · ${st.label}`}`}
             data-testid="order-timer"
           >
