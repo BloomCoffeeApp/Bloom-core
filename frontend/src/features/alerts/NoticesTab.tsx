@@ -4,6 +4,7 @@ import { useState } from 'react'
 
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { EmptyState } from '@/components/empty-state'
+import { DateTimeField } from '@/components/time-field'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -271,7 +272,7 @@ function NoticeFormDialog({
           <div className="grid gap-2">
             <Label htmlFor="n-exp">Vence (opcional)</Label>
             <div className="flex flex-wrap items-center gap-2">
-              <Input id="n-exp" type="datetime-local" value={expires} onChange={(e) => setExpires(e.target.value)} className="w-auto" />
+              <DateTimeField id="n-exp" value={expires} onChange={setExpires} aria-label="Vence" />
               <Button type="button" size="sm" variant="secondary" onClick={() => quickExpire(0)}>
                 Hoy
               </Button>

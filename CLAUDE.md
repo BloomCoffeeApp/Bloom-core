@@ -45,8 +45,9 @@ App de gestión para cafetería (POS, caja, stock, compras, clientes, alertas, r
 - Front: cliente `api` de `src/lib/api.ts`; cada módulo tiene `features/<modulo>/types.ts` (tipos que reflejan los schemas Pydantic) y `api.ts` (hooks de TanStack Query). Si cambiás un schema, actualizá su `types.ts`.
 - Componentes por módulo en `src/features/<modulo>/`. Reutilizar `components/` compartidos (DataTable, PageHeader, MoneyInput, StatCard, EmptyState, ConfirmDialog) antes de crear nuevos.
 - Colores solo vía tokens del tema (variables CSS de shadcn); no hex sueltos en componentes.
-- Fechas y números: **nunca** `type="date"` ni las flechitas del navegador. Fechas con `components/date-picker.tsx`
-  (`DatePicker`, valor `YYYY-MM-DD`; en los e2e `pickDate` / `clearDate`), números con − / + con
+- Fechas, horas y números: **nunca** `type="date"`, `type="time"`, `type="datetime-local"` ni las flechitas del navegador.
+  Fechas con `components/date-picker.tsx` (`DatePicker`, valor `YYYY-MM-DD`; en los e2e `pickDate` / `clearDate`), horas con
+  `components/time-field.tsx` (`TimeField`, valor `HH:MM`; `DateTimeField` para fecha y hora), números con − / + con
   `components/number-stepper.tsx`, plata con `MoneyInput`. Pantalla completa con `useFullscreen` (`use-desktop.ts`).
 - Textos de UI en **español rioplatense** (vos, “Guardar”, “Cobrar”). Código, nombres de variables y commits en inglés.
 - Targets táctiles ≥ 44 px en POS y Barista.

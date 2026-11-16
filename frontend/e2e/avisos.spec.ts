@@ -23,6 +23,30 @@ test.describe('Avisos', () => {
     expect(errors.consoleErrors).toEqual([])
   })
 
+  test('Bloom\'s own time field: type, − / + and the arrows (no browser clock popup)', async ({ page, errors }) => {
+    await page.goto('/avisos?tab=tablon')
+    await page.getByRole('button', { name: 'Nuevo aviso' }).first().click()
+    const form = page.getByRole('dialog', { name: 'Nuevo aviso' })
+    const time = form.getByRole('group', { name: 'Vence: hora' })
+    await expect(time.getByRole('textbox', { name: 'Vence: hora: horas' })).toBeDisabled() // no date yet
+    await form.getByLabel('Vence: fecha').click()
+    await page.getByRole('gridcell').first().click() // any day of the calendar
+    const hours = time.getByRole('textbox', { name: 'Vence: hora: horas' })
+    const minutes = time.getByRole('textbox', { name: 'Vence: hora: minutos' })
+    await hours.fill('08')
+    await minutes.fill('30')
+    await time.getByRole('button', { name: 'Vence: hora: sumar minutos' }).click()
+    await expect(minutes).toHaveValue('35') // 5-minute steps
+    await time.getByRole('button', { name: 'Vence: hora: sumar hora' }).click()
+    await expect(hours).toHaveValue('09')
+    await hours.press('ArrowDown')
+    await expect(hours).toHaveValue('08')
+    await hours.fill('23')
+    await time.getByRole('button', { name: 'Vence: hora: sumar hora' }).click()
+    await expect(hours).toHaveValue('00') // wraps around
+    expect(errors.consoleErrors).toEqual([])
+  })
+
   test('notice board: publish pinned, unpin, delete', async ({ page }) => {
     const title = `Aviso ${uid()}`
     await page.goto('/avisos?tab=tablon')
