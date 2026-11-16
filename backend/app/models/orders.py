@@ -45,6 +45,15 @@ class FloorZone(IdMixin, TimestampMixin, Base):
     sort_order: Mapped[int] = mapped_column(default=0)
     active: Mapped[bool] = mapped_column(default=True)
     waiter_employee_id: Mapped[int | None] = mapped_column(ForeignKey("employees.id"))
+    # Migration 0032: a zone belongs to one floor and may be drawn on the plan as an area (cells); a table whose
+    # centre is inside it is in the zone. `code` (SALON, TERRAZA…) is unique within the floor and goes into table codes.
+    floor_id: Mapped[int] = mapped_column(default=1, server_default="1", index=True)
+    code: Mapped[str | None] = mapped_column(String(8))
+    pos_x: Mapped[int | None]
+    pos_y: Mapped[int | None]
+    width: Mapped[int] = mapped_column(default=12, server_default="12")
+    height: Mapped[int] = mapped_column(default=8, server_default="8")
+    color: Mapped[str] = mapped_column(String(10), default="sand", server_default="sand")
 
 
 class DiningTable(IdMixin, TimestampMixin, Base):
@@ -64,6 +73,8 @@ class DiningTable(IdMixin, TimestampMixin, Base):
     shape: Mapped[str] = mapped_column(String(8), default="rect", server_default="rect")
     seats: Mapped[int] = mapped_column(default=4, server_default="4")
     floor_id: Mapped[int] = mapped_column(default=1, server_default="1", index=True)  # which floor plan (migration 0031)
+    # Own identifier made by the app: FLOOR-ZONE-NN (PB-SALON-01). Regenerated when the table changes floor or zone.
+    code: Mapped[str | None] = mapped_column(String(24), index=True)
     # Secret printed in the table's QR (rotatable): without it nobody can order for this table.
     token: Mapped[str] = mapped_column(String(32), unique=True)
 
@@ -87,6 +98,7 @@ class Floor(IdMixin, Base):
 
     __tablename__ = "floors"
     name: Mapped[str] = mapped_column(String(40))
+    code: Mapped[str | None] = mapped_column(String(6))  # PB, P1, SOT… (first part of the table codes)
     sort_order: Mapped[int] = mapped_column(default=0, server_default="0")
 
 

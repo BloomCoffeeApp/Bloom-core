@@ -408,6 +408,7 @@
  "PUT /api/tables/floor-items": "perm:orders.manage",
  "PUT /api/tables/layout": "perm:orders.manage",
  "PUT /api/tables/settings": "perm:orders.manage",
+ "PUT /api/tables/zone-areas": "perm:orders.manage",
  "PUT /api/tables/zones/{zone_id}/waiter": "perm:orders.manage",
  "PUT /api/tables/{table_id}/waiter": "perm:orders.manage",
  "PUT /api/team/config": "perm:orders.manage|settings.manage",
