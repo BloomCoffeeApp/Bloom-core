@@ -34,7 +34,10 @@ export function TabsDialog({
               <li key={t.id} className="rounded-2xl border p-3">
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="font-heading text-xl font-semibold">Mesa {t.table_label}</p>
+                    <p className="font-heading text-xl font-semibold">
+                      Mesa {t.table_label}
+                      {t.table_code && <span className="ml-2 align-middle font-mono text-xs font-normal text-muted-foreground">{t.table_code}</span>}
+                    </p>
                     <p className="text-xs text-muted-foreground">
                       Abierta {fmtTime(t.opened_at)} · {t.orders} pedido{t.orders === 1 ? '' : 's'}
                       {t.unfinished > 0 && (

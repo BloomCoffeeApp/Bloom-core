@@ -188,6 +188,7 @@ export function OrderCard({ order: o, elapsed, level, actions }: { order: Order;
             {o.source === 'online' && <Globe className="size-3.5" aria-label="Pedido online" />}
             <span className="font-medium text-foreground">{where(o)}</span>
             {o.table_label && !o.online && <span>· {CHANNEL_LABEL[o.channel]}</span>}
+            {o.table_code && !o.online && <span className="font-mono text-[11px]" data-testid="order-table-code">· {o.table_code}</span>}
             {o.sale_number && <span>· Ticket #{o.sale_number}</span>}
           </p>
           <span

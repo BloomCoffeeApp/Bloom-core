@@ -94,6 +94,7 @@ export interface CartState {
   lines: CartLine[]
   channel: Channel
   table_label: string
+  table_code?: string | null
   customer: PosCustomer | null
   discount: { mode: 'amount' | 'pct'; value: number }
   points_to_redeem: number

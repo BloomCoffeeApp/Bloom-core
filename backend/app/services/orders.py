@@ -605,6 +605,9 @@ def board(db: Session, station_id: int | None = None) -> dict[str, Any]:
     cids = {o.customer_id for o in rows if o.customer_id and o.source == "online"}
     customers = {cu.id: cu for cu in db.scalars(select(Customer).where(Customer.id.in_(cids)))} if cids else {}
     orders = sorted((serialize(o, t, c["warn_pct"], names, sale_numbers, customers) for o in rows), key=_sort_key)
+    table_codes = {tid: code for tid, code in db.execute(select(DiningTable.id, DiningTable.code)) if code}
+    for o in orders:
+        o["table_code"] = table_codes.get(o["table_id"])  # PB-SALON-01 (None for counter / online orders)
     stations = active_stations(db)
     direct = printing.station_printers(db) if stations else {}
     return {
@@ -656,7 +659,7 @@ def pickup(db: Session) -> dict[str, Any]:
 def active_calls(db: Session, t: datetime | None = None) -> list[dict[str, Any]]:
     t = t or now()
     rows = db.execute(
-        select(WaiterCall, DiningTable.label)
+        select(WaiterCall, DiningTable.label, DiningTable.code)
         .join(DiningTable, DiningTable.id == WaiterCall.table_id)
         .where(WaiterCall.resolved_at.is_(None), WaiterCall.expires_at > t)
         .order_by(WaiterCall.created_at)
@@ -666,11 +669,12 @@ def active_calls(db: Session, t: datetime | None = None) -> list[dict[str, Any]]
             "id": c.id,
             "table_id": c.table_id,
             "table_label": label,
+            "table_code": code,
             "kind": c.kind,
             "created_at": c.created_at,
             "elapsed_s": max(int((t - c.created_at).total_seconds()), 0),
         }
-        for c, label in rows
+        for c, label, code in rows
     ]
 
 
@@ -835,6 +839,7 @@ def list_open_tabs(db: Session) -> list[dict[str, Any]]:
                 "id": tab.id,
                 "table_id": tab.table_id,
                 "table_label": table.label if table else "?",
+                "table_code": table.code if table else None,
                 "opened_at": tab.opened_at,
                 "orders": sum(1 for o in orders if o.status not in ("pending", "cancelled")),
                 "unfinished": sum(1 for o in orders if o.status in IN_PROGRESS),

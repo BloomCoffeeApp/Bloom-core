@@ -65,9 +65,10 @@ async function openWhatsApp(o: Order, kind: 'accepted' | 'ready' | 'dispatched' 
 const waKind = (o: Order) =>
   o.status === 'awaiting_pay' || o.status === 'accepted' ? 'accepted' : o.status === 'ready' ? 'ready' : o.status === 'dispatched' ? 'dispatched' : 'generic'
 
-const describe = (o: Order) => `${o.table_label || ''}${o.table_label ? ' · ' : ''}${o.items.reduce((a, i) => a + i.qty, 0)} productos`
+const withCode = (label: string | null | undefined, code?: string | null) => `${label ?? ''}${code ? ` (${code})` : ''}`
+const describe = (o: Order) => `${withCode(o.table_label, o.table_code)}${o.table_label ? ' · ' : ''}${o.items.reduce((a, i) => a + i.qty, 0)} productos`
 const callText = (c: WaiterCall) =>
-  c.kind === 'bill' ? `Mesa ${c.table_label} pide la cuenta` : c.kind === 'invoice' ? `Mesa ${c.table_label} pide factura` : `Mesa ${c.table_label} llama al mozo`
+  c.kind === 'bill' ? `Mesa ${withCode(c.table_label, c.table_code)} pide la cuenta` : c.kind === 'invoice' ? `Mesa ${withCode(c.table_label, c.table_code)} pide factura` : `Mesa ${c.table_label} llama al mozo`
 
 function OrdersPage() {
   const [station, setStationState] = useState<number | null>(loadStation)
@@ -149,7 +150,7 @@ function OrdersPage() {
       notify(
         first.online
           ? `Nuevo pedido online #${first.number} · ${first.online.customer_name ?? ''}`
-          : first.status === 'pending' ? `Pedido de ${first.table_label ?? 'una mesa'} para confirmar` : `Nuevo pedido #${first.number}`,
+          : first.status === 'pending' ? `Pedido de ${first.table_label ? withCode(first.table_label, first.table_code) : 'una mesa'} para confirmar` : `Nuevo pedido #${first.number}`,
         fresh.length > 1 ? `${fresh.length} pedidos nuevos` : describe(first),
         p,
         `order-${first.id}`,

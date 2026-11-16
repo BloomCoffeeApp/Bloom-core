@@ -92,6 +92,8 @@ export interface Order {
   channel: Channel
   table_id: number | null
   table_label: string | null
+  /** Own identifier of the table (PB-SALON-01); set on the board. */
+  table_code?: string | null
   station_id: number | null
   sale_id: number | null
   sale_number: number | null
@@ -121,6 +123,7 @@ export interface WaiterCall {
   id: number
   table_id: number
   table_label: string
+  table_code?: string | null
   kind: 'waiter' | 'bill' | 'invoice'
   created_at: string
   elapsed_s: number
@@ -164,6 +167,7 @@ export interface Tab {
   id: number
   table_id: number
   table_label: string
+  table_code?: string | null
   opened_at: string
   orders: number
   unfinished: number

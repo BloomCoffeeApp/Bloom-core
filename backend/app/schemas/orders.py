@@ -92,6 +92,7 @@ class OrderOut(BaseModel):
     channel: str
     table_id: int | None
     table_label: str | None
+    table_code: str | None = None  # PB-SALON-01, set on the board
     station_id: int | None = None
     sale_id: int | None
     sale_number: int | None
@@ -118,6 +119,7 @@ class WaiterCallOut(BaseModel):
     id: int
     table_id: int
     table_label: str
+    table_code: str | None = None
     kind: Literal["waiter", "bill", "invoice"]
     created_at: datetime
     elapsed_s: int
@@ -168,6 +170,7 @@ class TabOut(BaseModel):
     id: int
     table_id: int
     table_label: str
+    table_code: str | None = None
     opened_at: datetime
     orders: int
     unfinished: int
