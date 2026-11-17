@@ -22,7 +22,7 @@ include = ["app*"]
 
 [project.optional-dependencies]
 # watchfiles: `uvicorn --reload` in scripts/dev.ps1.
-dev = ["pytest", "httpx", "pyinstaller", "watchfiles"]
+dev = ["pytest", "httpx", "hypothesis", "pyinstaller", "watchfiles"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
