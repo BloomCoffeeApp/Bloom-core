@@ -79,7 +79,7 @@ def test_physical_count_applies_differences(seeded):
     assert r.json()["counted_items"] == 2
     r = client.post(f"/api/stock/counts/{c['id']}/apply", headers=admin)
     assert r.status_code == 200 and r.json()["status"] == "applied"
-    assert _item(client, admin, "Leche entera")["current_qty"] == counted
+    assert math.isclose(_item(client, admin, "Leche entera")["current_qty"], counted, abs_tol=1e-6)  # float sums differ by ~1e-12
     assert _item(client, admin, "Bebida de avena")["current_qty"] == max(avena["expected_qty"], 0)
     assert _item(client, admin, "Crema de leche")["current_qty"] == crema_before  # not counted → untouched
     kardex = client.get(f"/api/stock/items/{leche['stock_item_id']}/movements", headers=admin).json()

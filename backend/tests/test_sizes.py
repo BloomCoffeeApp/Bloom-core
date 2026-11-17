@@ -1,5 +1,6 @@
 """Product sizes: own price + recipe per size, POS sale snapshot, stock, voids, backward compatibility."""
 
+import math
 import sqlite3
 from pathlib import Path
 
@@ -136,7 +137,7 @@ def test_sell_grande_consumes_its_recipe_and_snapshots(seeded, db):
     item = r.json()["items"][0]
     assert item["size_name"] == "Grande 16 oz" and item["size_id"] == sz["Gr"]
     assert item["name_snapshot"] == "Latte" and item["unit_price_cents"] == 420000 and item["total_cents"] == 840000
-    assert _stock(db, "Leche entera") == leche0 - 600
+    assert math.isclose(_stock(db, "Leche entera"), leche0 - 600, abs_tol=1e-6)
     assert _stock(db, "Café blend de la casa") == cafe0 - 72
     grande_cost = next(s for s in client.get(f"/api/products/{pid}", headers=admin).json()["sizes"] if s["short_label"] == "Gr")["cost_cents"]
     assert item["cost_cents"] == 2 * grande_cost
@@ -191,7 +192,7 @@ def test_void_courtesy_and_loyalty_with_sizes(seeded, db):
     pid, sz = _sized_latte(client, admin, db)
     leche0 = _stock(db, "Leche entera")
     r = _sale(client, admin, [{"product_id": pid, "size_id": sz["Ch"], "qty": 4}], 4 * 300000)
-    assert _stock(db, "Leche entera") == leche0 - 600
+    assert math.isclose(_stock(db, "Leche entera"), leche0 - 600, abs_tol=1e-6)
     assert client.post(f"/api/sales/{r.json()['id']}/void", headers=admin, json={"reason": "error de carga"}).status_code == 200
     assert _stock(db, "Leche entera") == leche0
     # Courtesy: valued at the size's menu price, stock by the size's recipe.
