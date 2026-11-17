@@ -45,7 +45,7 @@ setuptools==84.2.1
 six==1.17.0
 SQLAlchemy==2.1.6
 starlette==1.10.0
-typing-inspection==0.4.4
+typing-inspection==0.4.5
 typing_extensions==4.16.0
 tzdata==2026.6
 uvicorn==0.54.0
