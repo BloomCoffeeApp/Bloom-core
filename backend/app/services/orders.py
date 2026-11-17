@@ -733,12 +733,30 @@ def tab_label(db: Session, tab: TableTab) -> str | None:
     return f"Mesa {table.label}"[:20] if table else None
 
 
+def is_prepaid(o: Order) -> bool:
+    """An order on an OPEN table account that was already charged by its own sale: a counter order passed to a table
+    («pagado en el mostrador»). It stays linked to that sale, is never charged again and does not add to the bill."""
+    return o.sale_id is not None and o.status != "cancelled"
+
+
+def release_prepaid(db: Session, sale: Sale) -> None:
+    """Voiding the sale of a counter order that sits on an open table account: the money goes back, so the order
+    becomes part of the table's bill again (inside the void's transaction)."""
+    for o in db.scalars(select(Order).where(Order.sale_id == sale.id, Order.tab_id.is_not(None))):
+        tab = db.get(TableTab, o.tab_id)
+        if tab is not None and tab.status == "open" and tab.sale_id != sale.id:
+            o.sale_id = None
+            o.payment_status = "unpaid"
+
+
 def close_tab(db: Session, tab: TableTab, sale: Sale) -> None:
     """Charging the tab (inside the sale's transaction): closes it and links its orders to the sale."""
     tab.status = "closed"
     tab.closed_at = now()
     tab.sale_id = sale.id
     for o in db.scalars(select(Order).where(Order.tab_id == tab.id, Order.status != "cancelled")):
+        if o.sale_id is not None:
+            continue  # already charged by its own sale (a counter order passed to this table)
         o.sale_id = sale.id
         if o.status == "delivered":  # servido → pagado
             transition(db, o, "paid", None, via="system")
@@ -767,6 +785,8 @@ def reopen_tab(db: Session, sale: Sale, user: User) -> dict[str, Any] | None:
     )
     target = other or tab
     for o in db.scalars(select(Order).where(Order.tab_id == tab.id)):
+        if o.sale_id is not None and o.sale_id != sale.id:
+            continue  # a counter order with its own sale: that one is not part of this tab's charge
         if o.sale_id == sale.id:
             o.sale_id = None
         if o.status == "paid":
@@ -788,10 +808,11 @@ def reopen_tab(db: Session, sale: Sale, user: User) -> dict[str, Any] | None:
 
 
 def tab_lines(orders: list[Order]) -> list[dict[str, Any]]:
-    """Billable lines of a tab: confirmed, not cancelled orders (equal lines merged)."""
+    """Billable lines of an open tab: confirmed, not cancelled orders (equal lines merged). Orders that were already
+    charged by their own sale (counter orders passed to the table) are not billable again."""
     merged: dict[tuple, dict[str, Any]] = {}
     for o in orders:
-        if o.status in ("pending", "cancelled"):
+        if o.status in ("pending", "cancelled") or is_prepaid(o):
             continue
         for i in o.items:
             mod_ids = sorted(m["id"] for m in (i.modifiers or []) if "id" in m)

@@ -572,6 +572,7 @@ def void_sale(db: Session, sale_id: int, reason: str, user: User) -> Sale:
         for ch in db.scalars(select(CollectCharge).where(CollectCharge.sale_id == sale.id, CollectCharge.ref_type == TABLE_REF_TYPE)):
             ch.sale_id = None  # what the phones paid counts again when the reopened table is charged
         reopened = orders.reopen_tab(db, sale, user)  # a table's charged tab gets its bill back
+        orders.release_prepaid(db, sale)  # a counter order passed to a table is owed again
         sale.status = "voided"
         sale.void_reason = reason.strip()
         sale.voided_by = user.id

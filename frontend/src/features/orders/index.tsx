@@ -218,7 +218,7 @@ function OrdersPage() {
     onReprint: (o: Order) => reprint.mutate(o),
     onMove:
       tablesFeature && proModules.MoveTableDialog && can('tables.send', 'tables.serve', 'orders.manage')
-        ? (o: Order) => setMoving({ kind: 'order', id: o.id, table_id: o.table_id, label: o.table_label ?? '' })
+        ? (o: Order) => setMoving({ kind: 'order', id: o.id, table_id: o.table_id, label: o.table_label ?? '', number: o.number, prepaid: o.table_id == null })
         : undefined,
   }
   const confirmAsk = () => {

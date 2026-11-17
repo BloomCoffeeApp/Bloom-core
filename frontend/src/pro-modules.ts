@@ -75,7 +75,7 @@ export interface SendToTableProps {
 /** What «Cambiar de mesa» moves: a whole account or one order. */
 export type MoveTarget =
   | { kind: 'tab'; id: number; table_id: number; label: string }
-  | { kind: 'order'; id: number; table_id: number | null; label: string }
+  | { kind: 'order'; id: number; table_id: number | null; label: string; number?: number; prepaid?: boolean }
 
 /** A stamp-card reward the POS adds to the cart. */
 export type StampReward =

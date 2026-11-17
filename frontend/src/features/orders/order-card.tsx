@@ -78,6 +78,7 @@ export interface CardActions {
 
 /** A table's order that is on its open account and can still change table. */
 const MOVABLE = new Set(['received', 'accepted', 'preparing', 'ready', 'delivered'])
+const COUNTER_MOVABLE = new Set(['received', 'accepted', 'preparing', 'ready']) // still on its way to the customer
 
 function ActionIcon({ name }: { name: string | null }) {
   const Icon = name ? ICONS[name] : undefined
@@ -180,7 +181,10 @@ export function OrderCard({ order: o, elapsed, level, actions }: { order: Order;
   const main = o.actions.filter((a) => a.place === 'main')
   const menu = o.actions.filter((a) => a.place === 'menu')
   const canReprint = !!actions.onReprint && !waiting && !o.online
-  const canMove = !!actions.onMove && o.source === 'table' && o.table_id != null && MOVABLE.has(o.status)
+  // A counter order (already charged at the register, no table yet) can go to a table: it stays paid there.
+  const counterPaid = o.source === 'pos' && o.table_id == null && o.sale_id != null
+  const canMove =
+    !!actions.onMove && ((o.source === 'table' && o.table_id != null && MOVABLE.has(o.status)) || (counterPaid && COUNTER_MOVABLE.has(o.status)))
   const hasMenu = menu.length > 0 || canReprint || canMove
   return (
     <article
@@ -285,7 +289,7 @@ export function OrderCard({ order: o, elapsed, level, actions }: { order: Order;
                 )}
                 {canMove && (
                   <DropdownMenuItem onSelect={() => actions.onMove!(o)} data-testid="order-move">
-                    <ArrowRightLeft /> Cambiar de mesa
+                    <ArrowRightLeft /> {counterPaid ? 'Pasar a una mesa (ya pagado)' : 'Cambiar de mesa'}
                   </DropdownMenuItem>
                 )}
               </DropdownMenuContent>
