@@ -415,8 +415,8 @@ export function AboutSection({ isAdmin }: { isAdmin: boolean }) {
         <div className="flex items-start gap-3 rounded-xl border p-4">
           <Scale className="mt-0.5 size-5 text-muted-foreground" />
           <div className="text-sm">
-            <p className="font-medium">Licencia MIT</p>
-            <p className="text-muted-foreground">Software libre: podés usarlo, modificarlo y compartirlo.</p>
+            <p className="font-medium">Licencia AGPL-3.0</p>
+            <p className="text-muted-foreground">Software libre: podés usarlo, modificarlo y compartirlo, y si publicás cambios, con la misma licencia.</p>
           </div>
         </div>
         <div className="flex items-start gap-3 rounded-xl border p-4">

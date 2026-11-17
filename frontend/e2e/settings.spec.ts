@@ -137,7 +137,7 @@ test.describe('Configuración', () => {
     await expect(main(page).getByRole('radio', { name: /Claro/ })).toHaveAttribute('aria-checked', 'true')
 
     await main(page).getByRole('tab', { name: 'Acerca de' }).click()
-    await expect(main(page).getByText('Licencia MIT')).toBeVisible()
+    await expect(main(page).getByText('Licencia AGPL-3.0')).toBeVisible()
     await expect(main(page).getByText(/Versión \d/)).toBeVisible()
 
     await main(page).getByRole('tab', { name: 'Licencia' }).click()

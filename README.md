@@ -202,4 +202,8 @@ La plata va **a la cuenta de cada local**, nunca a Bloom (Configuración → Cob
 
 ## Licencia
 
-[MIT](LICENSE)
+Copyright © 2026 Bloom. Esta edición gratuita se distribuye bajo la [GNU Affero General Public License v3.0 o posterior](LICENSE)
+(AGPL-3.0-or-later): podés usarla, estudiarla, modificarla y compartirla; si distribuís una versión modificada, o la ofrecés
+como servicio por red, tenés que publicar tus cambios con la misma licencia. Los módulos «Pro» son software aparte, con su
+propia licencia comercial, y no forman parte de este repositorio. El nombre y el logotipo «Bloom» son marcas del titular y no
+se licencian con el código.

@@ -3,7 +3,7 @@ name = "bloom"
 version = "1.0.0"
 description = "Gestión integral para cafeterías: POS, stock, compras, clientes y asistente de barista."
 requires-python = ">=3.12"
-license = "MIT"
+license = "AGPL-3.0-or-later"
 # Plain uvicorn (not [standard]): the desktop app serves HTTP/1.1 to one local window, so h11 is
 # enough; httptools/websockets/PyYAML/python-dotenv only made the installer bigger.
 dependencies = [
