@@ -149,7 +149,7 @@ function ModifierBody({
             <Plus />
           </Button>
         </div>
-        <div className="flex min-w-0 flex-1 justify-end gap-2">
+        <div className="ml-auto flex gap-2">
           <Button variant="ghost" className="h-12 px-4" onClick={onCancel}>
             Cancelar
           </Button>
