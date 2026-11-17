@@ -1,6 +1,7 @@
 import {
   ArrowLeft,
   Cake,
+  Download,
   CalendarClock,
   ChevronLeft,
   ChevronRight,
@@ -13,6 +14,7 @@ import {
   Phone,
   Receipt,
   Repeat,
+  ShieldOff,
   Star,
   Trophy,
   UserX,
@@ -28,6 +30,7 @@ import { StatCard } from '@/components/stat-card'
 import { LockBadge } from '@/components/lock-badge'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -38,7 +41,7 @@ import { useHasFeature } from '@/features/license/api'
 import { LockedNotice } from '@/components/lock-badge'
 import { proModules } from '@pro'
 
-import { useCustomer, useCustomerSales, useDeactivateCustomer, useSaveCustomer } from './api'
+import { useAnonymizeCustomer, useCustomer, useCustomerSales, useDeactivateCustomer, useExportCustomerData, useSaveCustomer } from './api'
 import { CustomerAvatar, CustomerFormDialog, PaymentDialog, PointsDialog } from './components'
 import type { CustomerDetail } from './types'
 
@@ -102,6 +105,11 @@ function Detail({ c }: { c: CustomerDetail }) {
   const [payOpen, setPayOpen] = useState(false)
   const [pointsOpen, setPointsOpen] = useState(false)
   const [confirmOff, setConfirmOff] = useState(false)
+  const [confirmWipe, setConfirmWipe] = useState(false)
+  const [wipeReason, setWipeReason] = useState('')
+  const anonymize = useAnonymizeCustomer()
+  const exportData = useExportCustomerData()
+  const anonymized = !!c.anonymized_at
   const deactivate = useDeactivateCustomer()
   const save = useSaveCustomer()
   const stampsPro = useHasFeature('loyalty_pro')
@@ -123,7 +131,7 @@ function Detail({ c }: { c: CustomerDetail }) {
           <div className="min-w-0 flex-1 space-y-2">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="font-heading text-3xl font-semibold tracking-tight">{c.name}</h1>
-              {!c.active && <Badge variant="outline">Inactivo</Badge>}
+              {anonymized ? <Badge variant="outline">Datos borrados</Badge> : !c.active && <Badge variant="outline">Inactivo</Badge>}
               {c.locked && <LockBadge />}
               {bdayToday && (
                 <Badge className="bg-destructive/10 text-destructive">
@@ -164,10 +172,22 @@ function Detail({ c }: { c: CustomerDetail }) {
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={() => setEditOpen(true)}>
-              <Pencil /> Editar
-            </Button>
-            {can('customers.manage') &&
+            {!anonymized && (
+              <Button variant="outline" onClick={() => setEditOpen(true)}>
+                <Pencil /> Editar
+              </Button>
+            )}
+            {can('customers.manage') && !anonymized && (
+              <Button variant="outline" onClick={() => exportData.mutate(c.id)} disabled={exportData.isPending}>
+                <Download /> Exportar sus datos
+              </Button>
+            )}
+            {can('customers.manage') && !anonymized && (
+              <Button variant="ghost" className="text-destructive" onClick={() => setConfirmWipe(true)}>
+                <ShieldOff /> Borrar datos personales
+              </Button>
+            )}
+            {can('customers.manage') && !anonymized &&
               (c.active ? (
                 <Button variant="ghost" className="text-destructive" onClick={() => setConfirmOff(true)}>
                   <UserX /> Desactivar
@@ -231,6 +251,26 @@ function Detail({ c }: { c: CustomerDetail }) {
       <CustomerFormDialog open={editOpen} onOpenChange={setEditOpen} customer={c} />
       <PaymentDialog open={payOpen} onOpenChange={setPayOpen} customer={c} />
       <PointsDialog open={pointsOpen} onOpenChange={setPointsOpen} customer={c} />
+      <ConfirmDialog
+        open={confirmWipe}
+        onOpenChange={(o) => {
+          setConfirmWipe(o)
+          if (!o) setWipeReason('')
+        }}
+        title={`¿Borrar los datos personales de ${c.name}?`}
+        description="Se borran su nombre, teléfono, email, dirección, cumpleaños, notas y puntos, y los datos de contacto copiados en sus pedidos. Las ventas y los importes se conservan sin su nombre, porque hay que guardarlos por obligación fiscal. No se puede deshacer."
+        confirmLabel="Borrar datos"
+        destructive
+        onConfirm={() => anonymize.mutate({ id: c.id, reason: wipeReason.trim() })}
+      >
+        <Input
+          aria-label="Motivo (opcional)"
+          placeholder="Motivo (opcional), por ejemplo: lo pidió por mail"
+          value={wipeReason}
+          maxLength={200}
+          onChange={(e) => setWipeReason(e.target.value)}
+        />
+      </ConfirmDialog>
       <ConfirmDialog
         open={confirmOff}
         onOpenChange={setConfirmOff}

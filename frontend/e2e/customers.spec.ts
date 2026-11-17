@@ -112,4 +112,30 @@ test.describe('Clientes', () => {
     await expect(account).toContainText(money(0))
     await expect(account.getByRole('button', { name: 'Registrar pago' })).toBeDisabled()
   })
+
+  test('export and erase personal data (anonymize) with confirmation', async ({ page, request }) => {
+    const name = `Privado ${uid()}`
+    const c = await createCustomerApi(page, request, { name, phone: '11 6000-1234', email: 'privado.e2e@example.com' })
+    await page.goto(`/clientes/${c.id}`)
+    await expect(page.getByText('11 6000-1234')).toBeVisible()
+
+    const [download] = await Promise.all([
+      page.waitForEvent('download'),
+      page.getByRole('button', { name: 'Exportar sus datos' }).click(),
+    ])
+    expect(download.suggestedFilename()).toBe(`cliente-${c.id}-datos.json`)
+
+    await page.getByRole('button', { name: 'Borrar datos personales' }).click()
+    const dlg = page.getByRole('alertdialog')
+    await expect(dlg).toContainText('No se puede deshacer')
+    await dlg.getByRole('button', { name: 'Cancelar' }).click()
+    await expect(page.getByText('11 6000-1234')).toBeVisible() // cancelling changes nothing
+
+    await page.getByRole('button', { name: 'Borrar datos personales' }).click()
+    await page.getByRole('alertdialog').getByRole('button', { name: 'Borrar datos' }).click()
+    await expect(page.getByText('Datos borrados', { exact: true })).toBeVisible()
+    await expect(page.getByText('11 6000-1234')).toBeHidden()
+    await expect(page.getByRole('heading', { level: 1, name: `Cliente anonimizado #${c.id}` })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Editar' })).toBeHidden()
+  })
 })

@@ -14,6 +14,8 @@ export interface Customer {
   credit_limit_cents: number
   active: boolean
   created_at: string
+  /** Set when the person asked to be forgotten: the card keeps only totals and sales. */
+  anonymized_at?: string | null
   /** Free plan: visible (balance still collectable) but can't be used in sales. */
   locked?: boolean
 }

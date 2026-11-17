@@ -111,3 +111,24 @@ export function useAdjustPoints(id: number) {
     onError,
   })
 }
+
+export function useExportCustomerData() {
+  return useMutation({
+    mutationFn: (id: number) => api.download(`/customers/${id}/export`, undefined, `cliente-${id}-datos.json`),
+    onSuccess: () => toast.success('Descargamos los datos del cliente'),
+    onError,
+  })
+}
+
+export function useAnonymizeCustomer() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, reason }: { id: number; reason?: string }) =>
+      api.post(`/customers/${id}/anonymize`, { confirm: true, reason: reason || null }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: customerKeys.all })
+      toast.success('Datos personales borrados. Las ventas se conservan.')
+    },
+    onError,
+  })
+}

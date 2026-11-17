@@ -21,6 +21,12 @@ def run_once() -> None:
     from app.services import alerts_engine, backup
     from app.services import settings as settings_svc
 
+    try:  # contact data copied into old online orders (once a day)
+        from app.services import privacy
+
+        privacy.run_retention_job()
+    except Exception:
+        log.exception("privacy retention failed")
     with SessionLocal() as db:
         try:  # this month's fixed expenses first, so their due-date alerts show up right away
             from app.services import expenses

@@ -43,6 +43,9 @@ DEFAULTS: dict[str, Any] = {
     "free_actives": {},
     # Business type and module on/off overrides (services/business_profile.py); only via /api/business.
     "business_profile": {"profile": "salon", "modules": {}},
+    # Personal data (services/privacy.py). The periods are DEFAULTS pending confirmation by the owner's lawyer
+    # (Ley 25.326): see pro/DATOS-PERSONALES.md. 0 = never clear.
+    "privacy": {"online_order_contact_days": 90},
     "setup_done": False,
 }
 

@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -48,6 +49,7 @@ class CustomerOut(ORM):
     credit_limit_cents: int
     active: bool
     created_at: datetime
+    anonymized_at: datetime | None = None
     # Free plan: visible (and its balance collectable) but not usable in sales (services/free_plan.py).
     locked: bool = False
 
@@ -145,3 +147,17 @@ class CustomerStats(BaseModel):
     deuda_total_cents: int
     deudores: int
     cumpleanos_hoy: list[BirthdayCustomer]
+
+
+class AnonymizeIn(BaseModel):
+    confirm: Literal[True]  # explicit confirmation: anonymizing cannot be undone
+    reason: str | None = Field(default=None, max_length=200)
+
+
+class AnonymizeOut(BaseModel):
+    id: int
+    anonymized_at: datetime
+    orders: int
+    sales_notes: int
+    audit: int
+    loyalty: int

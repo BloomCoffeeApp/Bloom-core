@@ -21,6 +21,8 @@ class Customer(IdMixin, TimestampMixin, Base):
     # Positive balance = customer owes money (cuenta corriente).
     balance_cents: Mapped[int] = mapped_column(default=0)
     active: Mapped[bool] = mapped_column(default=True)
+    # Set when the person asked to be forgotten (services/privacy.py): the card keeps only its id, totals and sales.
+    anonymized_at: Mapped[datetime | None] = mapped_column(DateTime)
 
 
 class LoyaltyTransaction(IdMixin, Base):

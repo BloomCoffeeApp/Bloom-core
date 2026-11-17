@@ -1,6 +1,9 @@
 from typing import Any
 
+import json
+
 from fastapi import APIRouter, Depends, Header, Query, Response
+from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
 
 from app.auth import Perm
@@ -9,6 +12,8 @@ from app.models import Customer, CustomerAccountMovement, LoyaltyTransaction, Us
 from app.schemas.common import Ok
 from app.schemas.customers import (
     AccountMovementOut,
+    AnonymizeIn,
+    AnonymizeOut,
     CustomerCreate,
     CustomerDetail,
     CustomerListItem,
@@ -21,7 +26,7 @@ from app.schemas.customers import (
     PointsIn,
 )
 from app.services import customers as svc
-from app.services import free_plan, idempotency
+from app.services import free_plan, idempotency, privacy
 
 router = APIRouter(prefix="/api", tags=["customers"])
 
@@ -106,3 +111,23 @@ def adjust_points(
 ) -> LoyaltyTransaction:
     c = svc.get_or_404(db, customer_id)
     return svc.adjust_points(db, c, data.points, data.reason, user)
+
+
+@router.post("/customers/{customer_id}/anonymize", response_model=AnonymizeOut)
+def anonymize_customer(
+    customer_id: int, data: AnonymizeIn, db: Session = Depends(get_db), user: User = Manager
+) -> dict[str, Any]:
+    """Right of suppression (Ley 25.326): wipes what identifies the person; sales and amounts stay (fiscal)."""
+    c = svc.get_or_404(db, customer_id)
+    return privacy.anonymize(db, c, user, data.reason)
+
+
+@router.get("/customers/{customer_id}/export")
+def export_customer(customer_id: int, db: Session = Depends(get_db), user: User = Manager) -> Response:
+    """Right of access: everything the cafe keeps about this person, as a JSON file."""
+    c = svc.get_or_404(db, customer_id)
+    body = json.dumps(jsonable_encoder(privacy.export(db, c, user)), ensure_ascii=False, indent=2)
+    return Response(
+        body, media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="cliente-{c.id}-datos.json"'},
+    )

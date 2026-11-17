@@ -149,7 +149,7 @@ def _base(c: Customer) -> dict[str, Any]:
         k: getattr(c, k)
         for k in (
             "id", "name", "phone", "email", "birthday", "notes", "points",
-            "balance_cents", "credit_limit_cents", "active", "created_at",
+            "balance_cents", "credit_limit_cents", "active", "created_at", "anonymized_at",
         )
     }
 
@@ -187,6 +187,8 @@ def create(db: Session, data: dict[str, Any], user: User) -> Customer:
 
 
 def update(db: Session, c: Customer, data: dict[str, Any], user: User) -> Customer:
+    if c.anonymized_at is not None:
+        raise HTTPException(409, "Este cliente fue anonimizado y ya no se puede editar")
     data = _clean(data)
     is_manager = roles.has(user, "customers.manage")
     if "credit_limit_cents" in data and data["credit_limit_cents"] != c.credit_limit_cents and not is_manager:
