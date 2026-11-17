@@ -210,6 +210,7 @@ def test_search_treats_percent_and_underscore_literally(api):
 
 
 def test_spreadsheet_formulas_are_neutralised_in_exports():
+    pytest.importorskip("bloom_pro")  # the Excel/CSV exporter is a Pro module: nothing to check in the free edition
     from bloom_pro.services import exporter
 
     for evil in ("=cmd|' /C calc'!A0", "+1+1", "-2+3", "@SUM(1)", "\t=1", "\r=1"):

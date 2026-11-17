@@ -102,14 +102,20 @@ def _public(path: str) -> bool:
     return any(re.match(pat, path) for pat, _ in PUBLIC)
 
 
+PRO_KEYS: set[str] = set()  # "METHOD path" of the routes the Pro edition adds (their handler lives in `bloom_pro`)
+
+
 def _endpoints():
     app = create_app(run_lifespan=False)
     out = []
     for path, route, inherited in _iter_routes(app.routes):
+        is_pro = (getattr(getattr(route, "endpoint", None), "__module__", "") or "").startswith("bloom_pro")
         for method in sorted(route.methods or ()):
             if method in ("HEAD", "OPTIONS"):
                 continue
             out.append((method, path, classify(route, inherited)))
+            if is_pro:
+                PRO_KEYS.add(f"{method} {path}")
     return out
 
 
@@ -129,7 +135,9 @@ def _body(method: str):
 
 def test_the_route_walker_finds_the_api():
     protected = [e for e in ENDPOINTS if e[2]["auth"]]
-    assert len(ENDPOINTS) > 250 and len(protected) > 200, (len(ENDPOINTS), len(protected))
+    # The free edition alone has ~215 endpoints (~204 protected); with the Pro edition linked, ~420 (~395).
+    floor_all, floor_protected = (250, 200) if PRO_KEYS else (150, 140)
+    assert len(ENDPOINTS) > floor_all and len(protected) > floor_protected, (len(ENDPOINTS), len(protected))
     assert any(e[2]["admin"] for e in ENDPOINTS) and any(e[2]["perms"] for e in ENDPOINTS)
 
 
@@ -201,7 +209,9 @@ def test_roles_with_permission_are_not_refused_on_safe_endpoints(tokens):
     assert not wrong, f"allowed by the catalog but refused: {wrong[:15]}"
 
 
-SNAPSHOT = Path(__file__).with_name("access_rules.snapshot.json")
+SNAPSHOT = Path(__file__).with_name("access_rules.snapshot.json")  # the rules of the free edition (this repo)
+# The routes the Pro edition adds are approved in the private repo, next to its tests (`tests/pro` is linked in).
+PRO_SNAPSHOT = Path(__file__).with_name("pro") / "access_rules.pro.snapshot.json"
 
 
 def rule_of(path: str, info: dict) -> str:
@@ -215,18 +225,25 @@ def rule_of(path: str, info: dict) -> str:
     return "+".join(parts) or "auth"
 
 
-def test_access_rules_match_the_approved_snapshot():
-    live = {f"{m} {p}": rule_of(p, info) for m, p, info in ENDPOINTS}
+def _check_snapshot(live: dict[str, str], path: Path) -> None:
     if os.environ.get("BLOOM_UPDATE_ACCESS"):
-        SNAPSHOT.write_text(json.dumps(dict(sorted(live.items())), indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
-    approved = json.loads(SNAPSHOT.read_text(encoding="utf-8"))
+        path.write_text(json.dumps(dict(sorted(live.items())), indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
+    assert path.exists(), f"{path.name} is missing: approve the current rules with BLOOM_UPDATE_ACCESS=1"
+    approved = json.loads(path.read_text(encoding="utf-8"))
     added = sorted(set(live) - set(approved))
     removed = sorted(set(approved) - set(live))
     changed = sorted(f"{k}: {approved[k]} -> {live[k]}" for k in set(live) & set(approved) if live[k] != approved[k])
     assert not (added or removed or changed), (
         "the access rules changed. If intended, approve with BLOOM_UPDATE_ACCESS=1 and review the diff of "
-        f"access_rules.snapshot.json.\n  new: {added[:10]}\n  removed: {removed[:10]}\n  changed: {changed[:10]}"
+        f"{path.name}.\n  new: {added[:10]}\n  removed: {removed[:10]}\n  changed: {changed[:10]}"
     )
+
+
+def test_access_rules_match_the_approved_snapshot():
+    live = {f"{m} {p}": rule_of(p, info) for m, p, info in ENDPOINTS}
+    _check_snapshot({k: v for k, v in live.items() if k not in PRO_KEYS}, SNAPSHOT)  # free edition: always
+    if PRO_KEYS:  # Pro linked: the routes it adds have their own approved snapshot (in the private repo)
+        _check_snapshot({k: v for k, v in live.items() if k in PRO_KEYS}, PRO_SNAPSHOT)
 
 
 # ----------------------------------------------------------------------- custom roles and personal exceptions
