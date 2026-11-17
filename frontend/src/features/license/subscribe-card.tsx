@@ -260,7 +260,7 @@ function PriceChangeNotice({ change, every, onCancel }: { change: PriceChange; e
         <Button className="h-11" onClick={() => setConfirm(true)} disabled={accept.isPending}>
           {accept.isPending && <Loader2 className="animate-spin" />} Aceptar nuevo precio
         </Button>
-        <Button variant="outline" className="h-11 text-destructive hover:text-destructive" onClick={onCancel}>
+        <Button variant="outline" className="h-11 border-destructive/60 text-destructive hover:border-destructive hover:bg-destructive/10 hover:text-destructive" onClick={onCancel}>
           <CircleSlash /> Cancelar suscripción
         </Button>
       </div>
@@ -335,7 +335,7 @@ export function SubscriptionCard() {
         <>
           {s.pending_price_change && <PriceChangeNotice change={s.pending_price_change} every={every} onCancel={() => setConfirm(true)} />}
           <div>
-            <Button variant="outline" className="h-11 text-destructive hover:text-destructive" onClick={() => setConfirm(true)}>
+            <Button variant="outline" className="h-11 border-destructive/60 text-destructive hover:border-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setConfirm(true)}>
               <CircleSlash /> Cancelar suscripción
             </Button>
           </div>

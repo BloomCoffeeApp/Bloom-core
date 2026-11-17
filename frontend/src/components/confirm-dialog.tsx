@@ -10,7 +10,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { buttonVariants } from '@/components/ui/button-variants'
 
 export function ConfirmDialog({
   open,
@@ -42,7 +41,7 @@ export function ConfirmDialog({
         <AlertDialogFooter>
           <AlertDialogCancel>Cancelar</AlertDialogCancel>
           <AlertDialogAction
-            className={destructive ? buttonVariants({ variant: 'destructive' }) : undefined}
+            variant={destructive ? 'destructive' : 'default'}
             onClick={onConfirm}
           >
             {confirmLabel}
