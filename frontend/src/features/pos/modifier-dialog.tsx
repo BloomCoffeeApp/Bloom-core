@@ -137,7 +137,9 @@ function ModifierBody({
           <Textarea id="mod-notes" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Ej.: bien caliente, sin espuma…" />
         </div>
       </div>
-      <DialogFooter className="flex-row items-center gap-3 sm:justify-between">
+      {/* flex-wrap: on a phone the quantity stepper and the two buttons do not fit in one row (they used to widen the
+          whole dialog and get it clipped), so the buttons drop to their own row. */}
+      <DialogFooter className="flex-row flex-wrap items-center gap-3 sm:justify-between">
         <div className="flex items-center gap-2">
           <Button variant="outline" size="icon-lg" className="size-12" onClick={() => setQty((q) => Math.max(1, q - 1))} aria-label="Restar">
             <Minus />
@@ -147,7 +149,7 @@ function ModifierBody({
             <Plus />
           </Button>
         </div>
-        <div className="flex gap-2">
+        <div className="flex min-w-0 flex-1 justify-end gap-2">
           <Button variant="ghost" className="h-12 px-4" onClick={onCancel}>
             Cancelar
           </Button>
