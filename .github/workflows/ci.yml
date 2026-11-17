@@ -32,6 +32,8 @@ jobs:
           python -m venv .venv
           .venv\Scripts\python -m pip install --upgrade pip
           .venv\Scripts\python -m pip install -r requirements.lock.txt
+          # test_properties.py needs it; the lock only carries what the app and pytest need (same version as `dev` locally)
+          .venv\Scripts\python -m pip install hypothesis==6.170.15
       - name: pytest
         working-directory: backend
         run: .venv\Scripts\python -m pytest -q
