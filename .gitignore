@@ -19,6 +19,7 @@ frontend/blob-report/
 *.db
 *.db-wal
 *.db-shm
+remote_config.json
 *.sqlite
 *.sqlite3
 backend/backups/
