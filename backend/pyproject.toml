@@ -11,6 +11,15 @@ dependencies = [
   "openpyxl", "pillow", "pywebview", "qrcode[pil]", "tzdata", "holidays",
 ]
 
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+# The package is `app`; `migrations/` and `tests/` live next to it and are not part of it. Without this, a fresh clone
+# fails `pip install -e .` ("Multiple top-level packages discovered in a flat-layout").
+[tool.setuptools.packages.find]
+include = ["app*"]
+
 [project.optional-dependencies]
 # watchfiles: `uvicorn --reload` in scripts/dev.ps1.
 dev = ["pytest", "httpx", "pyinstaller", "watchfiles"]
