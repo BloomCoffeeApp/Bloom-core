@@ -26,6 +26,15 @@ export function LoginPage({ businessName }: { businessName?: string }) {
     queryKey: ['login-users'],
     queryFn: () => api.get<AuthUser[]>('/auth/users'),
   })
+  // Online demo only: the visitor can't know the PINs, so the login screen says them (same query as the demo pill, so it is cached).
+  const { data: health } = useQuery({
+    queryKey: ['health'],
+    queryFn: () => api.get<{ demo?: { session: boolean; users: { name: string; pin: string }[] } }>('/health'),
+    staleTime: 30_000,
+    retry: false,
+  })
+  const inDemo = !!health?.demo?.session
+  const demoPin = inDemo && selected ? health?.demo?.users.find((d) => d.name === selected.name)?.pin : undefined
 
   const submit = useCallback(
     async (value: string) => {
@@ -77,6 +86,22 @@ export function LoginPage({ businessName }: { businessName?: string }) {
             <p className="text-sm text-muted-foreground">
               {selected ? `Hola ${selected.name.split(' ')[0]}, ingresá tu PIN` : '¿Quién está trabajando?'}
             </p>
+            {inDemo && (
+              <p
+                data-testid="demo-login-hint"
+                className="mx-auto mt-3 w-fit rounded-full bg-warning px-3 py-1 text-xs font-medium text-warning-foreground"
+              >
+                {!selected ? (
+                  'Es una demo: elegí un usuario y te mostramos su PIN.'
+                ) : demoPin ? (
+                  <>
+                    PIN de la demo: <span className="font-mono font-semibold">{demoPin}</span>
+                  </>
+                ) : (
+                  'Ingresá el PIN de ese usuario.'
+                )}
+              </p>
+            )}
           </div>
         </div>
 

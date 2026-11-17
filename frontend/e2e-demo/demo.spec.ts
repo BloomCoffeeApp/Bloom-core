@@ -47,6 +47,23 @@ async function sellMedialuna(page: Page) {
   await expect(page.getByRole('dialog').getByText('¡Venta cobrada!')).toBeVisible()
 }
 
+test('the login screen tells the visitor which PIN to use', async ({ browser }) => {
+  const ctx = await browser.newContext()
+  try {
+    const page = await openDemo(ctx)
+    const hint = page.getByTestId('demo-login-hint')
+    await expect(hint).toContainText('elegí un usuario')
+    await page.getByRole('button', { name: new RegExp(OWNER.name) }).click()
+    await expect(hint).toContainText(`PIN de la demo: ${OWNER.pin}`)
+    // Typing exactly what the screen says gets the visitor in.
+    for (const d of OWNER.pin) await page.getByRole('button', { name: d, exact: true }).click()
+    await page.getByRole('button', { name: 'Entrar' }).click()
+    await expect(page.getByRole('heading', { level: 1 })).toContainText('Dueño')
+  } finally {
+    await ctx.close()
+  }
+})
+
 test('every visitor gets their own sandbox: sales never leak between browsers', async ({ browser }) => {
   const a = await browser.newContext()
   const b = await browser.newContext()
