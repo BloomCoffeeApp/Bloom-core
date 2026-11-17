@@ -28,9 +28,10 @@ REFRESH_EVERY_S = 12 * 3600
 
 
 class LicenseServerError(Exception):
-    def __init__(self, message: str = "", status: int | None = None):
+    def __init__(self, message: str = "", status: int | None = None, code: str | None = None):
         super().__init__(message)
         self.status = status  # HTTP status when the server answered; None when it couldn't be reached
+        self.code = code  # machine-readable reason sent by the server (only "revoked" is acted on)
 
 
 def server_url() -> str | None:
@@ -45,6 +46,17 @@ def server_url() -> str | None:
     if not url or not url.lower().startswith(("http://", "https://")):
         return None
     return url.rstrip("/")
+
+
+def _http_error(e: urllib.error.HTTPError) -> LicenseServerError:
+    detail = code = None
+    try:
+        body = json.loads(e.read())
+        detail, code = body.get("detail"), body.get("code")
+    except Exception:
+        pass
+    return LicenseServerError(detail if isinstance(detail, str) and detail else f"El servidor de licencias respondió {e.code}.",
+                              e.code, code if isinstance(code, str) else None)
 
 
 def _post(path: str, body: dict) -> dict:
@@ -69,11 +81,7 @@ def _send(method: str, path: str, body: dict) -> dict:
         with urllib.request.urlopen(req, timeout=TIMEOUT_S) as r:  # nosec B310 - scheme checked in server_url()
             return json.loads(r.read())
     except urllib.error.HTTPError as e:
-        try:
-            detail = json.loads(e.read()).get("detail")
-        except Exception:
-            detail = None
-        raise LicenseServerError(detail or f"El servidor de licencias respondió {e.code}.", e.code) from e
+        raise _http_error(e) from e
     except (urllib.error.URLError, TimeoutError, OSError) as e:
         raise LicenseServerError("No se pudo conectar con el servidor de licencias. Revisá la conexión a internet.") from e
 
@@ -88,11 +96,7 @@ def _get(path: str, query: dict | None = None) -> dict:
         with urllib.request.urlopen(req, timeout=TIMEOUT_S) as r:  # nosec B310 - scheme checked in server_url()
             return json.loads(r.read())
     except urllib.error.HTTPError as e:
-        try:
-            detail = json.loads(e.read()).get("detail")
-        except Exception:
-            detail = None
-        raise LicenseServerError(detail or f"El servidor de licencias respondió {e.code}.", e.code) from e
+        raise _http_error(e) from e
     except (urllib.error.URLError, TimeoutError, OSError) as e:
         raise LicenseServerError("No se pudo conectar con el servidor de licencias. Revisá la conexión a internet.") from e
 
@@ -130,7 +134,14 @@ def refresh() -> LicenseStatus:
     try:
         return _accept(_post("/v1/refresh", {"token": token, **_device()}))
     except LicenseServerError as e:
-        write_state(last_error=str(e))
+        # Only an explicit "this license was revoked" from the server takes Pro away (back to the free plan).
+        # Network failures, timeouts, 5xx and every other 403 (e.g. this PC was released) just record the error.
+        if e.status == 403 and e.code == "revoked":
+            store_token(None)
+            write_state(last_error=str(e))
+            log.warning("License revoked by the vendor: back to the free plan.")
+        else:
+            write_state(last_error=str(e))
         raise
 
 

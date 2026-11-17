@@ -287,3 +287,51 @@ def test_cancel_subscription_from_the_app(seeded, monkeypatch):
     assert any(a["action"] == "cancel" and a["entity"] == "subscription" for a in audit)
     cashier = login(client, "Caja Demo", "1111")
     assert client.post("/api/license/subscription/cancel", headers=cashier).status_code == 403
+
+
+def test_revoked_license_is_removed_only_on_the_revoked_code(seeded, signer, monkeypatch):
+    """M-01: a 403 with code=revoked sends the app back to Free; network errors and other 403s never do."""
+    from app.licensing import client as lc
+    from app.licensing import status as st
+
+    st.store_token(signer())
+    assert st.current_status(force=True).valid
+
+    def failing(error):
+        def post(path, body):
+            raise error
+        return post
+
+    for err in (
+        lc.LicenseServerError("No se pudo conectar"),                      # offline
+        lc.LicenseServerError("boom", 500),                                 # server error
+        lc.LicenseServerError("otra PC", 403),                              # 403 without code
+        lc.LicenseServerError("x", 403, code="algo-raro"),                  # unknown code
+        lc.LicenseServerError("pagá", 402, code="revoked"),                 # code on another status
+    ):
+        monkeypatch.setattr(lc, "_post", failing(err))
+        with pytest.raises(lc.LicenseServerError):
+            lc.refresh()
+        assert st.current_status(force=True).valid, err
+
+    monkeypatch.setattr(lc, "_post", failing(lc.LicenseServerError("Esta licencia fue dada de baja.", 403, code="revoked")))
+    with pytest.raises(lc.LicenseServerError):
+        lc.refresh()
+    assert not lc.has_token()
+    assert st.current_status(force=True).plan == "free"
+    assert "dada de baja" in (st.read_state().get("last_error") or "")
+
+
+def test_http_error_body_code_is_parsed(monkeypatch):
+    import io
+    import urllib.error
+
+    from app.licensing import client as lc
+
+    def mk(body: bytes):
+        return urllib.error.HTTPError("u", 403, "Forbidden", {}, io.BytesIO(body))
+
+    e = lc._http_error(mk(b'{"detail": "baja", "code": "revoked"}'))
+    assert (e.status, e.code, str(e)) == (403, "revoked", "baja")
+    e = lc._http_error(mk(b"<html>no json</html>"))
+    assert e.code is None and "403" in str(e)
