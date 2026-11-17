@@ -4,6 +4,7 @@
   "description": "Punto de venta, stock, compras, clientes y asistente de barista para cafeterías.",
   "version": "1.0.0",
   "updateManifest": "",
+  "licenseServer": "https://bloom-licencias.bloomcoffeeapp.workers.dev",
   "appId": "bloom-cafe",
   "exeName": "Bloom",
   "dataDirName": "Bloom",
