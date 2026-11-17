@@ -225,11 +225,16 @@ def rule_of(path: str, info: dict) -> str:
     return "+".join(parts) or "auth"
 
 
+# Serves the built web app: it only exists when `frontend/dist` does (a backend-only CI job has none), so it is no access rule.
+SPA_ROUTE = "GET /{path:path}"
+
+
 def _check_snapshot(live: dict[str, str], path: Path) -> None:
+    live = {k: v for k, v in live.items() if k != SPA_ROUTE}
     if os.environ.get("BLOOM_UPDATE_ACCESS"):
         path.write_text(json.dumps(dict(sorted(live.items())), indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
     assert path.exists(), f"{path.name} is missing: approve the current rules with BLOOM_UPDATE_ACCESS=1"
-    approved = json.loads(path.read_text(encoding="utf-8"))
+    approved = {k: v for k, v in json.loads(path.read_text(encoding="utf-8")).items() if k != SPA_ROUTE}
     added = sorted(set(live) - set(approved))
     removed = sorted(set(approved) - set(live))
     changed = sorted(f"{k}: {approved[k]} -> {live[k]}" for k in set(live) & set(approved) if live[k] != approved[k])
