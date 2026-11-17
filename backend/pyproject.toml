@@ -7,7 +7,7 @@ license = "AGPL-3.0-or-later"
 # Plain uvicorn (not [standard]): the desktop app serves HTTP/1.1 to one local window, so h11 is
 # enough; httptools/websockets/PyYAML/python-dotenv only made the installer bigger.
 dependencies = [
-  "fastapi", "uvicorn", "sqlalchemy>=2.0", "alembic", "pydantic>=2", "argon2-cffi", "cryptography",
+  "fastapi", "uvicorn", "sqlalchemy>=2.0", "alembic", "pydantic>=2.14.3", "argon2-cffi", "cryptography",
   "openpyxl", "pillow", "pywebview", "qrcode[pil]", "tzdata", "holidays",
 ]
 
