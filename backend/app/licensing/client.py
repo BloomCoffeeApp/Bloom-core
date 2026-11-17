@@ -38,7 +38,9 @@ def server_url() -> str | None:
 
     if demo.is_enabled():  # the online demo never talks to the license server
         return None
-    url = os.environ.get("BLOOM_LICENSE_SERVER") or BRAND.get("licenseServer")
+    # A variable that is SET wins, even when empty: BLOOM_LICENSE_SERVER="" means "no server" (the e2e stack uses it);
+    # only when it is not set at all does the address in brand.json apply.
+    url = os.environ["BLOOM_LICENSE_SERVER"] if "BLOOM_LICENSE_SERVER" in os.environ else BRAND.get("licenseServer")
     # Only http(s): urlopen would also follow file:// or ftp:// if a bad value got into brand.json/env.
     if not url or not url.lower().startswith(("http://", "https://")):
         return None
