@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Loader2, Plus, Save, Trash2 } from 'lucide-react'
 import { useState } from 'react'
+import { Link } from 'react-router'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
@@ -150,6 +151,15 @@ export function ChannelSuppliesEditor({ owner, id }: { owner: 'product' | 'categ
             </li>
           ))}
         </ul>
+      )}
+      {!items.isLoading && !firstItem && (
+        <p className="rounded-lg bg-muted px-3 py-2 text-xs">
+          Todavía no cargaste ningún insumo (vasos, tapas, servilletas…), por eso no se puede agregar. Creálos primero en{' '}
+          <Link to="/stock" className="font-medium underline underline-offset-2">
+            Stock
+          </Link>
+          .
+        </p>
       )}
       <div className="flex flex-wrap gap-2">
         <Button

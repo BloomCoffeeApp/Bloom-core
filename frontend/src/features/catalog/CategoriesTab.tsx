@@ -2,6 +2,7 @@ import { FolderPlus, Pencil, Tags } from 'lucide-react'
 import { useState } from 'react'
 
 import { EmptyState } from '@/components/empty-state'
+import { NumberStepper } from '@/components/number-stepper'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -21,16 +22,19 @@ import type { CategoryInput, ProductCategory } from './types'
 
 const EMPTY: CategoryInput = { name: '', color: 'amber', icon: 'coffee', sort_order: 0, active: true, send_to_orders: true }
 
-function CategoryDialog({
+export function CategoryDialog({
   open,
   onOpenChange,
   category,
   nextOrder,
+  onSaved,
 }: {
   open: boolean
   onOpenChange: (o: boolean) => void
   category: ProductCategory | null
   nextOrder: number
+  /** Called with the saved category (lets a product form pick the one it just created). */
+  onSaved?: (c: ProductCategory) => void
 }) {
   const save = useSaveCategory()
   const [form, setForm] = useState<CategoryInput>(EMPTY)
@@ -49,7 +53,12 @@ function CategoryDialog({
             e.preventDefault()
             save.mutate(
               { id: category?.id, data: { ...form, name: form.name.trim() } },
-              { onSuccess: () => onOpenChange(false) },
+              {
+                onSuccess: (saved) => {
+                  onSaved?.(saved)
+                  onOpenChange(false)
+                },
+              },
             )
           }}
         >
@@ -88,12 +97,11 @@ function CategoryDialog({
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-1.5">
               <Label htmlFor="cat-order">Orden en el POS</Label>
-              <Input
+              <NumberStepper
                 id="cat-order"
-                type="number"
-                className="tabular"
+                min={0}
                 value={form.sort_order}
-                onChange={(e) => setForm((f) => ({ ...f, sort_order: Number(e.target.value) || 0 }))}
+                onChange={(v) => setForm((f) => ({ ...f, sort_order: Number(v) || 0 }))}
               />
             </div>
             <label className="flex items-center justify-between gap-3 self-end rounded-xl border px-3 py-2">

@@ -1,6 +1,6 @@
 """Base and demo data. ALL demo data is fictional (no real people, businesses or contacts)."""
 
-from datetime import date, timedelta
+from datetime import timedelta
 
 from sqlalchemy.orm import Session
 
@@ -29,6 +29,7 @@ from app.models import (
     User,
 )
 from app.services import stock as stock_svc
+from app.services.timeutil import local_today
 
 PAYMENT_METHODS = [
     ("efectivo", "Efectivo"),
@@ -180,7 +181,7 @@ def seed_demo(db: Session, admin_id: int | None = None) -> None:
     for p in (espresso, doble, americano, cortado, latte, capuccino, flat, filtrado):
         db.add(ProductModifierGroup(product_id=p.id, group_id=extra_grp.id))
 
-    today = date.today()
+    today = local_today()  # same clock birthdays_today() uses (Buenos Aires), not the host's
     db.add_all(
         [
             Customer(name="Cliente Frecuente (demo)", phone="11 5555-0101", birthday=today, notes="Latte con avena, sin azúcar", points=80),

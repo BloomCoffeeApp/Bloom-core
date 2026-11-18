@@ -21,6 +21,7 @@ import { useStockItems } from '../stock/api'
 import { StockItemPicker } from '../stock/components'
 import { useDeactivateProduct, useModifierGroups, usePriceHistory, useProductCategories, useSaveProduct, useSizes } from './api'
 import { marginOf, marginTextClass } from './catalog-utils'
+import { CategoryDialog } from './CategoriesTab'
 import { ChannelSuppliesEditor } from './ChannelSuppliesEditor'
 import { MenuDetailsEditor } from './MenuDetailsEditor'
 import { ColorSwatches } from './shared'
@@ -106,6 +107,7 @@ export function ProductEditor({
 
   const [name, setName] = useState('')
   const [categoryId, setCategoryId] = useState<number | null>(null)
+  const [newCatOpen, setNewCatOpen] = useState(false)
   const [price, setPrice] = useState<number | null>(null)
   const [color, setColor] = useState<string | null>(null)
   const [description, setDescription] = useState('')
@@ -214,7 +216,16 @@ export function ProductEditor({
                   <Input id="pe-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej.: Latte" />
                 </div>
                 <div className="grid gap-1.5">
-                  <Label htmlFor="pe-cat">Categoría</Label>
+                  <div className="flex items-center justify-between gap-2">
+                    <Label htmlFor="pe-cat">Categoría</Label>
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                      onClick={() => setNewCatOpen(true)}
+                    >
+                      <Plus className="size-3" /> Nueva categoría
+                    </button>
+                  </div>
                   <Select value={categoryId ? String(categoryId) : 'none'} onValueChange={(v) => setCategoryId(v === 'none' ? null : Number(v))}>
                     <SelectTrigger id="pe-cat" className="w-full">
                       <SelectValue />
@@ -482,6 +493,13 @@ export function ProductEditor({
           </div>
         </SheetFooter>
       </SheetContent>
+      <CategoryDialog
+        open={newCatOpen}
+        onOpenChange={setNewCatOpen}
+        category={null}
+        nextOrder={(cats.data?.reduce((m, c) => Math.max(m, c.sort_order), -1) ?? -1) + 1}
+        onSaved={(c) => setCategoryId(c.id)}
+      />
     </Sheet>
   )
 }

@@ -24,6 +24,7 @@ import { useSuppliersLite } from './purchasing'
 import {
   useAdjustStock,
   useMovements,
+  useSaveStockCategory,
   useSaveStockItem,
   useStockCategories,
 } from './api'
@@ -319,8 +320,21 @@ export function StockItemDialog({
   const cats = useStockCategories()
   const suppliers = useSuppliersLite(open)
   const save = useSaveStockItem()
+  const saveCat = useSaveStockCategory()
+  const [newCat, setNewCat] = useState<string | null>(null)
+  const createCat = () =>
+    saveCat.mutate(
+      { name: (newCat ?? '').trim() },
+      {
+        onSuccess: (c) => {
+          setForm((f) => ({ ...f, category_id: c.id }))
+          setNewCat(null)
+        },
+      },
+    )
 
   if (useDepsChanged([open, item]) && open) {
+    setNewCat(null)
     if (item) {
       setForm({
         name: item.name,
@@ -368,7 +382,36 @@ export function StockItemDialog({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-1.5">
-              <Label>Categoría</Label>
+              <div className="flex items-center justify-between gap-2">
+                <Label>Categoría</Label>
+                <button
+                  type="button"
+                  className="text-xs font-medium text-primary hover:underline"
+                  onClick={() => setNewCat((v) => (v === null ? '' : null))}
+                >
+                  {newCat === null ? '+ Nueva' : 'Cancelar'}
+                </button>
+              </div>
+              {newCat !== null && (
+                <div className="flex gap-1.5">
+                  <Input
+                    autoFocus
+                    aria-label="Nombre de la categoría nueva"
+                    placeholder="Ej.: Lácteos"
+                    value={newCat}
+                    onChange={(e) => setNewCat(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        createCat()
+                      }
+                    }}
+                  />
+                  <Button type="button" disabled={!newCat.trim() || saveCat.isPending} onClick={createCat}>
+                    Crear
+                  </Button>
+                </div>
+              )}
               <Select
                 value={form.category_id ? String(form.category_id) : 'none'}
                 onValueChange={(v) => set('category_id', v === 'none' ? null : Number(v))}

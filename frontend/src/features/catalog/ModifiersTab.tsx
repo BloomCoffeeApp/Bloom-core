@@ -72,18 +72,20 @@ function GroupDialog({ open, onOpenChange, group }: { open: boolean; onOpenChang
           <DialogTitle className="font-heading text-xl">{group ? 'Editar grupo' : 'Nuevo grupo de modificadores'}</DialogTitle>
           <DialogDescription>Ej.: “Tipo de leche” (elegir 1) o “Extras” (hasta 3).</DialogDescription>
         </DialogHeader>
-        <div className="grid gap-4 sm:grid-cols-[1fr_7rem_7rem]">
+        <div className="grid gap-4">
           <div className="grid gap-1.5">
             <Label htmlFor="g-name">Nombre</Label>
-            <Input id="g-name" value={name} onChange={(e) => setName(e.target.value)} />
+            <Input id="g-name" autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej.: Tipo de leche" />
           </div>
-          <div className="grid gap-1.5">
-            <Label htmlFor="g-min">Mínimo</Label>
-            <NumberStepper id="g-min" min={0} value={min} onChange={setMin} />
-          </div>
-          <div className="grid gap-1.5">
-            <Label htmlFor="g-max">Máximo</Label>
-            <NumberStepper id="g-max" min={1} value={max} onChange={setMax} />
+          <div className="flex flex-wrap gap-x-8 gap-y-3">
+            <div className="grid gap-1.5">
+              <Label htmlFor="g-min">Mínimo a elegir</Label>
+              <NumberStepper id="g-min" min={0} value={min} onChange={setMin} />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="g-max">Máximo a elegir</Label>
+              <NumberStepper id="g-max" min={1} value={max} onChange={setMax} />
+            </div>
           </div>
         </div>
         {minN > maxN && <p className="text-xs text-destructive">El mínimo no puede superar al máximo.</p>}
@@ -92,11 +94,16 @@ function GroupDialog({ open, onOpenChange, group }: { open: boolean; onOpenChang
           <Label>Opciones</Label>
           {mods.map((m) => (
             <Collapsible key={m.key} className="rounded-xl border">
-              <div className="grid grid-cols-[minmax(0,1fr)_9rem_auto_2.25rem] items-center gap-2 p-2">
-                <Input placeholder="Nombre de la opción" value={m.name} onChange={(e) => upd(m.key, { name: e.target.value })} />
+              <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 p-2 sm:grid-cols-[minmax(0,1fr)_9rem_auto_auto]">
+                <Input
+                  className="col-span-3 sm:col-span-1"
+                  placeholder="Nombre de la opción"
+                  value={m.name}
+                  onChange={(e) => upd(m.key, { name: e.target.value })}
+                />
                 <MoneyInput value={m.price} onChange={(c) => upd(m.key, { price: c })} placeholder="0" />
                 <CollapsibleTrigger asChild>
-                  <Button variant="ghost" size="sm" className="text-xs">
+                  <Button variant="ghost" size="sm" className="text-xs" title="Qué insumos suma o resta esta opción">
                     Stock {m.recipe.length ? <Badge variant="secondary">{m.recipe.length}</Badge> : null}
                     <ChevronDown />
                   </Button>
