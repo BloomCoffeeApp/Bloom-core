@@ -52,8 +52,8 @@ test('expenses: cash expense out of the drawer, pending → paid, monthly fixed 
   await form.getByLabel('Concepto').fill(`ABL ${tag}`)
   await form.getByLabel('Monto').fill('18000')
   await form.getByRole('radio', { name: 'Pendiente de pago' }).click()
-  const tomorrow = new Date(Date.now() + 86_400_000)
-  const iso = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`
+  // "Tomorrow" in the app's own time zone (Buenos Aires), not the runner's: CI runs in UTC, which is already the next day after 21:00 in Argentina.
+  const iso = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }).format(new Date(Date.now() + 86_400_000))
   await pickDate(form, 'Vence el', iso)
   await form.getByRole('button', { name: 'Cargar gasto' }).click()
   const pending = page.getByRole('row').filter({ hasText: `ABL ${tag}` })
